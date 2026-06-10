@@ -1,0 +1,102 @@
+WARNING 2026-06-09 16:47:07,655 log Not Found: /
+WARNING 2026-06-09 16:47:07,656 basehttp "GET / HTTP/1.1" 404 3221
+ERROR 2026-06-09 16:56:24,810 log Internal Server Error: /api/v1/reports/monthly-revenue/
+ERROR 2026-06-09 16:56:24,824 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:24,827 log Internal Server Error: /api/v1/reports/dashboard/
+ERROR 2026-06-09 16:56:24,839 log Internal Server Error: /api/v1/reports/payment-methods/
+ERROR 2026-06-09 16:56:24,845 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:24,844 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:25,961 log Internal Server Error: /api/v1/reports/monthly-revenue/
+ERROR 2026-06-09 16:56:25,962 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:26,056 log Internal Server Error: /api/v1/reports/dashboard/
+ERROR 2026-06-09 16:56:26,059 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:26,069 log Internal Server Error: /api/v1/reports/payment-methods/
+ERROR 2026-06-09 16:56:26,070 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:30,068 log Internal Server Error: /api/v1/projects/
+ERROR 2026-06-09 16:56:30,082 basehttp "GET /api/v1/projects/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:30,087 log Internal Server Error: /api/v1/projects/packages/
+ERROR 2026-06-09 16:56:30,088 basehttp "GET /api/v1/projects/packages/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:31,174 log Internal Server Error: /api/v1/projects/
+ERROR 2026-06-09 16:56:31,175 basehttp "GET /api/v1/projects/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:31,232 log Internal Server Error: /api/v1/projects/packages/
+ERROR 2026-06-09 16:56:31,234 basehttp "GET /api/v1/projects/packages/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:32,812 log Internal Server Error: /api/v1/reports/payment-methods/
+ERROR 2026-06-09 16:56:32,815 log Internal Server Error: /api/v1/reports/monthly-revenue/
+ERROR 2026-06-09 16:56:32,819 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:32,821 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:32,839 log Internal Server Error: /api/v1/reports/dashboard/
+ERROR 2026-06-09 16:56:32,840 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:33,957 log Internal Server Error: /api/v1/reports/payment-methods/
+ERROR 2026-06-09 16:56:33,974 log Internal Server Error: /api/v1/reports/dashboard/
+ERROR 2026-06-09 16:56:33,975 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:33,979 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:33,989 log Internal Server Error: /api/v1/reports/monthly-revenue/
+ERROR 2026-06-09 16:56:33,990 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:50,663 log Internal Server Error: /api/v1/reports/dashboard/
+ERROR 2026-06-09 16:56:50,674 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:50,687 log Internal Server Error: /api/v1/reports/monthly-revenue/
+ERROR 2026-06-09 16:56:50,687 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:50,696 log Internal Server Error: /api/v1/reports/payment-methods/
+ERROR 2026-06-09 16:56:50,702 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:51,745 log Internal Server Error: /api/v1/reports/dashboard/
+ERROR 2026-06-09 16:56:51,745 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:51,859 log Internal Server Error: /api/v1/reports/monthly-revenue/
+ERROR 2026-06-09 16:56:51,860 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:56:51,903 log Internal Server Error: /api/v1/reports/payment-methods/
+ERROR 2026-06-09 16:56:51,907 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:06,065 log Internal Server Error: /api/v1/projects/
+ERROR 2026-06-09 16:57:06,068 basehttp "GET /api/v1/projects/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:06,086 log Internal Server Error: /api/v1/projects/packages/
+ERROR 2026-06-09 16:57:06,088 basehttp "GET /api/v1/projects/packages/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:07,274 log Internal Server Error: /api/v1/projects/packages/
+ERROR 2026-06-09 16:57:07,279 log Internal Server Error: /api/v1/projects/
+ERROR 2026-06-09 16:57:07,280 basehttp "GET /api/v1/projects/packages/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:07,281 basehttp "GET /api/v1/projects/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:32,491 log Internal Server Error: /api/v1/buildings/
+ERROR 2026-06-09 16:57:32,492 log Internal Server Error: /api/v1/projects/
+ERROR 2026-06-09 16:57:32,493 basehttp "GET /api/v1/buildings/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:32,494 basehttp "GET /api/v1/projects/?page_size=100 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:33,638 log Internal Server Error: /api/v1/buildings/
+ERROR 2026-06-09 16:57:33,639 basehttp "GET /api/v1/buildings/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:33,738 log Internal Server Error: /api/v1/projects/
+ERROR 2026-06-09 16:57:33,743 basehttp "GET /api/v1/projects/?page_size=100 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:34,077 log Internal Server Error: /api/v1/meters/
+ERROR 2026-06-09 16:57:34,079 basehttp "GET /api/v1/meters/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:34,117 log Internal Server Error: /api/v1/units/
+ERROR 2026-06-09 16:57:34,119 basehttp "GET /api/v1/units/?status=Active&page_size=500 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:35,176 log Internal Server Error: /api/v1/meters/
+ERROR 2026-06-09 16:57:35,176 basehttp "GET /api/v1/meters/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:35,210 log Internal Server Error: /api/v1/units/
+ERROR 2026-06-09 16:57:35,211 basehttp "GET /api/v1/units/?status=Active&page_size=500 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:36,969 log Internal Server Error: /api/v1/projects/
+ERROR 2026-06-09 16:57:36,973 basehttp "GET /api/v1/projects/?page_size=100 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:36,976 log Internal Server Error: /api/v1/billing/
+ERROR 2026-06-09 16:57:36,977 basehttp "GET /api/v1/billing/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:38,091 log Internal Server Error: /api/v1/projects/
+ERROR 2026-06-09 16:57:38,092 basehttp "GET /api/v1/projects/?page_size=100 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:38,181 log Internal Server Error: /api/v1/billing/
+ERROR 2026-06-09 16:57:38,184 basehttp "GET /api/v1/billing/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:58,636 log Internal Server Error: /api/v1/projects/packages/
+ERROR 2026-06-09 16:57:58,636 basehttp "GET /api/v1/projects/packages/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:58,662 log Internal Server Error: /api/v1/projects/
+ERROR 2026-06-09 16:57:58,663 basehttp "GET /api/v1/projects/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:59,810 log Internal Server Error: /api/v1/projects/packages/
+ERROR 2026-06-09 16:57:59,811 basehttp "GET /api/v1/projects/packages/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:57:59,858 log Internal Server Error: /api/v1/projects/
+ERROR 2026-06-09 16:57:59,859 basehttp "GET /api/v1/projects/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:58:24,938 log Internal Server Error: /api/v1/projects/packages/
+ERROR 2026-06-09 16:58:24,939 basehttp "POST /api/v1/projects/packages/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:58:26,335 log Internal Server Error: /api/v1/projects/packages/
+ERROR 2026-06-09 16:58:26,336 basehttp "POST /api/v1/projects/packages/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:58:27,415 log Internal Server Error: /api/v1/projects/packages/
+ERROR 2026-06-09 16:58:27,416 basehttp "POST /api/v1/projects/packages/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:59:20,500 log Internal Server Error: /api/v1/projects/
+ERROR 2026-06-09 16:59:20,510 basehttp "GET /api/v1/projects/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:59:20,541 log Internal Server Error: /api/v1/projects/packages/
+ERROR 2026-06-09 16:59:20,547 basehttp "GET /api/v1/projects/packages/ HTTP/1.1" 500 60
+ERROR 2026-06-09 16:59:21,664 log Internal Server Error: /api/v1/projects/
+ERROR 2026-06-09 16:59:21,665 basehttp "GET /api/v1/projects/?search=&page=1 HTTP/1.1" 500 60
+ERROR 2026-06-09 16:59:21,787 log Internal Server Error: /api/v1/projects/packages/
+ERROR 2026-06-09 16:59:21,789 basehttp "GET /api/v1/projects/packages/ HTTP/1.1" 500 60
+WARNING 2026-06-10 11:30:18,922 log Not Found: /
+WARNING 2026-06-10 11:30:18,926 basehttp "GET / HTTP/1.1" 404 3221
