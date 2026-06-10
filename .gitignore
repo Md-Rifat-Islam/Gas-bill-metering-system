@@ -1,0 +1,43 @@
+# ======================
+# Django Backend
+# ======================
+backend/__pycache__/
+backend/**/*.pyc
+backend/db.sqlite3
+backend/.env
+backend/media/
+backend/staticfiles/
+
+# Python virtual environment
+backend/venv/
+backend/.venv/
+
+
+# ======================
+# React Frontend
+# ======================
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env
+
+
+# ======================
+# Docker
+# ======================
+*.log
+docker-compose.override.yml
+
+
+# ======================
+# IDE
+# ======================
+.vscode/
+.idea/
+
+
+# ======================
+# OS
+# ======================
+.DS_Store
+Thumbs.db
