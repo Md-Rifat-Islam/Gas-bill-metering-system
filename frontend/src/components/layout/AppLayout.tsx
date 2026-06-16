@@ -2,31 +2,27 @@ import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Building, Home, FileText, CreditCard,
-  BarChart3, LogOut, User, Menu, X, Flame, Users, Layers, Gauge
+  BarChart3, LogOut, User, Menu, X, Flame, Users, Layers, Gauge,
+  ShieldCheck, Settings
 } from 'lucide-react'
 import { cn } from '@/utils/helpers'
 import { useAuthStore } from '@/store/authStore'
+import { usePermissions } from '@/hooks/usePermissions'
 import { authAPI } from '@/api/client'
 import toast from 'react-hot-toast'
 
-const NAV_ITEMS = [
-  { icon: LayoutDashboard, label: 'Dashboard',  path: '/dashboard' },
-  { icon: Layers,          label: 'Projects',   path: '/projects' },
-  { icon: Building,        label: 'Buildings',  path: '/buildings' },
-  { icon: Home,            label: 'Units',      path: '/units' },
-  { icon: Gauge,           label: 'Meters',     path: '/meters' },
-  { icon: FileText,        label: 'Billing',    path: '/billing' },
-  { icon: CreditCard,      label: 'Payments',   path: '/payments' },
-  { icon: BarChart3,       label: 'Reports',    path: '/reports' },
-]
-
-const SETTINGS_ITEMS = [
-  { icon: Users, label: 'Staff Users', path: '/settings/staff' },
-]
+const ROLE_COLOR: Record<string, string> = {
+  super_admin:   'bg-purple-100 text-purple-700',
+  admin:         'bg-blue-100 text-blue-700',
+  billing_staff: 'bg-amber-100 text-amber-700',
+  accountant:    'bg-emerald-100 text-emerald-700',
+  viewer:        'bg-gray-100 text-gray-500',
+}
 
 export default function AppLayout() {
   const [open, setOpen] = useState(true)
   const { user, clearAuth, refresh_token } = useAuthStore()
+  const { can } = usePermissions()
   const navigate = useNavigate()
 
   const handleLogout = async () => {
@@ -36,9 +32,28 @@ export default function AppLayout() {
     toast.success('Logged out')
   }
 
+  // Build nav items filtered by permission
+  const navItems = [
+    { icon: LayoutDashboard, label: 'Dashboard',  path: '/dashboard',  show: true },
+    { icon: Layers,          label: 'Projects',   path: '/projects',   show: can.viewProjects },
+    { icon: Building,        label: 'Buildings',  path: '/buildings',  show: can.viewBuildings },
+    { icon: Home,            label: 'Units',      path: '/units',      show: can.viewBuildings },
+    { icon: Gauge,           label: 'Meters',     path: '/meters',     show: can.viewBuildings },
+    { icon: FileText,        label: 'Billing',    path: '/billing',    show: can.viewBills },
+    { icon: CreditCard,      label: 'Payments',   path: '/payments',   show: can.viewPayments },
+    { icon: BarChart3,       label: 'Reports',    path: '/reports',    show: can.viewReports },
+  ].filter(i => i.show)
+
+  const settingsItems = [
+    { icon: Users,       label: 'Staff Users',  path: '/settings/staff',  show: can.manageUsers },
+    { icon: ShieldCheck, label: 'Roles & RBAC', path: '/settings/roles',  show: can.manageRBAC },
+  ].filter(i => i.show)
+
+  const roleName = user?.role?.role_name ?? ''
+
   return (
     <div className="flex h-screen overflow-hidden bg-surface-50">
-      {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
+      {/* ── Sidebar ── */}
       <aside className={cn(
         'flex flex-col bg-white border-r border-surface-100 transition-all duration-200 shrink-0',
         open ? 'w-64' : 'w-[72px]'
@@ -49,45 +64,39 @@ export default function AppLayout() {
             <Flame className="w-5 h-5 text-white" />
           </div>
           {open && (
-            <div className="animate-fadeIn overflow-hidden">
+            <div className="animate-fadeIn">
               <div className="text-base font-bold text-surface-900 leading-none">GasBill</div>
-              <div className="text-[11px] text-surface-400 mt-0.5">Utility Billing System</div>
+              <div className="text-[11px] text-surface-400 mt-0.5">Utility Billing</div>
             </div>
           )}
         </div>
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-0.5">
-          {NAV_ITEMS.map(({ icon: Icon, label, path }) => (
-            <NavLink
-              key={path}
-              to={path}
-              title={!open ? label : undefined}
-              className={({ isActive }) => cn('sidebar-link', isActive && 'active')}
-            >
+          {navItems.map(({ icon: Icon, label, path }) => (
+            <NavLink key={path} to={path} title={!open ? label : undefined}
+              className={({ isActive }) => cn('sidebar-link', isActive && 'active')}>
               <Icon className="w-[18px] h-[18px] shrink-0" />
               {open && <span className="animate-fadeIn truncate">{label}</span>}
             </NavLink>
           ))}
 
-          <div className="pt-4">
-            {open && (
-              <div className="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-surface-400">
-                Settings
-              </div>
-            )}
-            {SETTINGS_ITEMS.map(({ icon: Icon, label, path }) => (
-              <NavLink
-                key={path}
-                to={path}
-                title={!open ? label : undefined}
-                className={({ isActive }) => cn('sidebar-link', isActive && 'active')}
-              >
-                <Icon className="w-[18px] h-[18px] shrink-0" />
-                {open && <span className="animate-fadeIn truncate">{label}</span>}
-              </NavLink>
-            ))}
-          </div>
+          {settingsItems.length > 0 && (
+            <div className="pt-4">
+              {open && (
+                <div className="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-surface-400">
+                  Settings
+                </div>
+              )}
+              {settingsItems.map(({ icon: Icon, label, path }) => (
+                <NavLink key={path} to={path} title={!open ? label : undefined}
+                  className={({ isActive }) => cn('sidebar-link', isActive && 'active')}>
+                  <Icon className="w-[18px] h-[18px] shrink-0" />
+                  {open && <span className="animate-fadeIn truncate">{label}</span>}
+                </NavLink>
+              ))}
+            </div>
+          )}
         </nav>
 
         {/* User footer */}
@@ -99,11 +108,13 @@ export default function AppLayout() {
             {open && (
               <div className="flex-1 min-w-0 animate-fadeIn">
                 <div className="text-sm font-semibold text-surface-800 truncate">{user?.name}</div>
-                <div className="text-xs text-surface-400 truncate">{user?.role?.role_name || 'Staff'}</div>
+                <span className={cn('badge text-[10px] mt-0.5 capitalize', ROLE_COLOR[roleName] ?? 'badge-gray')}>
+                  {roleName.replace('_', ' ')}
+                </span>
               </div>
             )}
             {open && (
-              <button onClick={handleLogout} className="btn-ghost btn-sm !p-1.5 ml-auto shrink-0" title="Logout">
+              <button onClick={handleLogout} className="btn-ghost btn-sm !p-1.5 shrink-0" title="Logout">
                 <LogOut className="w-4 h-4" />
               </button>
             )}
@@ -111,9 +122,8 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      {/* ── Main ────────────────────────────────────────────────────────────── */}
+      {/* ── Main ── */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Topbar */}
         <header className="h-16 bg-white border-b border-surface-100 flex items-center gap-4 px-6 shrink-0">
           <button onClick={() => setOpen(!open)} className="btn-ghost btn-sm !p-2">
             {open ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
@@ -121,12 +131,10 @@ export default function AppLayout() {
           <div className="flex-1" />
           <div className="text-sm text-surface-400">
             {new Date().toLocaleDateString('en-BD', {
-              weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+              weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
             })}
           </div>
         </header>
-
-        {/* Page */}
         <main className="flex-1 overflow-y-auto p-8">
           <div className="max-w-7xl mx-auto animate-fadeIn">
             <Outlet />

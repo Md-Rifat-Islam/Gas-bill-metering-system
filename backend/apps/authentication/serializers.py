@@ -66,4 +66,5 @@ class OTPVerifySerializer(serializers.Serializer):
 class CustomerUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerUser
-        fields = ['id', 'name', 'mobile', 'is_active', 'created_at']
+        fields = ['id', 'name', 'mobile', 'email', 'is_active', 'created_at']
+        read_only_fields = ['id', 'mobile', 'is_active', 'created_at']

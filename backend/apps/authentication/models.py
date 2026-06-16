@@ -76,6 +76,7 @@ class CustomerUser(models.Model):
     """End-user / customer who logs in via mobile OTP"""
     mobile = models.CharField(max_length=15, unique=True)
     name = models.CharField(max_length=100, blank=True)
+    email = models.EmailField(blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -85,6 +86,15 @@ class CustomerUser(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.mobile})"
+
+    # DRF permission checks (IsAuthenticated etc.) expect these attributes
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
 
 
 class OTPVerification(models.Model):

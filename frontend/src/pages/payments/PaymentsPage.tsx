@@ -38,7 +38,9 @@ export default function PaymentsPage() {
 
       <div className="flex gap-3 mb-6">
         <select className="input max-w-[160px]" value={methodFilter}
-          onChange={e => { setMethodFilter(e.target.value); setPage(1) }}>
+          onChange={e => { setMethodFilter(e.target.value); setPage(1) }}
+          title="Filter by payment method"
+        >
           <option value="">All Methods</option>
           <option>Cash</option>
           <option>Bank</option>
@@ -82,7 +84,9 @@ export default function PaymentsPage() {
                     <td className="text-surface-400 text-sm max-w-xs truncate">{p.notes || '—'}</td>
                     <td>
                       <button className="btn-ghost btn-sm"
-                        onClick={() => navigate(`/billing/${p.bill}`)}>
+                        onClick={() => navigate(`/billing/${p.bill}`)}
+                        title="View Bill"
+                      >
                         <ExternalLink className="w-3.5 h-3.5" />
                       </button>
                     </td>

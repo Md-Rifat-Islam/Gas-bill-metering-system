@@ -4,6 +4,7 @@ import {
   PieChart, Pie, Cell, Legend
 } from 'recharts'
 import { reportsAPI } from '@/api/client'
+import { usePermissions } from '@/hooks/usePermissions'
 import { PageLoader, StatusBadge } from '@/components/ui'
 import { formatCurrency, formatMonth } from '@/utils/helpers'
 
@@ -22,6 +23,7 @@ export default function ReportsPage() {
     queryKey: ['unpaid-bills'],
     queryFn: () => reportsAPI.unpaidBills().then(r => r.data),
   })
+  const { can } = usePermissions()
   const { data: payMethods = [] } = useQuery({
     queryKey: ['payment-methods'],
     queryFn: () => reportsAPI.paymentMethods().then(r => r.data),

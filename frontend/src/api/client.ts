@@ -58,6 +58,7 @@ export const authAPI = {
   createStaff: (data: any) => api.post('/auth/staff/', data),
   updateStaff: (id: number, data: any) => api.patch(`/auth/staff/${id}/`, data),
   roles: () => api.get('/auth/roles/'),
+  rolesDropdown: () => api.get('/auth/roles/dropdown/'),
 }
 
 export const projectsAPI = {
@@ -89,7 +90,12 @@ export const metersAPI = {
   list: (params?: any) => api.get('/meters/', { params }),
   create: (data: any) => api.post('/meters/', data),
   readings: (params?: any) => api.get('/meters/readings/', { params }),
-  createReading: (data: any) => api.post('/meters/readings/', data),
+  createReading: (data: FormData | any) => {
+    const isForm = data instanceof FormData
+    return api.post('/meters/readings/', data, {
+      headers: isForm ? { 'Content-Type': 'multipart/form-data' } : {},
+    })
+  },
 }
 
 export const billingAPI = {

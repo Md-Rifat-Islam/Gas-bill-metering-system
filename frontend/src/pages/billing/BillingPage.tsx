@@ -6,6 +6,7 @@ import { Plus, Search, FileText, Eye, Filter } from 'lucide-react'
 import { billingAPI, buildingsAPI, projectsAPI, unitsAPI } from '@/api/client'
 import { Modal, PageLoader, EmptyState, Pagination, StatusBadge } from '@/components/ui'
 import { formatCurrency, formatMonth } from '@/utils/helpers'
+import { usePermissions } from '@/hooks/usePermissions'
 import toast from 'react-hot-toast'
 
 function CreateBillModal({ open, onClose }: any) {
@@ -13,7 +14,7 @@ function CreateBillModal({ open, onClose }: any) {
   const { register, handleSubmit, watch, setValue, control, reset, formState: { errors } } = useForm({
     defaultValues: {
       project_id: '', building_id: '', unit_id: '',
-      billing_month: new Date().toISOString().slice(0, 7) + '-01',
+      billing_month: new Date().toISOString().slice(0, 7),
       previous_reading: 0, current_reading: 0,
       unit_price: 0, service_charge: 0,
       extra_charge: 0, discount: 0, late_fee: 0,
@@ -68,7 +69,7 @@ function CreateBillModal({ open, onClose }: any) {
       unit_id: data.unit_id,
       building_id: data.building_id,
       project_id: data.project_id,
-      billing_month: data.billing_month,
+      billing_month: data.billing_month.length === 7 ? data.billing_month + '-01' : data.billing_month,
       previous_reading: data.previous_reading,
       current_reading: data.current_reading,
       unit_price: data.unit_price,
@@ -251,6 +252,7 @@ function CreateBillModal({ open, onClose }: any) {
 
 export default function BillingPage() {
   const navigate = useNavigate()
+  const { can } = usePermissions()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
@@ -274,9 +276,8 @@ export default function BillingPage() {
           <h1 className="page-title">Billing</h1>
           <p className="page-subtitle">Create and manage gas bills for all units</p>
         </div>
-        <button className="btn-primary" onClick={() => setCreateModal(true)}>
-          <Plus className="w-4 h-4" /> Create Bill
-        </button>
+        {can.createBill && <button className="btn-primary" onClick={() => setCreateModal(true)}>
+          <Plus className="w-4 h-4" /> Create Bill</button>}
       </div>
 
       <div className="flex gap-3 mb-6 flex-wrap">
@@ -286,7 +287,9 @@ export default function BillingPage() {
             value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
         </div>
         <select className="input max-w-[140px]" value={statusFilter}
-          onChange={e => { setStatusFilter(e.target.value); setPage(1) }}>
+          aria-label="Filter bills by status"
+          onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
+        >
           <option value="">All Status</option>
           <option value="Unpaid">Unpaid</option>
           <option value="Partial">Partial</option>
@@ -337,7 +340,7 @@ export default function BillingPage() {
                     <td className="font-mono text-danger-600 font-semibold">{formatCurrency(b.due_amount)}</td>
                     <td><StatusBadge status={b.status} /></td>
                     <td>
-                      <button className="btn-ghost btn-sm" onClick={() => navigate(`/billing/${b.id}`)}>
+                      <button className="btn-ghost btn-sm" onClick={() => navigate(`/billing/${b.id}`)} title="View Details">
                         <Eye className="w-3.5 h-3.5" />
                       </button>
                     </td>

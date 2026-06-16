@@ -32,7 +32,7 @@ function UnitModal({ open, onClose, editItem, buildings, packages }: any) {
   return (
     <Modal open={open} onClose={onClose} title={editItem ? 'Edit Unit' : 'New Unit'} size="lg">
       <form onSubmit={handleSubmit(d => save.mutate(d))} className="space-y-5">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 mt-32">
           <div className="col-span-2">
             <label className="label">Building *</label>
             <select {...register('building_id', { required: true })} className="input">
@@ -151,12 +151,12 @@ export default function UnitsPage() {
           <input className="input pl-9" placeholder="Search units, allottees…"
             value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
         </div>
-        <select className="input max-w-[200px]" value={buildingFilter}
+        <select className="input max-w-[200px]" value={buildingFilter} aria-label="Filter by building"
           onChange={e => { setBuildingFilter(e.target.value); setPage(1) }}>
           <option value="">All Buildings</option>
           {buildings?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
-        <select className="input max-w-[140px]" value={statusFilter}
+        <select className="input max-w-[140px]" value={statusFilter} aria-label="Filter by status"
           onChange={e => { setStatusFilter(e.target.value); setPage(1) }}>
           <option value="">All Status</option>
           <option value="Active">Active</option>
@@ -206,7 +206,7 @@ export default function UnitsPage() {
                     </td>
                     <td><span className={u.status === 'Active' ? 'badge-green' : 'badge-gray'}>{u.status}</span></td>
                     <td>
-                      <button className="btn-ghost btn-sm" onClick={() => setModal({ open: true, item: u })}>
+                      <button className="btn-ghost btn-sm" onClick={() => setModal({ open: true, item: u })} aria-label={`Edit unit ${u.unit_no}`} title={`Edit unit ${u.unit_no}`}>
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                     </td>

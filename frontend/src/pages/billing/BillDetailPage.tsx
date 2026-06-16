@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft, CreditCard, Printer, History } from 'lucide-react'
 import { billingAPI, paymentsAPI, auditAPI } from '@/api/client'
+import { usePermissions } from '@/hooks/usePermissions'
 import { Modal, PageLoader, StatusBadge } from '@/components/ui'
 import { formatCurrency, formatDate, formatMonth } from '@/utils/helpers'
 import toast from 'react-hot-toast'
@@ -72,6 +73,7 @@ export default function BillDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [payModal, setPayModal] = useState(false)
+  const { can } = usePermissions()
 
   const { data: bill, isLoading } = useQuery({
     queryKey: ['bill', id],
@@ -91,7 +93,7 @@ export default function BillDetailPage() {
   return (
     <div className="max-w-4xl">
       <div className="flex items-center gap-4 mb-8">
-        <button className="btn-ghost btn-sm" onClick={() => navigate('/billing')}>
+        <button className="btn-ghost btn-sm" onClick={() => navigate('/billing')} title="Back to bills list">
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="flex-1">
@@ -99,7 +101,7 @@ export default function BillDetailPage() {
           <p className="page-subtitle">{formatMonth(bill.billing_month)}</p>
         </div>
         <StatusBadge status={bill.status} />
-        {!isPaid && (
+        {!isPaid && can.recordPayment && (
           <button className="btn-primary" onClick={() => setPayModal(true)}>
             <CreditCard className="w-4 h-4" /> Record Payment
           </button>

@@ -102,7 +102,9 @@ export default function BuildingsPage() {
             value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
         </div>
         <select className="input max-w-[200px]" value={projectFilter}
-          onChange={e => { setProjectFilter(e.target.value); setPage(1) }}>
+          onChange={e => { setProjectFilter(e.target.value); setPage(1) }}
+          title="Filter by project"
+          >
           <option value="">All Projects</option>
           {projects?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
@@ -137,7 +139,7 @@ export default function BuildingsPage() {
                     <td className="text-center font-semibold">{b.unit_count || 0}</td>
                     <td><span className={b.is_active ? 'badge-green' : 'badge-gray'}>{b.is_active ? 'Active' : 'Inactive'}</span></td>
                     <td>
-                      <button className="btn-ghost btn-sm" onClick={() => setModal({ open: true, item: b })}>
+                      <button className="btn-ghost btn-sm" onClick={() => setModal({ open: true, item: b })} title="Edit building">
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                     </td>

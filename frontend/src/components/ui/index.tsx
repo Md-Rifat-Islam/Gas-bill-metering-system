@@ -19,7 +19,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
       <div className={cn('relative bg-white rounded-2xl shadow-2xl w-full animate-fadeIn', sizes[size])}>
         <div className="flex items-center justify-between p-6 border-b border-surface-100">
           <h2 className="text-lg font-bold text-surface-900">{title}</h2>
-          <button onClick={onClose} className="btn-ghost btn-sm !p-1.5">
+          <button onClick={onClose} className="btn-ghost btn-sm !p-1.5" title="Close Modal">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -63,6 +63,7 @@ export function Pagination({ page, count, pageSize = 20, onChange }: PaginationP
         className="btn-secondary btn-sm !px-2"
         disabled={page === 1}
         onClick={() => onChange(page - 1)}
+        title="Previous Page"
       >
         <ChevronLeft className="w-4 h-4" />
       </button>
@@ -73,6 +74,7 @@ export function Pagination({ page, count, pageSize = 20, onChange }: PaginationP
         className="btn-secondary btn-sm !px-2"
         disabled={page === pages}
         onClick={() => onChange(page + 1)}
+        title="Next Page"
       >
         <ChevronRight className="w-4 h-4" />
       </button>
@@ -142,6 +144,37 @@ export function StatCard({ label, value, icon: Icon, color, change }: {
         <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center', color || 'bg-brand-50')}>
           <Icon className="w-5 h-5 text-brand-600" />
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── PermissionGate ────────────────────────────────────────────────────────────
+export function PermissionGate({
+  allowed,
+  fallback = null,
+  children,
+}: {
+  allowed: boolean
+  fallback?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return allowed ? <>{children}</> : <>{fallback}</>
+}
+
+// ── AccessDenied ──────────────────────────────────────────────────────────────
+export function AccessDenied() {
+  return (
+    <div className="flex flex-col items-center justify-center h-64 gap-4">
+      <div className="w-16 h-16 rounded-2xl bg-danger-50 flex items-center justify-center">
+        <svg className="w-8 h-8 text-danger-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+            d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+        </svg>
+      </div>
+      <div className="text-center">
+        <div className="font-semibold text-surface-800">Access Denied</div>
+        <div className="text-sm text-surface-400 mt-1">You don't have permission to view this section.</div>
       </div>
     </div>
   )

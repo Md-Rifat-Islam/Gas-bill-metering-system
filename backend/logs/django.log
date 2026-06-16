@@ -100,3 +100,81 @@ ERROR 2026-06-09 16:59:21,787 log Internal Server Error: /api/v1/projects/packag
 ERROR 2026-06-09 16:59:21,789 basehttp "GET /api/v1/projects/packages/ HTTP/1.1" 500 60
 WARNING 2026-06-10 11:30:18,922 log Not Found: /
 WARNING 2026-06-10 11:30:18,926 basehttp "GET / HTTP/1.1" 404 3221
+WARNING 2026-06-10 12:10:27,121 log Not Found: /
+WARNING 2026-06-10 12:10:27,124 basehttp "GET / HTTP/1.1" 404 3221
+ERROR 2026-06-10 17:47:16,499 log Internal Server Error: /api/v1/auth/staff/
+ERROR 2026-06-10 17:47:16,500 basehttp "POST /api/v1/auth/staff/ HTTP/1.1" 500 60
+ERROR 2026-06-10 17:47:21,671 log Internal Server Error: /api/v1/auth/staff/
+ERROR 2026-06-10 17:47:21,671 basehttp "POST /api/v1/auth/staff/ HTTP/1.1" 500 60
+ERROR 2026-06-10 17:48:57,702 log Internal Server Error: /api/v1/auth/staff/
+ERROR 2026-06-10 17:48:57,703 basehttp "POST /api/v1/auth/staff/ HTTP/1.1" 500 60
+ERROR 2026-06-10 17:49:17,633 log Internal Server Error: /api/v1/auth/staff/
+ERROR 2026-06-10 17:49:17,633 basehttp "POST /api/v1/auth/staff/ HTTP/1.1" 500 60
+ERROR 2026-06-10 17:50:43,414 log Internal Server Error: /api/v1/auth/staff/
+ERROR 2026-06-10 17:50:43,415 basehttp "POST /api/v1/auth/staff/ HTTP/1.1" 500 60
+WARNING 2026-06-11 11:57:01,061 log Unauthorized: /api/v1/reports/payment-methods/
+WARNING 2026-06-11 11:57:01,069 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 401 483
+WARNING 2026-06-11 11:57:01,062 log Unauthorized: /api/v1/reports/monthly-revenue/
+WARNING 2026-06-11 11:57:01,079 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 401 483
+WARNING 2026-06-11 11:57:01,065 log Unauthorized: /api/v1/reports/dashboard/
+WARNING 2026-06-11 11:57:01,088 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 401 483
+ERROR 2026-06-11 12:43:41,054 log Internal Server Error: /api/v1/billing/
+ERROR 2026-06-11 12:43:41,057 basehttp "POST /api/v1/billing/ HTTP/1.1" 500 60
+ERROR 2026-06-11 12:43:57,609 log Internal Server Error: /api/v1/billing/
+ERROR 2026-06-11 12:43:57,610 basehttp "POST /api/v1/billing/ HTTP/1.1" 500 60
+ERROR 2026-06-11 12:43:58,630 log Internal Server Error: /api/v1/billing/
+ERROR 2026-06-11 12:43:58,630 basehttp "POST /api/v1/billing/ HTTP/1.1" 500 60
+WARNING 2026-06-11 18:08:53,224 log Forbidden: /api/v1/meters/
+WARNING 2026-06-11 18:08:53,225 basehttp "GET /api/v1/meters/?search=&page=1 HTTP/1.1" 403 100
+ERROR 2026-06-11 18:10:15,564 log Internal Server Error: /api/v1/billing/
+ERROR 2026-06-11 18:10:15,565 basehttp "POST /api/v1/billing/ HTTP/1.1" 500 60
+ERROR 2026-06-11 18:10:26,065 log Internal Server Error: /api/v1/billing/
+ERROR 2026-06-11 18:10:26,066 basehttp "POST /api/v1/billing/ HTTP/1.1" 500 60
+WARNING 2026-06-14 11:54:32,451 log Unauthorized: /api/v1/reports/payment-methods/
+WARNING 2026-06-14 11:54:32,452 log Unauthorized: /api/v1/reports/monthly-revenue/
+WARNING 2026-06-14 11:54:32,457 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 401 483
+WARNING 2026-06-14 11:54:32,455 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 401 483
+WARNING 2026-06-14 11:54:32,456 log Unauthorized: /api/v1/reports/dashboard/
+WARNING 2026-06-14 11:54:32,467 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 401 483
+ERROR 2026-06-14 11:59:33,147 log Internal Server Error: /api/v1/billing/
+ERROR 2026-06-14 11:59:33,147 basehttp "POST /api/v1/billing/ HTTP/1.1" 500 60
+ERROR 2026-06-14 11:59:35,057 log Internal Server Error: /api/v1/billing/
+ERROR 2026-06-14 11:59:35,058 basehttp "POST /api/v1/billing/ HTTP/1.1" 500 60
+WARNING 2026-06-14 12:03:27,741 log Not Found: /api/v1/billing/NaN/
+WARNING 2026-06-14 12:03:27,742 basehttp "GET /api/v1/billing/NaN/ HTTP/1.1" 404 3690
+ERROR 2026-06-14 12:03:27,776 log Internal Server Error: /api/v1/payments/
+ERROR 2026-06-14 12:03:27,777 basehttp "GET /api/v1/payments/?bill=undefined HTTP/1.1" 500 60
+WARNING 2026-06-14 12:03:28,876 log Not Found: /api/v1/billing/NaN/
+WARNING 2026-06-14 12:03:28,877 basehttp "GET /api/v1/billing/NaN/ HTTP/1.1" 404 3690
+ERROR 2026-06-14 12:03:29,010 log Internal Server Error: /api/v1/payments/
+ERROR 2026-06-14 12:03:29,021 basehttp "GET /api/v1/payments/?bill=undefined HTTP/1.1" 500 60
+WARNING 2026-06-15 11:45:59,104 log Unauthorized: /api/v1/reports/payment-methods/
+WARNING 2026-06-15 11:45:59,106 log Unauthorized: /api/v1/reports/dashboard/
+WARNING 2026-06-15 11:45:59,107 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 401 483
+WARNING 2026-06-15 11:45:59,117 log Unauthorized: /api/v1/reports/monthly-revenue/
+WARNING 2026-06-15 11:45:59,123 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 401 483
+WARNING 2026-06-15 11:45:59,129 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 401 483
+WARNING 2026-06-15 11:45:59,274 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-06-15 11:45:59,278 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-06-15 11:45:59,280 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-06-15 11:45:59,281 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 119
+WARNING 2026-06-15 11:45:59,283 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 119
+WARNING 2026-06-15 11:45:59,287 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 119
+WARNING 2026-06-15 12:06:54,055 log Bad Request: /api/v1/auth/otp/verify/
+WARNING 2026-06-15 12:06:54,056 basehttp "POST /api/v1/auth/otp/verify/ HTTP/1.1" 400 34
+WARNING 2026-06-15 12:06:56,458 log Bad Request: /api/v1/auth/otp/verify/
+WARNING 2026-06-15 12:06:56,459 basehttp "POST /api/v1/auth/otp/verify/ HTTP/1.1" 400 34
+WARNING 2026-06-15 12:07:02,761 log Bad Request: /api/v1/auth/otp/verify/
+WARNING 2026-06-15 12:07:02,762 basehttp "POST /api/v1/auth/otp/verify/ HTTP/1.1" 400 34
+WARNING 2026-06-15 15:26:27,045 log Not Found: /api/v1/billing/NaN/
+WARNING 2026-06-15 15:26:27,046 basehttp "GET /api/v1/billing/NaN/ HTTP/1.1" 404 3804
+ERROR 2026-06-15 15:26:27,076 log Internal Server Error: /api/v1/payments/
+ERROR 2026-06-15 15:26:27,078 basehttp "GET /api/v1/payments/?bill=undefined HTTP/1.1" 500 60
+WARNING 2026-06-15 15:26:28,116 log Not Found: /api/v1/billing/NaN/
+WARNING 2026-06-15 15:26:28,118 basehttp "GET /api/v1/billing/NaN/ HTTP/1.1" 404 3804
+ERROR 2026-06-15 15:26:28,239 log Internal Server Error: /api/v1/payments/
+ERROR 2026-06-15 15:26:28,240 basehttp "GET /api/v1/payments/?bill=undefined HTTP/1.1" 500 60
+WARNING 2026-06-16 11:38:01,948 log Unauthorized: /api/v1/projects/packages/
+WARNING 2026-06-16 11:38:01,953 basehttp "GET /api/v1/projects/packages/ HTTP/1.1" 401 483
+WARNING 2026-06-16 11:38:01,950 log Unauthorized: /api/v1/projects/
+WARNING 2026-06-16 11:38:01,955 basehttp "GET /api/v1/projects/?search=&page=1 HTTP/1.1" 401 483

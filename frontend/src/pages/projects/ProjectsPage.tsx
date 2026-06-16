@@ -172,7 +172,10 @@ export default function ProjectsPage() {
                     </div>
                     <div className="text-xs text-surface-400 mt-0.5">per {p.unit_type}</div>
                   </div>
-                  <button className="btn-ghost btn-sm !p-1" onClick={e => { e.stopPropagation(); setPackageModal({ open: true, item: p }) }}>
+                  <button className="btn-ghost btn-sm !p-1" 
+                    onClick={e => { e.stopPropagation(); setPackageModal({ open: true, item: p }) }}
+                    title="Edit package"
+                  >
                     <Pencil className="w-3 h-3" />
                   </button>
                 </div>
@@ -220,7 +223,12 @@ export default function ProjectsPage() {
                       </span>
                     </td>
                     <td>
-                      <button className="btn-ghost btn-sm" onClick={() => setProjectModal({ open: true, item: p })}>
+                      <button
+                        className="btn-ghost btn-sm"
+                        onClick={() => setProjectModal({ open: true, item: p })}
+                        title="Edit project"
+                        aria-label="Edit project"
+                      >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                     </td>

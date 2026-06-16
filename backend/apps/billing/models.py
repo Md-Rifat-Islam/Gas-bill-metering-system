@@ -52,8 +52,8 @@ class Bill(models.Model):
         'authentication.StaffUser', on_delete=models.SET_NULL, null=True, related_name='bills_created'
     )
     last_updated_by = models.ForeignKey(
-        'authentication.StaffUser', on_delete=models.SET_NULL, null=True, related_name='bills_updated'
-    )
+    'authentication.StaffUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='bills_updated'
+)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
