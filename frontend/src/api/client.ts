@@ -54,11 +54,20 @@ export const authAPI = {
     api.post('/auth/login/', { email, password }),
   logout: (refresh: string) => api.post('/auth/logout/', { refresh }),
   me: () => api.get('/auth/me/'),
+
   staff: () => api.get('/auth/staff/'),
   createStaff: (data: any) => api.post('/auth/staff/', data),
   updateStaff: (id: number, data: any) => api.patch(`/auth/staff/${id}/`, data),
+  deleteStaff: (id: number) => api.delete(`/auth/staff/${id}/`),
+
   roles: () => api.get('/auth/roles/'),
   rolesDropdown: () => api.get('/auth/roles/dropdown/'),
+
+  // Granular per-module permission overrides for one staff user
+  getUserPermissions: (userId: number) => api.get(`/auth/staff/${userId}/permissions/`),
+  setUserPermissions: (userId: number, overrides: Array<{
+    module: string; can_view: boolean; can_edit: boolean; can_delete: boolean
+  }>) => api.put(`/auth/staff/${userId}/permissions/`, overrides),
 }
 
 export const projectsAPI = {
@@ -77,6 +86,7 @@ export const buildingsAPI = {
   get: (id: number) => api.get(`/buildings/${id}/`),
   create: (data: any) => api.post('/buildings/', data),
   update: (id: number, data: any) => api.patch(`/buildings/${id}/`, data),
+  delete: (id: number) => api.delete(`/buildings/${id}/`),
 }
 
 export const unitsAPI = {
@@ -84,6 +94,7 @@ export const unitsAPI = {
   get: (id: number) => api.get(`/units/${id}/`),
   create: (data: any) => api.post('/units/', data),
   update: (id: number, data: any) => api.patch(`/units/${id}/`, data),
+  delete: (id: number) => api.delete(`/units/${id}/`),
 }
 
 export const metersAPI = {
@@ -103,6 +114,7 @@ export const billingAPI = {
   get: (id: number) => api.get(`/billing/${id}/`),
   create: (data: any) => api.post('/billing/', data),
   update: (id: number, data: any) => api.patch(`/billing/${id}/`, data),
+  delete: (id: number) => api.delete(`/billing/${id}/`),
   summary: () => api.get('/billing/summary/'),
 }
 
@@ -117,6 +129,22 @@ export const reportsAPI = {
   projectRevenue: () => api.get('/reports/project-revenue/'),
   unpaidBills: () => api.get('/reports/unpaid-bills/'),
   paymentMethods: () => api.get('/reports/payment-methods/'),
+
+  // Triggers a file download (binary response) rather than returning JSON.
+  exportBuildingExcel: async (buildingId: number, buildingName: string, month?: string) => {
+    const res = await api.get(`/reports/export/building/${buildingId}/`, {
+      params: month ? { month } : undefined,
+      responseType: 'blob',
+    })
+    const url = window.URL.createObjectURL(new Blob([res.data]))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${buildingName.replace(/\s+/g, '_')}_gas_bill_export.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  },
 }
 
 export const auditAPI = {

@@ -9,4 +9,5 @@ urlpatterns = [
     path('unpaid-bills/',    views.UnpaidBillsView.as_view()),
     path('payment-methods/', views.PaymentMethodSummaryView.as_view()),
     path('billing-queue/',   views.BillingQueueView.as_view()),
+    path('export/building/<int:building_id>/', views.ExportBuildingExcelView.as_view(), name='export-building-excel'),
 ]

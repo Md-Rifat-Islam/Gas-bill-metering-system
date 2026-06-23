@@ -1,95 +1,190 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { Plus, Pencil, Package, Building2, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Package, Building2, Search } from 'lucide-react'
 import { projectsAPI } from '@/api/client'
-import { Modal, PageLoader, EmptyState, Pagination, StatCard } from '@/components/ui'
+import { Modal, PageLoader, EmptyState, Pagination, ConfirmDialog } from '@/components/ui'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useConfirm } from '@/hooks'
 import { formatCurrency } from '@/utils/helpers'
 import toast from 'react-hot-toast'
 
 interface PackageForm { name: string; unit_type: string; per_unit_cost: number; description: string }
-interface ProjectForm { name: string; address: string; default_package_id: number | null; service_charge: number }
+interface ProjectForm { name: string; address: string; default_package_id: number | ''; service_charge: number }
 
-function PackageModal({ open, onClose, editItem }: any) {
+function PackageModal({ open, onClose, editItem, readOnly }: any) {
   const qc = useQueryClient()
   const { register, handleSubmit, reset, formState: { errors } } = useForm<PackageForm>({
-    defaultValues: editItem || { unit_type: 'm3', per_unit_cost: 0 }
+    defaultValues: { name: '', unit_type: 'm3', per_unit_cost: 0, description: '' },
   })
+
+  // Fix: re-populate the form whenever the modal opens / target item changes.
+  useEffect(() => {
+    if (open) {
+      reset(editItem
+        ? { name: editItem.name, unit_type: editItem.unit_type, per_unit_cost: editItem.per_unit_cost, description: editItem.description ?? '' }
+        : { name: '', unit_type: 'm3', per_unit_cost: 0, description: '' }
+      )
+    }
+  }, [open, editItem, reset])
+
   const save = useMutation({
     mutationFn: (data: PackageForm) =>
       editItem ? projectsAPI.updatePackage(editItem.id, data) : projectsAPI.createPackage(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['packages'] })
       toast.success(editItem ? 'Package updated' : 'Package created')
-      onClose(); reset()
+      onClose()
     },
   })
+
   return (
     <Modal open={open} onClose={onClose} title={editItem ? 'Edit Package' : 'New Package'} size="sm">
       <form onSubmit={handleSubmit(d => save.mutate(d))} className="space-y-4">
         <div>
-          <label className="label">Package Name *</label>
-          <input {...register('name', { required: true })} className="input" placeholder="Residential Gas" />
+          <label className="label" htmlFor="pkg-name">Package Name <span className="text-danger-500">*</span></label>
+          <input
+            id="pkg-name"
+            {...register('name', { required: true })}
+            disabled={readOnly}
+            className="input"
+            placeholder="Residential Gas"
+            aria-label="Package name"
+            title="Package name"
+          />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="label">Unit Type</label>
-            <select {...register('unit_type')} className="input">
+            <label className="label" htmlFor="pkg-unit-type">Unit Type</label>
+            <select
+              id="pkg-unit-type"
+              {...register('unit_type')}
+              disabled={readOnly}
+              className="input"
+              aria-label="Unit type"
+              title="Unit type"
+            >
               <option value="m3">Cubic Meter (m³)</option>
               <option value="kg">Kilogram (Kg)</option>
             </select>
           </div>
           <div>
-            <label className="label">Price / Unit (৳) *</label>
-            <input {...register('per_unit_cost', { required: true, min: 0 })} type="number" step="0.01" className="input" />
+            <label className="label" htmlFor="pkg-price">Price / Unit (৳) <span className="text-danger-500">*</span></label>
+            <input
+              id="pkg-price"
+              {...register('per_unit_cost', { required: true, min: 0 })}
+              type="number"
+              step="0.01"
+              disabled={readOnly}
+              className="input"
+              aria-label="Price per unit"
+              title="Price per unit"
+            />
           </div>
         </div>
         <div>
-          <label className="label">Description</label>
-          <textarea {...register('description')} className="input" rows={2} />
+          <label className="label" htmlFor="pkg-desc">Description</label>
+          <textarea
+            id="pkg-desc"
+            {...register('description')}
+            disabled={readOnly}
+            className="input"
+            rows={2}
+            aria-label="Description"
+            title="Description"
+          />
         </div>
-        <div className="flex gap-3 justify-end pt-2">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn-primary" disabled={save.isPending}>
-            {save.isPending ? 'Saving…' : 'Save Package'}
-          </button>
-        </div>
+        {!readOnly && (
+          <div className="flex gap-3 justify-end pt-2">
+            <button type="button" className="btn-secondary" onClick={onClose} aria-label="Cancel" title="Cancel">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={save.isPending}
+              aria-label="Save package"
+              title="Save package"
+            >
+              {save.isPending ? 'Saving…' : 'Save Package'}
+            </button>
+          </div>
+        )}
       </form>
     </Modal>
   )
 }
 
-function ProjectModal({ open, onClose, editItem, packages }: any) {
+function ProjectModal({ open, onClose, editItem, packages, readOnly }: any) {
   const qc = useQueryClient()
   const { register, handleSubmit, reset } = useForm<ProjectForm>({
-    defaultValues: editItem
-      ? { ...editItem, default_package_id: editItem.default_package?.id || null }
-      : { service_charge: 0 }
+    defaultValues: { name: '', address: '', default_package_id: '', service_charge: 0 },
   })
+
+  // Fix: re-populate the form whenever the modal opens / target item changes.
+  useEffect(() => {
+    if (open) {
+      reset(editItem
+        ? {
+            name: editItem.name,
+            address: editItem.address ?? '',
+            default_package_id: editItem.default_package?.id ?? '',
+            service_charge: editItem.service_charge ?? 0,
+          }
+        : { name: '', address: '', default_package_id: '', service_charge: 0 }
+      )
+    }
+  }, [open, editItem, reset])
+
   const save = useMutation({
     mutationFn: (data: ProjectForm) =>
       editItem ? projectsAPI.update(editItem.id, data) : projectsAPI.create(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projects'] })
       toast.success(editItem ? 'Project updated' : 'Project created')
-      onClose(); reset()
+      onClose()
     },
   })
+
   return (
     <Modal open={open} onClose={onClose} title={editItem ? 'Edit Project' : 'New Project'}>
       <form onSubmit={handleSubmit(d => save.mutate(d))} className="space-y-4">
         <div>
-          <label className="label">Project Name *</label>
-          <input {...register('name', { required: true })} className="input" placeholder="Bashundhara Residentials" />
+          <label className="label" htmlFor="proj-name">Project Name <span className="text-danger-500">*</span></label>
+          <input
+            id="proj-name"
+            {...register('name', { required: true })}
+            disabled={readOnly}
+            className="input"
+            placeholder="Bashundhara Residentials"
+            aria-label="Project name"
+            title="Project name"
+          />
         </div>
         <div>
-          <label className="label">Address</label>
-          <textarea {...register('address')} className="input" rows={2} placeholder="Dhaka, Bangladesh" />
+          <label className="label" htmlFor="proj-address">Address</label>
+          <textarea
+            id="proj-address"
+            {...register('address')}
+            disabled={readOnly}
+            className="input"
+            rows={2}
+            placeholder="Dhaka, Bangladesh"
+            aria-label="Address"
+            title="Address"
+          />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="label">Default Package</label>
-            <select {...register('default_package_id')} className="input">
+            <label className="label" htmlFor="proj-package">Default Package</label>
+            <select
+              id="proj-package"
+              {...register('default_package_id')}
+              disabled={readOnly}
+              className="input"
+              aria-label="Default package"
+              title="Default package"
+            >
               <option value="">— Select package —</option>
               {packages?.map((p: any) => (
                 <option key={p.id} value={p.id}>{p.name} (৳{p.per_unit_cost}/{p.unit_type})</option>
@@ -97,26 +192,48 @@ function ProjectModal({ open, onClose, editItem, packages }: any) {
             </select>
           </div>
           <div>
-            <label className="label">Service Charge (৳)</label>
-            <input {...register('service_charge', { min: 0 })} type="number" step="0.01" className="input" defaultValue={0} />
+            <label className="label" htmlFor="proj-service-charge">Service Charge (৳)</label>
+            <input
+              id="proj-service-charge"
+              {...register('service_charge', { min: 0 })}
+              type="number"
+              step="0.01"
+              disabled={readOnly}
+              className="input"
+              aria-label="Service charge"
+              title="Service charge"
+            />
           </div>
         </div>
-        <div className="flex gap-3 justify-end pt-2">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn-primary" disabled={save.isPending}>
-            {save.isPending ? 'Saving…' : 'Save Project'}
-          </button>
-        </div>
+        {!readOnly && (
+          <div className="flex gap-3 justify-end pt-2">
+            <button type="button" className="btn-secondary" onClick={onClose} aria-label="Cancel" title="Cancel">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={save.isPending}
+              aria-label="Save project"
+              title="Save project"
+            >
+              {save.isPending ? 'Saving…' : 'Save Project'}
+            </button>
+          </div>
+        )}
       </form>
     </Modal>
   )
 }
 
 export default function ProjectsPage() {
+  const { can } = usePermissions()
+  const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [projectModal, setProjectModal] = useState<{ open: boolean; item?: any }>({ open: false })
   const [packageModal, setPackageModal] = useState<{ open: boolean; item?: any }>({ open: false })
+  const { confirmState, confirm, handleClose } = useConfirm()
 
   const { data, isLoading } = useQuery({
     queryKey: ['projects', search, page],
@@ -126,6 +243,22 @@ export default function ProjectsPage() {
     queryKey: ['packages'],
     queryFn: () => projectsAPI.packages().then(r => r.data.results || r.data),
   })
+
+  const deleteProject = useMutation({
+    mutationFn: (id: number) => projectsAPI.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Project deactivated')
+    },
+  })
+
+  const handleDeleteProject = async (p: any) => {
+    const ok = await confirm(
+      'Delete project',
+      `Are you sure you want to delete "${p.name}"? This will deactivate the project. This action cannot be undone.`
+    )
+    if (ok) deleteProject.mutate(p.id)
+  }
 
   const projects = data?.results || []
 
@@ -137,16 +270,27 @@ export default function ProjectsPage() {
           <p className="page-subtitle">Manage housing projects and pricing packages</p>
         </div>
         <div className="flex gap-3">
-          <button className="btn-secondary" onClick={() => setPackageModal({ open: true })}>
+          <button
+            className="btn-secondary"
+            onClick={() => setPackageModal({ open: true })}
+            aria-label="Manage packages"
+            title="Manage packages"
+          >
             <Package className="w-4 h-4" /> Packages
           </button>
-          <button className="btn-primary" onClick={() => setProjectModal({ open: true })}>
-            <Plus className="w-4 h-4" /> New Project
-          </button>
+          {can.createProject && (
+            <button
+              className="btn-primary"
+              onClick={() => setProjectModal({ open: true })}
+              aria-label="Create new project"
+              title="Create new project"
+            >
+              <Plus className="w-4 h-4" /> New Project
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Search */}
       <div className="relative mb-6 max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
         <input
@@ -154,10 +298,11 @@ export default function ProjectsPage() {
           placeholder="Search projects…"
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(1) }}
+          aria-label="Search projects"
+          title="Search projects"
         />
       </div>
 
-      {/* Packages section */}
       {pkgs?.length > 0 && (
         <div className="mb-8">
           <div className="text-sm font-semibold text-surface-600 mb-3">Pricing Packages</div>
@@ -172,9 +317,11 @@ export default function ProjectsPage() {
                     </div>
                     <div className="text-xs text-surface-400 mt-0.5">per {p.unit_type}</div>
                   </div>
-                  <button className="btn-ghost btn-sm !p-1" 
+                  <button
+                    className="btn-ghost btn-sm !p-1"
                     onClick={e => { e.stopPropagation(); setPackageModal({ open: true, item: p }) }}
-                    title="Edit package"
+                    aria-label={`Edit package ${p.name}`}
+                    title={`Edit package ${p.name}`}
                   >
                     <Pencil className="w-3 h-3" />
                   </button>
@@ -185,7 +332,6 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Projects table */}
       {isLoading ? <PageLoader /> : (
         <>
           <div className="table-wrapper">
@@ -223,14 +369,26 @@ export default function ProjectsPage() {
                       </span>
                     </td>
                     <td>
-                      <button
-                        className="btn-ghost btn-sm"
-                        onClick={() => setProjectModal({ open: true, item: p })}
-                        title="Edit project"
-                        aria-label="Edit project"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex gap-1">
+                        <button
+                          className="btn-ghost btn-sm"
+                          onClick={() => setProjectModal({ open: true, item: p })}
+                          aria-label={`Edit project ${p.name}`}
+                          title={`Edit project ${p.name}`}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        {can.deleteProject && (
+                          <button
+                            className="btn-ghost btn-sm text-danger-500 hover:bg-danger-50"
+                            onClick={() => handleDeleteProject(p)}
+                            aria-label={`Delete project ${p.name}`}
+                            title={`Delete project ${p.name}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -246,11 +404,22 @@ export default function ProjectsPage() {
         onClose={() => setProjectModal({ open: false })}
         editItem={projectModal.item}
         packages={pkgs}
+        readOnly={!can.editProject}
       />
       <PackageModal
         open={packageModal.open}
         onClose={() => setPackageModal({ open: false })}
         editItem={packageModal.item}
+        readOnly={!can.editPackages}
+      />
+
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        danger
+        onClose={() => handleClose(false)}
+        onConfirm={() => handleClose(true)}
       />
     </div>
   )

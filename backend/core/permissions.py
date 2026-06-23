@@ -52,19 +52,29 @@ class IsAnyStaff(BasePermission):
 
 class UserModulePermission(BasePermission):
     """
-    Super Admin : full CRUD
-    Admin       : create / edit / activate / deactivate  (no role assignment)
-    Others      : read-only
+    Super Admin : full CRUD on every user, including other Super Admins/Admins
+    Admin       : create new users; edit/delete/manage-permissions only for
+                  users they personally created; cannot touch Super Admin
+                  or other Admin accounts at all (not even read in the
+                  edit form — list view still shows them, per requirement
+                  that visibility of *existence* is fine but editing is not)
+    Others      : no access — list/detail views 403 immediately
     """
     message = 'Insufficient permissions for User management.'
 
     def has_permission(self, request, view):
         r = role(request)
+        return r in (R, A)
+
+    def has_object_permission(self, request, view, obj):
+        r = role(request)
         if r == R:
             return True
         if r == A:
-            return True          # write allowed; role-assign blocked in serializer
-        return request.method in SAFE_METHODS and r in (BO, AC)
+            if request.method in SAFE_METHODS:
+                return True   # Admin can view any staff row in the list
+            return request.user.can_manage(obj)
+        return False
 
 
 class RBACPermission(BasePermission):
@@ -192,6 +202,35 @@ class SystemSettingsPermission(BasePermission):
     message = 'System settings require Super Admin.'
     def has_permission(self, request, view):
         return role(request) == R
+
+
+class UserPermissionManagePermission(BasePermission):
+    """
+    Controls who may view/edit the granular per-module permission overrides
+    for a given target StaffUser (passed as view.kwargs['user_id']).
+
+    Super Admin : any user
+    Admin       : only users they created, and never Super Admin/Admin targets
+    Others      : never
+    """
+    message = "You do not have permission to manage this user's permissions."
+
+    def has_permission(self, request, view):
+        from apps.authentication.models import StaffUser
+        r = role(request)
+        if r not in (R, A):
+            return False
+
+        target_id = view.kwargs.get('user_id')
+        if target_id is None:
+            return True  # list/create without a specific target — checked elsewhere
+
+        try:
+            target = StaffUser.objects.select_related('role').get(id=target_id)
+        except StaffUser.DoesNotExist:
+            return False
+
+        return request.user.can_manage(target) if r == A else True
 
 
 # ── Dashboard scoping helper (used in views) ──────────────────────────────────

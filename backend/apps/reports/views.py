@@ -140,3 +140,73 @@ class BillingQueueView(APIView):
             .order_by('building__name', 'unit__unit_no')
         )
         return Response(list(data))
+
+
+# ── Excel Export: Building Summary + linked Unit (customer copy) sheets ──────
+
+class ExportBuildingExcelView(APIView):
+    """
+    GET /api/v1/reports/export/building/<building_id>/?month=YYYY-MM-DD
+
+    Generates a single .xlsx with:
+      - one "<Building> Summary" sheet (master data — editable)
+      - one "Unit ..." sheet per unit/bill (every cell formula-linked back
+        to the Summary sheet, so editing the Summary instantly updates
+        every Unit sheet when opened in Excel/LibreOffice)
+
+    Restricted to Admin / Super Admin, matching the "When Admin exports
+    both sheets together" requirement. (Super Admin always included since
+    they have every Admin permission plus more.)
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, building_id):
+        from django.http import HttpResponse
+        from apps.buildings.models import Building
+        from apps.reports.exports.building_export import generate_building_workbook
+        from core.permissions import role, R, A
+        import io
+
+        if role(request) not in (R, A):
+            return Response(
+                {'detail': 'Only Admin or Super Admin can export building data.'},
+                status=403,
+            )
+
+        try:
+            building = Building.objects.select_related('project', 'project__default_package', 'default_package').get(
+                id=building_id
+            )
+        except Building.DoesNotExist:
+            return Response({'detail': 'Building not found.'}, status=404)
+
+        bills_qs = (
+            Bill.objects.filter(building=building)
+            .select_related('unit', 'unit__allottee', 'unit__package')
+            .order_by('unit__floor_no', 'unit__unit_no')
+        )
+
+        month_param = request.query_params.get('month')
+        if month_param:
+            bills_qs = bills_qs.filter(billing_month=month_param)
+        else:
+            # Default: latest billing_month present for this building
+            latest = bills_qs.order_by('-billing_month').values_list('billing_month', flat=True).first()
+            if latest:
+                bills_qs = bills_qs.filter(billing_month=latest)
+
+        bills = list(bills_qs)
+
+        wb = generate_building_workbook(building, bills)
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        filename = f"{building.name.replace(' ', '_')}_gas_bill_export.xlsx"
+        response = HttpResponse(
+            buf.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response

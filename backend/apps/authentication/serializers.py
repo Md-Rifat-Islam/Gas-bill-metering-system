@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import StaffUser, Role, CustomerUser, OTPVerification
+from .models import StaffUser, Role, CustomerUser, OTPVerification, UserPermission, PermissionModule
 from django.contrib.auth import authenticate
 
 
@@ -10,23 +10,54 @@ class RoleSerializer(serializers.ModelSerializer):
         fields = ['id', 'role_name']
 
 
+class UserPermissionSerializer(serializers.ModelSerializer):
+    module_label = serializers.CharField(source='get_module_display', read_only=True)
+
+    class Meta:
+        model = UserPermission
+        fields = ['id', 'module', 'module_label', 'can_view', 'can_edit', 'can_delete', 'updated_at']
+        read_only_fields = ['id', 'updated_at']
+
+
 class StaffUserSerializer(serializers.ModelSerializer):
     role = RoleSerializer(read_only=True)
     role_id = serializers.PrimaryKeyRelatedField(
         queryset=Role.objects.all(), source='role', write_only=True, required=False
     )
     password = serializers.CharField(write_only=True, required=False)
+    created_by_name = serializers.CharField(source='created_by.name', read_only=True, default=None)
+    permission_overrides = UserPermissionSerializer(many=True, read_only=True)
+    can_manage = serializers.SerializerMethodField()
 
     class Meta:
         model = StaffUser
-        fields = ['id', 'name', 'email', 'mobile', 'role', 'role_id', 'is_active', 'password', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = [
+            'id', 'name', 'email', 'mobile', 'role', 'role_id', 'is_active',
+            'password', 'created_at', 'created_by', 'created_by_name',
+            'permission_overrides', 'notes', 'can_manage',
+        ]
+        read_only_fields = ['id', 'created_at', 'created_by', 'created_by_name', 'permission_overrides', 'can_manage']
+
+    def get_can_manage(self, obj):
+        """
+        Tells the frontend whether the *requesting* user may edit/delete/
+        manage-permissions for *this row*. This is presentation-only — the
+        backend re-checks the same StaffUser.can_manage() rule on every
+        write request regardless of what this flag says.
+        """
+        request = self.context.get('request')
+        if not request or not getattr(request, 'user', None) or not request.user.is_authenticated:
+            return False
+        return request.user.can_manage(obj)
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
+        request = self.context.get('request')
         user = StaffUser(**validated_data)
         if password:
             user.set_password(password)
+        if request and getattr(request, 'user', None) and request.user.is_authenticated:
+            user.created_by = request.user
         user.save()
         return user
 

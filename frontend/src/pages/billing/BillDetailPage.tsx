@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, CreditCard, Printer, History } from 'lucide-react'
+import { ArrowLeft, CreditCard, Printer, History, Trash2 } from 'lucide-react'
 import { billingAPI, paymentsAPI, auditAPI } from '@/api/client'
 import { usePermissions } from '@/hooks/usePermissions'
-import { Modal, PageLoader, StatusBadge } from '@/components/ui'
+import { useConfirm } from '@/hooks'
+import { Modal, PageLoader, StatusBadge, ConfirmDialog } from '@/components/ui'
 import { formatCurrency, formatDate, formatMonth } from '@/utils/helpers'
 import toast from 'react-hot-toast'
 
@@ -36,13 +37,26 @@ function PaymentModal({ open, onClose, bill }: any) {
           </div>
         </div>
         <div>
-          <label className="label">Amount (৳) *</label>
-          <input {...register('paid_amount', { required: true, min: 0.01 })}
-            type="number" step="0.01" className="input" />
+          <label className="label" htmlFor="pay-amount">Amount (৳) <span className="text-danger-500">*</span></label>
+          <input
+            id="pay-amount"
+            {...register('paid_amount', { required: true, min: 0.01 })}
+            type="number"
+            step="0.01"
+            className="input"
+            aria-label="Payment amount"
+            title="Payment amount"
+          />
         </div>
         <div>
-          <label className="label">Payment Method *</label>
-          <select {...register('payment_method', { required: true })} className="input">
+          <label className="label" htmlFor="pay-method">Payment Method <span className="text-danger-500">*</span></label>
+          <select
+            id="pay-method"
+            {...register('payment_method', { required: true })}
+            className="input"
+            aria-label="Payment method"
+            title="Payment method"
+          >
             <option value="Cash">Cash</option>
             <option value="Bank">Bank Transfer</option>
             <option value="bKash">bKash</option>
@@ -51,16 +65,38 @@ function PaymentModal({ open, onClose, bill }: any) {
           </select>
         </div>
         <div>
-          <label className="label">Transaction ID</label>
-          <input {...register('transaction_id')} className="input" placeholder="Optional" />
+          <label className="label" htmlFor="pay-txn">Transaction ID</label>
+          <input
+            id="pay-txn"
+            {...register('transaction_id')}
+            className="input"
+            placeholder="Optional"
+            aria-label="Transaction ID"
+            title="Transaction ID"
+          />
         </div>
         <div>
-          <label className="label">Notes</label>
-          <textarea {...register('notes')} className="input" rows={2} />
+          <label className="label" htmlFor="pay-notes">Notes</label>
+          <textarea
+            id="pay-notes"
+            {...register('notes')}
+            className="input"
+            rows={2}
+            aria-label="Notes"
+            title="Notes"
+          />
         </div>
         <div className="flex gap-3 justify-end pt-1">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn-primary" disabled={pay.isPending}>
+          <button type="button" className="btn-secondary" onClick={onClose} aria-label="Cancel" title="Cancel">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={pay.isPending}
+            aria-label="Record payment"
+            title="Record payment"
+          >
             {pay.isPending ? 'Processing…' : 'Record Payment'}
           </button>
         </div>
@@ -72,8 +108,10 @@ function PaymentModal({ open, onClose, bill }: any) {
 export default function BillDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const [payModal, setPayModal] = useState(false)
   const { can } = usePermissions()
+  const { confirmState, confirm, handleClose } = useConfirm()
 
   const { data: bill, isLoading } = useQuery({
     queryKey: ['bill', id],
@@ -85,6 +123,23 @@ export default function BillDetailPage() {
     enabled: !!id,
   })
 
+  const deleteBill = useMutation({
+    mutationFn: () => billingAPI.delete(Number(id)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bills'] })
+      toast.success('Bill deleted')
+      navigate('/billing')
+    },
+  })
+
+  const handleDelete = async () => {
+    const ok = await confirm(
+      'Delete bill',
+      `Are you sure you want to delete bill #${bill?.bill_number}? This action cannot be undone.`
+    )
+    if (ok) deleteBill.mutate()
+  }
+
   if (isLoading) return <PageLoader />
   if (!bill) return <div className="text-center py-20 text-surface-400">Bill not found</div>
 
@@ -93,7 +148,12 @@ export default function BillDetailPage() {
   return (
     <div className="max-w-4xl">
       <div className="flex items-center gap-4 mb-8">
-        <button className="btn-ghost btn-sm" onClick={() => navigate('/billing')} title="Back to bills list">
+        <button
+          className="btn-ghost btn-sm"
+          onClick={() => navigate('/billing')}
+          aria-label="Back to billing list"
+          title="Back to billing list"
+        >
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="flex-1">
@@ -102,8 +162,24 @@ export default function BillDetailPage() {
         </div>
         <StatusBadge status={bill.status} />
         {!isPaid && can.recordPayment && (
-          <button className="btn-primary" onClick={() => setPayModal(true)}>
+          <button
+            className="btn-primary"
+            onClick={() => setPayModal(true)}
+            aria-label="Record payment"
+            title="Record payment"
+          >
             <CreditCard className="w-4 h-4" /> Record Payment
+          </button>
+        )}
+        {can.deleteBill && (
+          <button
+            className="btn-secondary text-danger-600 border-danger-200 hover:bg-danger-50"
+            onClick={handleDelete}
+            disabled={deleteBill.isPending}
+            aria-label="Delete bill"
+            title="Delete bill"
+          >
+            <Trash2 className="w-4 h-4" /> Delete
           </button>
         )}
       </div>
@@ -211,6 +287,15 @@ export default function BillDetailPage() {
       </div>
 
       <PaymentModal open={payModal} onClose={() => setPayModal(false)} bill={bill} />
+
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        danger
+        onClose={() => handleClose(false)}
+        onConfirm={() => handleClose(true)}
+      />
     </div>
   )
 }

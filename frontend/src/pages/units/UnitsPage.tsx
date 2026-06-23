@@ -1,41 +1,73 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { Plus, Pencil, Home, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Home, Search } from 'lucide-react'
 import { unitsAPI, buildingsAPI, projectsAPI } from '@/api/client'
-import { Modal, PageLoader, EmptyState, Pagination } from '@/components/ui'
+import { Modal, PageLoader, EmptyState, Pagination, ConfirmDialog } from '@/components/ui'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useConfirm } from '@/hooks'
 import toast from 'react-hot-toast'
 
-function UnitModal({ open, onClose, editItem, buildings, packages }: any) {
+function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: any) {
   const qc = useQueryClient()
   const { register, handleSubmit, reset } = useForm({
-    defaultValues: editItem
-      ? {
-          ...editItem,
-          building_id: editItem.building_id,
-          package_id: editItem.package_id || '',
-          allottee_name: editItem.allottee?.name || '',
-          allottee_email: editItem.allottee?.email || '',
-          allottee_nid: editItem.allottee?.nid || '',
-        }
-      : { status: 'Active' }
+    defaultValues: {
+      building_id: '', floor_no: '', unit_no: '', meter_no: '', mobile_number: '',
+      package_id: '', status: 'Active', allottee_name: '', allottee_email: '', allottee_nid: '',
+    },
   })
+
+  // Fix: re-populate the form whenever the modal opens / target item changes.
+  // Previously `defaultValues` was only evaluated on first mount, so editing
+  // a second/third unit after the first kept showing the first unit's (or
+  // blank) values since this UnitModal instance is reused for every row.
+  useEffect(() => {
+    if (open) {
+      reset(editItem
+        ? {
+            building_id: editItem.building_id ?? editItem.building?.id ?? '',
+            floor_no: editItem.floor_no ?? '',
+            unit_no: editItem.unit_no ?? '',
+            meter_no: editItem.meter_no ?? '',
+            mobile_number: editItem.mobile_number ?? '',
+            package_id: editItem.package_id ?? '',
+            status: editItem.status ?? 'Active',
+            allottee_name: editItem.allottee?.name ?? '',
+            allottee_email: editItem.allottee?.email ?? '',
+            allottee_nid: editItem.allottee?.nid ?? '',
+          }
+        : {
+            building_id: '', floor_no: '', unit_no: '', meter_no: '', mobile_number: '',
+            package_id: '', status: 'Active', allottee_name: '', allottee_email: '', allottee_nid: '',
+          }
+      )
+    }
+  }, [open, editItem, reset])
+
   const save = useMutation({
     mutationFn: (data: any) =>
       editItem ? unitsAPI.update(editItem.id, data) : unitsAPI.create(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['units'] })
       toast.success(editItem ? 'Unit updated' : 'Unit created')
-      onClose(); reset()
+      onClose()
     },
   })
+
   return (
     <Modal open={open} onClose={onClose} title={editItem ? 'Edit Unit' : 'New Unit'} size="lg">
       <form onSubmit={handleSubmit(d => save.mutate(d))} className="space-y-5">
-        <div className="grid grid-cols-2 gap-4 mt-32">
+        <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <label className="label">Building *</label>
-            <select {...register('building_id', { required: true })} className="input">
+            <label className="label" htmlFor="unit-building">Building <span className="text-danger-500">*</span></label>
+            <select
+              id="unit-building"
+              {...register('building_id', { required: true })}
+              disabled={readOnly}
+              className="input"
+              aria-label="Building"
+              title="Building"
+            >
               <option value="">— Select building —</option>
               {buildings?.map((b: any) => (
                 <option key={b.id} value={b.id}>{b.project_name} › {b.name}</option>
@@ -43,24 +75,63 @@ function UnitModal({ open, onClose, editItem, buildings, packages }: any) {
             </select>
           </div>
           <div>
-            <label className="label">Floor No. *</label>
-            <input {...register('floor_no', { required: true, min: 0 })} type="number" className="input" />
+            <label className="label" htmlFor="unit-floor">Floor No. <span className="text-danger-500">*</span></label>
+            <input
+              id="unit-floor"
+              {...register('floor_no', { required: true, min: 0 })}
+              type="number"
+              disabled={readOnly}
+              className="input"
+              aria-label="Floor number"
+              title="Floor number"
+            />
           </div>
           <div>
-            <label className="label">Unit No. *</label>
-            <input {...register('unit_no', { required: true })} className="input" placeholder="A1" />
+            <label className="label" htmlFor="unit-no">Unit No. <span className="text-danger-500">*</span></label>
+            <input
+              id="unit-no"
+              {...register('unit_no', { required: true })}
+              disabled={readOnly}
+              className="input"
+              placeholder="A1"
+              aria-label="Unit number"
+              title="Unit number"
+            />
           </div>
           <div>
-            <label className="label">Meter No.</label>
-            <input {...register('meter_no')} className="input" placeholder="MTR-00001" />
+            <label className="label" htmlFor="unit-meter">Meter No.</label>
+            <input
+              id="unit-meter"
+              {...register('meter_no')}
+              disabled={readOnly}
+              className="input"
+              placeholder="MTR-00001"
+              aria-label="Meter number"
+              title="Meter number"
+            />
           </div>
           <div>
-            <label className="label">Mobile Number</label>
-            <input {...register('mobile_number')} className="input" placeholder="01XXXXXXXXX" />
+            <label className="label" htmlFor="unit-mobile">Mobile Number</label>
+            <input
+              id="unit-mobile"
+              {...register('mobile_number')}
+              disabled={readOnly}
+              className="input"
+              placeholder="01XXXXXXXXX"
+              aria-label="Mobile number"
+              title="Mobile number"
+            />
           </div>
           <div>
-            <label className="label">Package</label>
-            <select {...register('package_id')} className="input">
+            <label className="label" htmlFor="unit-package">Package</label>
+            <select
+              id="unit-package"
+              {...register('package_id')}
+              disabled={readOnly}
+              className="input"
+              aria-label="Package"
+              title="Package"
+            >
               <option value="">— Inherit from building/project —</option>
               {packages?.map((p: any) => (
                 <option key={p.id} value={p.id}>{p.name} (৳{p.per_unit_cost}/{p.unit_type})</option>
@@ -68,50 +139,94 @@ function UnitModal({ open, onClose, editItem, buildings, packages }: any) {
             </select>
           </div>
           <div>
-            <label className="label">Status</label>
-            <select {...register('status')} className="input">
+            <label className="label" htmlFor="unit-status">Status</label>
+            <select
+              id="unit-status"
+              {...register('status')}
+              disabled={readOnly}
+              className="input"
+              aria-label="Status"
+              title="Status"
+            >
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
             </select>
           </div>
         </div>
 
-        {/* Allottee */}
         <div className="border-t border-surface-100 pt-4">
           <div className="text-sm font-semibold text-surface-700 mb-3">Allottee Information</div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="label">Name</label>
-              <input {...register('allottee_name')} className="input" placeholder="Full name" />
+              <label className="label" htmlFor="allottee-name">Name</label>
+              <input
+                id="allottee-name"
+                {...register('allottee_name')}
+                disabled={readOnly}
+                className="input"
+                placeholder="Full name"
+                aria-label="Allottee name"
+                title="Allottee name"
+              />
             </div>
             <div>
-              <label className="label">Email</label>
-              <input {...register('allottee_email')} type="email" className="input" placeholder="email@example.com" />
+              <label className="label" htmlFor="allottee-email">Email</label>
+              <input
+                id="allottee-email"
+                {...register('allottee_email')}
+                type="email"
+                disabled={readOnly}
+                className="input"
+                placeholder="email@example.com"
+                aria-label="Allottee email"
+                title="Allottee email"
+              />
             </div>
             <div>
-              <label className="label">NID</label>
-              <input {...register('allottee_nid')} className="input" placeholder="National ID" />
+              <label className="label" htmlFor="allottee-nid">NID</label>
+              <input
+                id="allottee-nid"
+                {...register('allottee_nid')}
+                disabled={readOnly}
+                className="input"
+                placeholder="National ID"
+                aria-label="Allottee national ID"
+                title="Allottee national ID"
+              />
             </div>
           </div>
         </div>
 
-        <div className="flex gap-3 justify-end pt-2">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn-primary" disabled={save.isPending}>
-            {save.isPending ? 'Saving…' : 'Save Unit'}
-          </button>
-        </div>
+        {!readOnly && (
+          <div className="flex gap-3 justify-end pt-2">
+            <button type="button" className="btn-secondary" onClick={onClose} aria-label="Cancel" title="Cancel">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={save.isPending}
+              aria-label="Save unit"
+              title="Save unit"
+            >
+              {save.isPending ? 'Saving…' : 'Save Unit'}
+            </button>
+          </div>
+        )}
       </form>
     </Modal>
   )
 }
 
 export default function UnitsPage() {
+  const { can } = usePermissions()
+  const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [buildingFilter, setBuildingFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
   const [modal, setModal] = useState<{ open: boolean; item?: any }>({ open: false })
+  const { confirmState, confirm, handleClose } = useConfirm()
 
   const { data, isLoading } = useQuery({
     queryKey: ['units', search, buildingFilter, statusFilter, page],
@@ -119,7 +234,7 @@ export default function UnitsPage() {
       search,
       building: buildingFilter || undefined,
       status: statusFilter || undefined,
-      page
+      page,
     }).then(r => r.data),
   })
   const { data: buildings } = useQuery({
@@ -131,6 +246,22 @@ export default function UnitsPage() {
     queryFn: () => projectsAPI.packages().then(r => r.data.results || r.data),
   })
 
+  const deleteUnit = useMutation({
+    mutationFn: (id: number) => unitsAPI.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['units'] })
+      toast.success('Unit deactivated')
+    },
+  })
+
+  const handleDelete = async (u: any) => {
+    const ok = await confirm(
+      'Delete unit',
+      `Are you sure you want to delete Floor ${u.floor_no} — ${u.unit_no}? This will deactivate the unit. This action cannot be undone.`
+    )
+    if (ok) deleteUnit.mutate(u.id)
+  }
+
   const units = data?.results || []
 
   return (
@@ -140,24 +271,47 @@ export default function UnitsPage() {
           <h1 className="page-title">Units</h1>
           <p className="page-subtitle">Manage residential / commercial units and allottees</p>
         </div>
-        <button className="btn-primary" onClick={() => setModal({ open: true })}>
-          <Plus className="w-4 h-4" /> New Unit
-        </button>
+        {can.editBuildings && (
+          <button
+            className="btn-primary"
+            onClick={() => setModal({ open: true })}
+            aria-label="Create new unit"
+            title="Create new unit"
+          >
+            <Plus className="w-4 h-4" /> New Unit
+          </button>
+        )}
       </div>
 
       <div className="flex gap-3 mb-6 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
-          <input className="input pl-9" placeholder="Search units, allottees…"
-            value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
+          <input
+            className="input pl-9"
+            placeholder="Search units, allottees…"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
+            aria-label="Search units and allottees"
+            title="Search units and allottees"
+          />
         </div>
-        <select className="input max-w-[200px]" value={buildingFilter} aria-label="Filter by building"
-          onChange={e => { setBuildingFilter(e.target.value); setPage(1) }}>
+        <select
+          className="input max-w-[200px]"
+          value={buildingFilter}
+          onChange={e => { setBuildingFilter(e.target.value); setPage(1) }}
+          aria-label="Filter by building"
+          title="Filter by building"
+        >
           <option value="">All Buildings</option>
           {buildings?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
-        <select className="input max-w-[140px]" value={statusFilter} aria-label="Filter by status"
-          onChange={e => { setStatusFilter(e.target.value); setPage(1) }}>
+        <select
+          className="input max-w-[140px]"
+          value={statusFilter}
+          onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
+          aria-label="Filter by status"
+          title="Filter by status"
+        >
           <option value="">All Status</option>
           <option value="Active">Active</option>
           <option value="Inactive">Inactive</option>
@@ -206,9 +360,26 @@ export default function UnitsPage() {
                     </td>
                     <td><span className={u.status === 'Active' ? 'badge-green' : 'badge-gray'}>{u.status}</span></td>
                     <td>
-                      <button className="btn-ghost btn-sm" onClick={() => setModal({ open: true, item: u })} aria-label={`Edit unit ${u.unit_no}`} title={`Edit unit ${u.unit_no}`}>
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex gap-1">
+                        <button
+                          className="btn-ghost btn-sm"
+                          onClick={() => setModal({ open: true, item: u })}
+                          aria-label={`Edit unit ${u.unit_no}`}
+                          title={`Edit unit ${u.unit_no}`}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        {can.deleteBuildings && (
+                          <button
+                            className="btn-ghost btn-sm text-danger-500 hover:bg-danger-50"
+                            onClick={() => handleDelete(u)}
+                            aria-label={`Delete unit ${u.unit_no}`}
+                            title={`Delete unit ${u.unit_no}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -225,6 +396,16 @@ export default function UnitsPage() {
         editItem={modal.item}
         buildings={buildings}
         packages={packages}
+        readOnly={!can.editBuildings}
+      />
+
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        danger
+        onClose={() => handleClose(false)}
+        onConfirm={() => handleClose(true)}
       />
     </div>
   )

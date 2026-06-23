@@ -11,6 +11,7 @@ urlpatterns = [
     path('me/',            views.MeView.as_view(),             name='me'),
     path('staff/',         views.StaffUserListCreateView.as_view(), name='staff-list'),
     path('staff/<int:pk>/', views.StaffUserDetailView.as_view(),   name='staff-detail'),
+    path('staff/<int:user_id>/permissions/', views.UserPermissionListView.as_view(), name='staff-permissions'),
     # roles/ for RBAC management (super_admin only)
     path('roles/',         views.RoleListView.as_view(),       name='roles'),
     # roles/dropdown/ for any staff picking a role in a form

@@ -1,14 +1,20 @@
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import StaffUser, Role, CustomerUser, OTPVerification
+from django.db import transaction
+from .models import StaffUser, Role, CustomerUser, OTPVerification, UserPermission, PermissionModule
 from .serializers import (
     StaffUserSerializer, LoginSerializer, RoleSerializer,
     OTPRequestSerializer, OTPVerifySerializer, CustomerUserSerializer,
+    UserPermissionSerializer,
 )
 from apps.audit.utils import log_action
-from core.permissions import UserModulePermission, RBACPermission, IsAnyStaff
+from core.permissions import (
+    UserModulePermission, RBACPermission, IsAnyStaff,
+    UserPermissionManagePermission, role as get_role, R, A,
+)
 
 
 class StaffLoginView(APIView):
@@ -103,8 +109,6 @@ class OTPVerifyView(APIView):
 
         customer = CustomerUser.objects.get(mobile=mobile)
 
-        # Issue customer-scoped JWT (custom claims so CustomerJWTAuthentication
-        # can distinguish this from a StaffUser token)
         refresh = RefreshToken()
         refresh['user_type']   = 'customer'
         refresh['customer_id'] = customer.id
@@ -118,37 +122,83 @@ class OTPVerifyView(APIView):
         })
 
 
+# ── Staff (Super Admin / Admin only — UserModulePermission enforces this) ─────
+
 class StaffUserListCreateView(generics.ListCreateAPIView):
-    queryset          = StaffUser.objects.all().select_related('role').order_by('name')
-    serializer_class  = StaffUserSerializer
-    permission_classes = [permissions.IsAuthenticated, UserModulePermission]
+    """
+    GET  — Super Admin sees everyone. Admin sees everyone too (read access to
+           the list is allowed so the org chart makes sense), but the
+           `can_edit`/`can_delete` flags computed per-row tell the frontend
+           which rows are actually actionable for this Admin.
+    POST — both Super Admin and Admin may create new staff. Admin cannot
+           assign the Super Admin role to the new user (enforced below) and
+           the new user's `created_by` is automatically set to the creator,
+           establishing the hierarchy used for all future permission checks.
+    """
+    queryset            = StaffUser.objects.all().select_related('role', 'created_by').order_by('name')
+    serializer_class    = StaffUserSerializer
+    permission_classes  = [permissions.IsAuthenticated, UserModulePermission]
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['request'] = self.request
+        return ctx
 
     def perform_create(self, serializer):
-        # Admin cannot assign Super Admin role
-        if self.request.user.role_name == 'admin':
+        if self.request.user.role_name == Role.ADMIN:
             role_obj = serializer.validated_data.get('role')
-            if role_obj and role_obj.role_name == 'super_admin':
-                from rest_framework.exceptions import PermissionDenied
-                raise PermissionDenied('Admin cannot assign Super Admin role.')
+            if role_obj and role_obj.role_name in (Role.SUPER_ADMIN, Role.ADMIN):
+                raise PermissionDenied('Admin cannot create Super Admin or Admin accounts.')
         user = serializer.save()
         log_action(self.request.user, 'staff_users', user.id, 'CREATE', None, StaffUserSerializer(user).data)
 
 
 class StaffUserDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset          = StaffUser.objects.all().select_related('role')
-    serializer_class  = StaffUserSerializer
-    permission_classes = [permissions.IsAuthenticated, UserModulePermission]
+    queryset            = StaffUser.objects.all().select_related('role', 'created_by')
+    serializer_class    = StaffUserSerializer
+    permission_classes  = [permissions.IsAuthenticated, UserModulePermission]
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['request'] = self.request
+        return ctx
+
+    def _check_hierarchy(self, request, target):
+        """Shared guard for update/destroy: enforces StaffUser.can_manage()."""
+        if request.user.role_name == Role.SUPER_ADMIN:
+            return
+        if request.user.role_name == Role.ADMIN:
+            if not request.user.can_manage(target):
+                raise PermissionDenied(
+                    "You can only manage staff accounts you created. "
+                    "Super Admin and other Admin accounts cannot be modified."
+                )
+            return
+        raise PermissionDenied('Insufficient permissions.')
 
     def perform_update(self, serializer):
-        old_data = StaffUserSerializer(self.get_object()).data
+        target = self.get_object()
+        self._check_hierarchy(self.request, target)
+
+        # Admin additionally cannot promote a user they manage to Admin/Super Admin
+        if self.request.user.role_name == Role.ADMIN:
+            new_role = serializer.validated_data.get('role')
+            if new_role and new_role.role_name in (Role.SUPER_ADMIN, Role.ADMIN):
+                raise PermissionDenied('Admin cannot promote a user to Admin or Super Admin.')
+
+        old_data = StaffUserSerializer(target).data
         user     = serializer.save()
         log_action(self.request.user, 'staff_users', user.id, 'UPDATE', old_data, StaffUserSerializer(user).data)
 
     def destroy(self, request, *args, **kwargs):
-        from core.permissions import IsSuperAdmin
-        if request.user.role_name != 'super_admin':
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied('Only Super Admin can delete staff.')
+        target = self.get_object()
+
+        if target.id == request.user.id:
+            raise PermissionDenied('You cannot delete your own account.')
+
+        self._check_hierarchy(request, target)
+
+        log_action(request.user, 'staff_users', target.id, 'DELETE', StaffUserSerializer(target).data, None)
         return super().destroy(request, *args, **kwargs)
 
 
@@ -170,8 +220,75 @@ class RoleListPublicView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        # Admin cannot see/assign super_admin role
         qs = Role.objects.all().order_by('id')
-        if request.user.role_name == 'admin':
-            qs = qs.exclude(role_name='super_admin')
+        if request.user.role_name == Role.ADMIN:
+            # Admin cannot see/assign Super Admin or Admin roles when creating
+            # or editing a user — they can only grant the operational roles.
+            qs = qs.exclude(role_name__in=[Role.SUPER_ADMIN, Role.ADMIN])
         return Response(RoleSerializer(qs, many=True).data)
+
+
+# ── Granular per-module permission overrides ──────────────────────────────────
+
+class UserPermissionListView(APIView):
+    """
+    GET  /auth/staff/<user_id>/permissions/   — list this user's overrides
+    PUT  /auth/staff/<user_id>/permissions/   — replace the full set in one call
+         body: [{"module": "billing", "can_view": true, "can_edit": false, "can_delete": false}, ...]
+
+    Enforced by UserPermissionManagePermission:
+      - Super Admin can edit anyone's permissions.
+      - Admin can edit permissions only for users they created, and never
+        for a Super Admin or another Admin (those targets 403 before
+        reaching this view, since can_manage() returns False for them).
+    """
+    permission_classes = [permissions.IsAuthenticated, UserPermissionManagePermission]
+
+    def get_target(self, user_id):
+        try:
+            return StaffUser.objects.select_related('role').get(id=user_id)
+        except StaffUser.DoesNotExist:
+            raise ValidationError({'detail': 'User not found.'})
+
+    def get(self, request, user_id):
+        target = self.get_target(user_id)
+        overrides = UserPermission.objects.filter(user=target)
+        return Response(UserPermissionSerializer(overrides, many=True).data)
+
+    @transaction.atomic
+    def put(self, request, user_id):
+        target = self.get_target(user_id)
+
+        # Belt-and-suspenders: re-verify hierarchy even though the permission
+        # class already checked it, in case of a future refactor.
+        if not request.user.can_manage(target):
+            raise PermissionDenied("You do not have permission to manage this user's permissions.")
+
+        valid_modules = {m.value for m in PermissionModule}
+        incoming = request.data if isinstance(request.data, list) else []
+
+        old_state = list(UserPermissionSerializer(
+            UserPermission.objects.filter(user=target), many=True
+        ).data)
+
+        UserPermission.objects.filter(user=target).delete()
+        created = []
+        for row in incoming:
+            module = row.get('module')
+            if module not in valid_modules:
+                continue
+            created.append(UserPermission.objects.create(
+                user=target,
+                module=module,
+                can_view=bool(row.get('can_view', True)),
+                can_edit=bool(row.get('can_edit', False)),
+                can_delete=bool(row.get('can_delete', False)),
+                granted_by=request.user,
+            ))
+
+        new_state = UserPermissionSerializer(created, many=True).data
+        log_action(
+            request.user, 'user_permissions', target.id, 'UPDATE',
+            {'overrides': old_state}, {'overrides': new_state},
+        )
+        return Response(new_state)

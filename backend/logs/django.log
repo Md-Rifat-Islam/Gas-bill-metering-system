@@ -178,3 +178,25 @@ WARNING 2026-06-16 11:38:01,948 log Unauthorized: /api/v1/projects/packages/
 WARNING 2026-06-16 11:38:01,953 basehttp "GET /api/v1/projects/packages/ HTTP/1.1" 401 483
 WARNING 2026-06-16 11:38:01,950 log Unauthorized: /api/v1/projects/
 WARNING 2026-06-16 11:38:01,955 basehttp "GET /api/v1/projects/?search=&page=1 HTTP/1.1" 401 483
+WARNING 2026-06-17 16:27:28,470 log Unauthorized: /api/v1/reports/monthly-revenue/
+WARNING 2026-06-17 16:27:28,471 log Unauthorized: /api/v1/reports/payment-methods/
+WARNING 2026-06-17 16:27:28,474 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 401 483
+WARNING 2026-06-17 16:27:28,476 log Unauthorized: /api/v1/reports/dashboard/
+WARNING 2026-06-17 16:27:28,490 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 401 483
+WARNING 2026-06-17 16:27:28,478 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 401 483
+WARNING 2026-06-17 16:27:28,647 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-06-17 16:27:28,649 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-06-17 16:27:28,651 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 119
+WARNING 2026-06-17 16:27:28,651 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 119
+WARNING 2026-06-17 16:27:28,652 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-06-17 16:27:28,661 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 119
+WARNING 2026-06-18 11:34:22,091 log Unauthorized: /api/v1/reports/payment-methods/
+WARNING 2026-06-18 11:34:22,094 log Unauthorized: /api/v1/reports/monthly-revenue/
+WARNING 2026-06-18 11:34:22,099 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 401 483
+WARNING 2026-06-18 11:34:22,094 log Unauthorized: /api/v1/reports/dashboard/
+WARNING 2026-06-18 11:34:22,102 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 401 483
+WARNING 2026-06-18 11:34:22,110 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 401 483
+WARNING 2026-06-23 10:43:31,000 log Unauthorized: /api/v1/projects/
+WARNING 2026-06-23 10:43:31,005 log Unauthorized: /api/v1/buildings/
+WARNING 2026-06-23 10:43:31,010 basehttp "GET /api/v1/projects/?page_size=100 HTTP/1.1" 401 483
+WARNING 2026-06-23 10:43:31,012 basehttp "GET /api/v1/buildings/?search=&page=1 HTTP/1.1" 401 483
