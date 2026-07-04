@@ -1,4 +1,4 @@
-# 🔥 GasBill — Utility Billing System
+# 🔥 DECO — Utility Billing System
 
 A full-stack Gas Billing Management System built with **Django REST Framework** (backend) and **React + Vite + TypeScript** (frontend), with beautiful Tailwind UI.
 

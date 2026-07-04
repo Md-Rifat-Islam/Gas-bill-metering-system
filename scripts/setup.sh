@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# GasBill — One-command local setup script
+# DECO — One-command local setup script
 # Usage: chmod +x scripts/setup.sh && ./scripts/setup.sh
 # ─────────────────────────────────────────────────────────────────────────────
 set -e
@@ -8,7 +8,7 @@ set -e
 BOLD="\033[1m"; GREEN="\033[32m"; CYAN="\033[36m"; YELLOW="\033[33m"; RESET="\033[0m"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo -e "${BOLD}${CYAN}🔥  GasBill Utility Billing System — Setup${RESET}"
+echo -e "${BOLD}${CYAN}🔥  DECO Utility Billing System — Setup${RESET}"
 echo "────────────────────────────────────────────"
 
 # ── 1. Backend ────────────────────────────────────────────────────────────────

@@ -14,7 +14,7 @@ export function useDebounce<T>(value: T, delay = 400): T {
 export function usePageTitle(title: string) {
   useEffect(() => {
     const prev = document.title
-    document.title = `${title} — GasBill`
+    document.title = `${title} — DECO`
     return () => { document.title = prev }
   }, [title])
 }

@@ -60,7 +60,7 @@ export default function PortalLoginPage() {
           <div className="w-14 h-14 rounded-2xl bg-brand-500 flex items-center justify-center mb-3">
             <Flame className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-xl font-bold text-surface-900">GasBill</h1>
+          <h1 className="text-xl font-bold text-surface-900">DECO</h1>
           <p className="text-sm text-surface-400 mt-1">Resident Portal</p>
         </div>
 

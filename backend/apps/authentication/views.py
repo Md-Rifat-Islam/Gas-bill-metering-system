@@ -15,7 +15,7 @@ from core.permissions import (
     UserModulePermission, RBACPermission, IsAnyStaff,
     UserPermissionManagePermission, role as get_role, R, A,
 )
-
+from core.rbac import ROLE_DEFAULT_PERMISSIONS
 
 class StaffLoginView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -80,7 +80,7 @@ class OTPRequestView(APIView):
             return Response({'error': 'This account has been deactivated.'}, status=status.HTTP_403_FORBIDDEN)
 
         otp_obj = OTPVerification.generate_otp(mobile)
-        # TODO: send_sms(mobile, f"Your GasBill OTP is {otp_obj.otp_code}")
+        # TODO: send_sms(mobile, f"Your DECO OTP is {otp_obj.otp_code}")
 
         payload = {'message': 'OTP sent successfully'}
         if dj_settings.DEBUG:
@@ -250,10 +250,54 @@ class UserPermissionListView(APIView):
         except StaffUser.DoesNotExist:
             raise ValidationError({'detail': 'User not found.'})
 
+    # def get(self, request, user_id):
+    #     target = self.get_target(user_id)
+    #     overrides = UserPermission.objects.filter(user=target)
+    #     return Response(UserPermissionSerializer(overrides, many=True).data)
+    
     def get(self, request, user_id):
         target = self.get_target(user_id)
-        overrides = UserPermission.objects.filter(user=target)
-        return Response(UserPermissionSerializer(overrides, many=True).data)
+
+        # Default permissions for the user's role
+        role_defaults = ROLE_DEFAULT_PERMISSIONS.get(target.role_name, {})
+
+        # Existing overrides keyed by module name
+        overrides = {
+            p.module: p
+            for p in UserPermission.objects.filter(user=target)
+        }
+
+        result = []
+
+        for module in PermissionModule:
+            # Get the default permissions for this module
+            default_view, default_edit, default_delete = role_defaults.get(
+                module,
+                (False, False, False)
+            )
+
+            override = overrides.get(module.value)
+
+            if override:
+                result.append({
+                    "module": module.value,
+                    "module_label": module.label,
+                    "can_view": override.can_view,
+                    "can_edit": override.can_edit,
+                    "can_delete": override.can_delete,
+                    "is_override": True,
+                })
+            else:
+                result.append({
+                    "module": module.value,
+                    "module_label": module.label,
+                    "can_view": default_view,
+                    "can_edit": default_edit,
+                    "can_delete": default_delete,
+                    "is_override": False,
+                })
+
+        return Response(result)
 
     @transaction.atomic
     def put(self, request, user_id):
@@ -272,20 +316,58 @@ class UserPermissionListView(APIView):
         ).data)
 
         UserPermission.objects.filter(user=target).delete()
+        # created = []
+        # for row in incoming:
+        #     module = row.get('module')
+        #     if module not in valid_modules:
+        #         continue
+        #     created.append(UserPermission.objects.create(
+        #         user=target,
+        #         module=module,
+        #         can_view=bool(row.get('can_view', True)),
+        #         can_edit=bool(row.get('can_edit', False)),
+        #         can_delete=bool(row.get('can_delete', False)),
+        #         granted_by=request.user,
+        #     ))
+        
         created = []
+
+        defaults = ROLE_DEFAULT_PERMISSIONS.get(target.role_name, {})
+
         for row in incoming:
-            module = row.get('module')
+            module = row.get("module")
+
             if module not in valid_modules:
                 continue
-            created.append(UserPermission.objects.create(
-                user=target,
-                module=module,
-                can_view=bool(row.get('can_view', True)),
-                can_edit=bool(row.get('can_edit', False)),
-                can_delete=bool(row.get('can_delete', False)),
-                granted_by=request.user,
-            ))
 
+            default_view, default_edit, default_delete = defaults.get(
+                module,
+                (False, False, False)
+            )
+
+            can_view = bool(row.get("can_view"))
+            can_edit = bool(row.get("can_edit"))
+            can_delete = bool(row.get("can_delete"))
+
+            # Skip storing if identical to role defaults
+            if (
+                can_view == default_view and
+                can_edit == default_edit and
+                can_delete == default_delete
+            ):
+                continue
+
+            created.append(
+                UserPermission.objects.create(
+                    user=target,
+                    module=module,
+                    can_view=can_view,
+                    can_edit=can_edit,
+                    can_delete=can_delete,
+                    granted_by=request.user,
+                )
+            )
+        #----------------------
         new_state = UserPermissionSerializer(created, many=True).data
         log_action(
             request.user, 'user_permissions', target.id, 'UPDATE',

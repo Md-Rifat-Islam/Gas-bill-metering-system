@@ -1,4 +1,4 @@
--- GasBill Utility Billing System — PostgreSQL Schema Reference
+-- DECO Utility Billing System — PostgreSQL Schema Reference
 -- Generated from Django models; run via `python manage.py migrate`
 
 -- ─────────────────────────── AUTH ────────────────────────────────────────────

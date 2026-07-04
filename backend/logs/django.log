@@ -200,3 +200,27 @@ WARNING 2026-06-23 10:43:31,000 log Unauthorized: /api/v1/projects/
 WARNING 2026-06-23 10:43:31,005 log Unauthorized: /api/v1/buildings/
 WARNING 2026-06-23 10:43:31,010 basehttp "GET /api/v1/projects/?page_size=100 HTTP/1.1" 401 483
 WARNING 2026-06-23 10:43:31,012 basehttp "GET /api/v1/buildings/?search=&page=1 HTTP/1.1" 401 483
+WARNING 2026-07-01 12:12:32,184 log Unauthorized: /api/v1/projects/
+WARNING 2026-07-01 12:12:32,188 log Unauthorized: /api/v1/billing/
+WARNING 2026-07-01 12:12:32,189 basehttp "GET /api/v1/billing/?search=&page=1 HTTP/1.1" 401 483
+WARNING 2026-07-01 12:12:32,190 basehttp "GET /api/v1/projects/?page_size=100 HTTP/1.1" 401 483
+WARNING 2026-07-02 10:54:37,233 log Unauthorized: /api/v1/projects/
+WARNING 2026-07-02 10:54:37,234 log Unauthorized: /api/v1/billing/
+WARNING 2026-07-02 10:54:37,240 basehttp "GET /api/v1/billing/?search=&page=1 HTTP/1.1" 401 483
+WARNING 2026-07-02 10:54:37,243 basehttp "GET /api/v1/projects/?page_size=100 HTTP/1.1" 401 483
+WARNING 2026-07-02 10:54:37,529 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-07-02 10:54:37,530 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-07-02 10:54:37,533 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 119
+WARNING 2026-07-02 10:54:37,534 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 119
+WARNING 2026-07-02 10:54:37,892 log Unauthorized: /api/v1/projects/
+WARNING 2026-07-02 10:54:37,895 basehttp "GET /api/v1/projects/?page_size=100 HTTP/1.1" 401 483
+WARNING 2026-07-02 10:59:12,009 log Unauthorized: /api/v1/auth/login/
+WARNING 2026-07-02 10:59:12,010 basehttp "POST /api/v1/auth/login/ HTTP/1.1" 401 483
+WARNING 2026-07-02 11:18:12,524 log Not Found: /api/v1/billing/NaN/
+WARNING 2026-07-02 11:18:12,528 basehttp "GET /api/v1/billing/NaN/ HTTP/1.1" 404 3804
+ERROR 2026-07-02 11:18:12,553 log Internal Server Error: /api/v1/payments/
+ERROR 2026-07-02 11:18:12,555 basehttp "GET /api/v1/payments/?bill=undefined HTTP/1.1" 500 60
+WARNING 2026-07-02 11:18:13,709 log Not Found: /api/v1/billing/NaN/
+WARNING 2026-07-02 11:18:13,713 basehttp "GET /api/v1/billing/NaN/ HTTP/1.1" 404 3804
+ERROR 2026-07-02 11:18:13,770 log Internal Server Error: /api/v1/payments/
+ERROR 2026-07-02 11:18:13,772 basehttp "GET /api/v1/payments/?bill=undefined HTTP/1.1" 500 60

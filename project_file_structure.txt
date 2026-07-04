@@ -1,0 +1,231 @@
+Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-system
+
+├── .gitignore
+├── README.md
+├── backend
+│   ├── .env.example
+│   ├── Dockerfile
+│   ├── apps
+│   │   ├── __init__.py
+│   │   ├── audit
+│   │   │   ├── __init__.py
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── migrations
+│   │   │   │   ├── 0001_initial.py
+│   │   │   │   └── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── urls.py
+│   │   │   ├── utils.py
+│   │   │   └── views.py
+│   │   ├── authentication
+│   │   │   ├── __init__.py
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── customer_auth.py
+│   │   │   ├── migrations
+│   │   │   │   ├── 0001_initial.py
+│   │   │   │   ├── 0002_alter_staffuser_mobile_and_more.py
+│   │   │   │   ├── 0002_customeruser_email.py
+│   │   │   │   ├── 0003_merge_20260615_1143.py
+│   │   │   │   ├── 0003_staffuser_created_by_userpermission.py
+│   │   │   │   ├── 0004_merge_20260617_1624.py
+│   │   │   │   ├── 0005_remove_staffuser_unique_staff_mobile_when_exists_and_more.py
+│   │   │   │   └── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── serializers.py
+│   │   │   ├── urls.py
+│   │   │   └── views.py
+│   │   ├── billing
+│   │   │   ├── __init__.py
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── migrations
+│   │   │   │   ├── 0001_initial.py
+│   │   │   │   ├── 0002_alter_bill_last_updated_by.py
+│   │   │   │   └── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── serializers.py
+│   │   │   ├── urls.py
+│   │   │   └── views.py
+│   │   ├── buildings
+│   │   │   ├── __init__.py
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── migrations
+│   │   │   │   ├── 0001_initial.py
+│   │   │   │   └── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── serializers.py
+│   │   │   ├── urls.py
+│   │   │   └── views.py
+│   │   ├── meters
+│   │   │   ├── __init__.py
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── migrations
+│   │   │   │   ├── 0001_initial.py
+│   │   │   │   ├── 0002_meterreading_reading_photo.py
+│   │   │   │   ├── 0003_alter_meterreading_options.py
+│   │   │   │   └── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── serializers.py
+│   │   │   ├── urls.py
+│   │   │   └── views.py
+│   │   ├── payments
+│   │   │   ├── __init__.py
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── migrations
+│   │   │   │   ├── 0001_initial.py
+│   │   │   │   ├── 0002_payment_approval_status_payment_approved_at_and_more.py
+│   │   │   │   ├── 0003_payment_proof_image_payment_proof_invoice.py
+│   │   │   │   ├── 0004_remove_payment_approval_status_and_more.py
+│   │   │   │   └── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── serializers.py
+│   │   │   ├── urls.py
+│   │   │   └── views.py
+│   │   ├── portal
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── migrations
+│   │   │   │   └── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── serializers.py
+│   │   │   ├── urls.py
+│   │   │   └── views.py
+│   │   ├── projects
+│   │   │   ├── __init__.py
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── migrations
+│   │   │   │   ├── 0001_initial.py
+│   │   │   │   └── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── serializers.py
+│   │   │   ├── urls.py
+│   │   │   └── views.py
+│   │   ├── reports
+│   │   │   ├── __init__.py
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── exports
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── building_export.py
+│   │   │   │   └── excel_exports.py
+│   │   │   ├── migrations
+│   │   │   │   └── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── urls.py
+│   │   │   └── views.py
+│   │   └── units
+│   │       ├── __init__.py
+│   │       ├── admin.py
+│   │       ├── apps.py
+│   │       ├── migrations
+│   │       │   ├── 0001_initial.py
+│   │       │   └── __init__.py
+│   │       ├── models.py
+│   │       ├── serializers.py
+│   │       ├── urls.py
+│   │       └── views.py
+│   ├── core
+│   │   ├── __init__.py
+│   │   ├── exceptions.py
+│   │   ├── pagination.py
+│   │   ├── permissions.py
+│   │   └── utils.py
+│   ├── gas_billing
+│   │   ├── __init__.py
+│   │   ├── settings.py
+│   │   ├── urls.py
+│   │   └── wsgi.py
+│   ├── logs
+│   ├── manage.py
+│   ├── media
+│   │   └── meter_readings
+│   │       └── 2026
+│   │           └── 06
+│   │               └── 4.png
+│   ├── requirements.txt
+│   └── templates
+├── docker-compose.yml
+├── docs
+│   └── schema.sql
+├── file_tree.py
+├── frontend
+│   ├── Dockerfile
+│   ├── index.html
+│   ├── nginx.conf
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── public
+│   │   ├── branding
+│   │   │   └── deco-logo.png
+│   │   └── vite.svg
+│   ├── src
+│   │   ├── App.tsx
+│   │   ├── api
+│   │   │   ├── client.ts
+│   │   │   └── portalClient.ts
+│   │   ├── components
+│   │   │   ├── forms
+│   │   │   │   └── index.tsx
+│   │   │   ├── layout
+│   │   │   │   ├── AppLayout.tsx
+│   │   │   │   └── PortalLayout.tsx
+│   │   │   └── ui
+│   │   │       └── index.tsx
+│   │   ├── hooks
+│   │   │   ├── index.ts
+│   │   │   └── usePermissions.ts
+│   │   ├── index.css
+│   │   ├── main.tsx
+│   │   ├── pages
+│   │   │   ├── auth
+│   │   │   │   └── LoginPage.tsx
+│   │   │   ├── billing
+│   │   │   │   ├── BillDetailPage.tsx
+│   │   │   │   └── BillingPage.tsx
+│   │   │   ├── buildings
+│   │   │   │   └── BuildingsPage.tsx
+│   │   │   ├── dashboard
+│   │   │   │   └── DashboardPage.tsx
+│   │   │   ├── meters
+│   │   │   │   └── MetersPage.tsx
+│   │   │   ├── payments
+│   │   │   │   └── PaymentsPage.tsx
+│   │   │   ├── portal
+│   │   │   │   ├── PortalBillDetailPage.tsx
+│   │   │   │   ├── PortalBillsPage.tsx
+│   │   │   │   ├── PortalDashboardPage.tsx
+│   │   │   │   ├── PortalLoginPage.tsx
+│   │   │   │   ├── PortalPaymentPage.tsx
+│   │   │   │   ├── PortalPaymentsPage.tsx
+│   │   │   │   └── PortalProfilePage.tsx
+│   │   │   ├── projects
+│   │   │   │   └── ProjectsPage.tsx
+│   │   │   ├── reports
+│   │   │   │   └── ReportsPage.tsx
+│   │   │   ├── settings
+│   │   │   │   ├── RolesPage.tsx
+│   │   │   │   └── StaffPage.tsx
+│   │   │   └── units
+│   │   │       └── UnitsPage.tsx
+│   │   ├── store
+│   │   │   ├── authStore.ts
+│   │   │   └── customerAuthStore.ts
+│   │   ├── types
+│   │   │   └── index.ts
+│   │   ├── utils
+│   │   │   └── helpers.ts
+│   │   └── vite-env.d.ts
+│   ├── tailwind.config.js
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   └── vite.config.ts
+├── project_file_structure.txt
+└── scripts
+    └── setup.sh

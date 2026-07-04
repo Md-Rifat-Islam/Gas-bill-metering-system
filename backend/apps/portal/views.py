@@ -143,7 +143,7 @@ class PortalInvoicePDFView(CustomerScopedMixin, APIView):
         y = height - 25 * mm
 
         p.setFont('Helvetica-Bold', 18)
-        p.drawString(20 * mm, y, 'GasBill — Invoice')
+        p.drawString(20 * mm, y, 'DECO — Invoice')
         y -= 6 * mm
         p.setFont('Helvetica', 9)
         p.setFillGray(0.4)

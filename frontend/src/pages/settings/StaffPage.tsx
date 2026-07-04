@@ -51,7 +51,12 @@ const TAB_LABEL: Record<Tab, string> = {
 }
 
 /* ── Permission matrix sub-form (Role & Permission tab) ─────────────────── */
-function PermissionMatrix({ userId, disabled }: { userId: number | null; disabled: boolean }) {
+// function PermissionMatrix({ userId, disabled }: { userId: number | null; disabled: boolean }) 
+function PermissionMatrix({userId, disabled, editItem,}: {
+  userId: number | null
+  disabled: boolean
+  editItem: any
+}) {
   const qc = useQueryClient()
   const { data: overrides = [], isLoading } = useQuery({
     queryKey: ['user-permissions', userId],
@@ -61,16 +66,44 @@ function PermissionMatrix({ userId, disabled }: { userId: number | null; disable
 
   const [rows, setRows] = useState<Record<string, { can_view: boolean; can_edit: boolean; can_delete: boolean }>>({})
 
+  // useEffect(() => {
+  //   const next: typeof rows = {}
+  //   for (const m of PERMISSION_MODULES) {
+  //     const existing = overrides.find((o: any) => o.module === m.value)
+  //     next[m.value] = existing
+  //       ? { can_view: existing.can_view, can_edit: existing.can_edit, can_delete: existing.can_delete }
+  //       : { can_view: true, can_edit: false, can_delete: false }
+  //   }
+  //   setRows(next)
+  // }, [overrides, userId])
+
+  //updated to fix the issue of not showing the default permissions when no overrides exist 
   useEffect(() => {
-    const next: typeof rows = {}
-    for (const m of PERMISSION_MODULES) {
-      const existing = overrides.find((o: any) => o.module === m.value)
-      next[m.value] = existing
-        ? { can_view: existing.can_view, can_edit: existing.can_edit, can_delete: existing.can_delete }
-        : { can_view: true, can_edit: false, can_delete: false }
+  if (!editItem) return
+
+  const next: typeof rows = {}
+
+  for (const m of PERMISSION_MODULES) {
+    const existing = overrides.find((o: any) => o.module === m.value)
+
+    if (existing) {
+      next[m.value] = {
+        can_view: existing.can_view,
+        can_edit: existing.can_edit,
+        can_delete: existing.can_delete,
+      }
+    } else {
+      // use role defaults from backend
+      next[m.value] = {
+        can_view: editItem.role_permissions?.[m.value]?.can_view ?? false,
+        can_edit: editItem.role_permissions?.[m.value]?.can_edit ?? false,
+        can_delete: editItem.role_permissions?.[m.value]?.can_delete ?? false,
+      }
     }
-    setRows(next)
-  }, [overrides, userId])
+  }
+
+  setRows(next)
+}, [overrides, editItem])
 
   const save = useMutation({
     mutationFn: () => {
@@ -238,7 +271,7 @@ function StaffModal({ open, onClose, editItem, roles, canManageThis }: {
             key={t}
             type="button"
             role="tab"
-            aria-selected={tab === t}
+            aria-selected={tab === t ? 'true' : 'false'}
             title={TAB_LABEL[t]}
             onClick={() => setTab(t)}
             className={`px-3.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
@@ -367,7 +400,7 @@ function StaffModal({ open, onClose, editItem, roles, canManageThis }: {
 
         {/* ── Role & Permission ── */}
         <div className={tab === 'permissions' ? 'block' : 'hidden'}>
-          <PermissionMatrix userId={editItem?.id ?? null} disabled={readOnly} />
+          <PermissionMatrix userId={editItem?.id ?? null} disabled={readOnly} editItem={editItem}/>
         </div>
 
         {/* ── Additional Details ── */}

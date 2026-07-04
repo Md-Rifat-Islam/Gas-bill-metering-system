@@ -27,7 +27,7 @@ export default function PortalLayout() {
           <Flame className="w-5 h-5 text-white" />
         </div>
         <div className="flex-1">
-          <div className="text-sm font-bold text-surface-900 leading-none">GasBill</div>
+          <div className="text-sm font-bold text-surface-900 leading-none">DECO</div>
           <div className="text-[11px] text-surface-400 mt-0.5">My Account</div>
         </div>
         {customer && (
