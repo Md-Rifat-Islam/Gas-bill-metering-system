@@ -3,6 +3,12 @@ from apps.billing.models import Bill
 from apps.payments.models import Payment
 from apps.authentication.models import CustomerUser
 
+# Re-exported here so portal views can import everything portal-related from
+# one place; the actual submit serializer lives in apps.payments since it
+# creates a Payment and needs to stay next to PaymentSerializer/validation
+# rules for consistency.
+from apps.payments.serializers import PortalPaymentSubmitSerializer  # noqa: F401
+
 
 class PortalProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -40,8 +46,11 @@ class PortalPaymentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Payment
-        fields = ['id', 'bill', 'bill_number', 'billing_month_display',
-                  'paid_amount', 'payment_method', 'transaction_id', 'payment_date', 'notes']
+        fields = [
+            'id', 'bill', 'bill_number', 'billing_month_display',
+            'paid_amount', 'payment_method', 'transaction_id', 'payment_date',
+            'status', 'remarks', 'notes',
+        ]
 
     def get_billing_month_display(self, obj):
         return obj.bill.billing_month.strftime('%B %Y')

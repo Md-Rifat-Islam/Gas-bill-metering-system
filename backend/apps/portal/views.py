@@ -1,15 +1,22 @@
+import uuid
+
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Sum
 from django.http import HttpResponse
 
 from apps.billing.models import Bill
-from apps.payments.models import Payment, PaymentTransaction
+from apps.payments.models import Payment, PaymentTransaction, PaymentChannelSettings
+from apps.payments.serializers import PaymentChannelSettingsSerializer
 from apps.authentication.customer_auth import CustomerJWTAuthentication
 from core.permissions import IsCustomer
-from .serializers import PortalProfileSerializer, PortalBillSerializer, PortalPaymentSerializer
+from .serializers import (
+    PortalProfileSerializer, PortalBillSerializer, PortalPaymentSerializer,
+    PortalPaymentSubmitSerializer,
+)
 
 
 class CustomerScopedMixin:
@@ -88,16 +95,32 @@ class PortalPaymentListView(CustomerScopedMixin, generics.ListAPIView):
             Payment.objects
             .filter(bill__unit__mobile_number=self.request.user.mobile)
             .select_related('bill')
-            .order_by('-payment_date')
+            .order_by('-created_at')
         )
+
+
+class PortalPaymentSubmitView(CustomerScopedMixin, generics.CreateAPIView):
+    """
+    Customer submits a payment with proof for review. Always created as
+    Pending — the bill balance is untouched until an accountant/admin
+    approves it via PaymentApproveView (apps.payments.views).
+    """
+    serializer_class = PortalPaymentSubmitSerializer
+    parser_classes    = [MultiPartParser, FormParser, JSONParser]
 
 
 class PortalPaymentInitiateView(CustomerScopedMixin, APIView):
     """
     Initiate an online payment for a bill (bKash / SSLCommerz).
 
-    NOTE: This is a stub that records a Pending PaymentTransaction.
-    Wire up the real redirect using settings.BKASH_* / SSLCOMMERZ_* credentials.
+    NOTE: This is a stub — the real gateway isn't wired up yet (see
+    settings.BKASH_* / SSLCOMMERZ_* credentials, still TODO). The bug that
+    caused "Could not start payment" on a second click: gateway_transaction_id
+    used to be derived deterministically from bill_number + due_amount, so
+    clicking twice generated the exact same id and violated the model's
+    unique constraint. Fixed by (a) generating a random id per attempt, and
+    (b) reusing an existing Pending attempt for the same bill instead of
+    creating a new row every click.
     """
     def post(self, request):
         bill_id = request.data.get('bill_id')
@@ -107,20 +130,38 @@ class PortalPaymentInitiateView(CustomerScopedMixin, APIView):
         if bill.due_amount <= 0:
             return Response({'error': 'This bill has no due amount.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        txn = PaymentTransaction.objects.create(
-            bill=bill,
-            gateway_name='SSLCommerz',
-            gateway_transaction_id=f"TXN-{bill.bill_number}-{int(bill.due_amount * 100)}",
-            amount=bill.due_amount,
-            status=PaymentTransaction.STATUS_PENDING,
+        txn = (
+            PaymentTransaction.objects
+            .filter(bill=bill, status=PaymentTransaction.STATUS_PENDING)
+            .order_by('-created_at')
+            .first()
         )
+        if not txn:
+            txn = PaymentTransaction.objects.create(
+                bill=bill,
+                gateway_name='bKash',
+                gateway_transaction_id=f"TXN-{uuid.uuid4().hex[:12].upper()}",
+                amount=bill.due_amount,
+                status=PaymentTransaction.STATUS_PENDING,
+            )
+
         return Response({
-            'message': 'Online payment gateway is being configured. '
-                       'Please contact your building office to complete this payment, '
-                       'or pay via Cash/Bank/bKash at the office counter.',
+            'coming_soon': True,
+            'message': 'Online bKash payment is coming soon. Please use one of the payment '
+                       'channels shown above and submit your payment with proof below.',
             'transaction_id': txn.gateway_transaction_id,
             'amount': str(bill.due_amount),
         })
+
+
+class PortalPaymentChannelView(APIView):
+    """Read-only view of bKash/Nagad/Bank details for the customer portal."""
+    authentication_classes = [CustomerJWTAuthentication]
+    permission_classes     = [IsAuthenticated, IsCustomer]
+
+    def get(self, request):
+        settings_obj = PaymentChannelSettings.get_solo()
+        return Response(PaymentChannelSettingsSerializer(settings_obj).data)
 
 
 # ── Invoice PDF ───────────────────────────────────────────────────────────────

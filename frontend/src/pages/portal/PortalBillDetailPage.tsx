@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { ArrowLeft, Download, CreditCard, Loader2 } from 'lucide-react'
-import { portalAPI } from '@/api/portalClient'
-import { PageLoader, StatusBadge, Modal } from '@/components/ui'
+import { useQuery } from '@tanstack/react-query'
+import { ArrowLeft, Download, Send, Loader2 } from 'lucide-react'
+import { portalAPI, portalPaymentChannelsAPI } from '@/api/portalClient'
+import { PageLoader, StatusBadge } from '@/components/ui'
+import { PaymentChannelsCard } from '@/components/payments/PaymentChannelsCard'
+import { BkashComingSoon } from '@/components/payments/BkashComingSoon'
 import { formatCurrency } from '@/utils/helpers'
 import toast from 'react-hot-toast'
 
 export default function PortalBillDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [payResult, setPayResult] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
 
   const { data: bill, isLoading } = useQuery({
@@ -18,10 +19,9 @@ export default function PortalBillDetailPage() {
     queryFn: () => portalAPI.bill(Number(id)).then(r => r.data),
   })
 
-  const pay = useMutation({
-    mutationFn: () => portalAPI.payInitiate(Number(id)),
-    onSuccess: (res) => setPayResult(res.data.message),
-    onError: (err: any) => toast.error(err.response?.data?.error || 'Could not start payment'),
+  const { data: channels } = useQuery({
+    queryKey: ['portal-payment-channels'],
+    queryFn: () => portalPaymentChannelsAPI.get().then(r => r.data),
   })
 
   const handleDownload = async () => {
@@ -69,6 +69,14 @@ export default function PortalBillDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Payment channels + gateway status — only relevant while something is still due */}
+      {!isPaid && (
+        <>
+          <PaymentChannelsCard data={channels} />
+          <BkashComingSoon />
+        </>
+      )}
 
       {/* Meter readings */}
       <div className="card">
@@ -118,20 +126,14 @@ export default function PortalBillDetailPage() {
           Invoice
         </button>
         {!isPaid && (
-          <button onClick={() => pay.mutate()} className="btn-primary flex-1" disabled={pay.isPending}>
-            {pay.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-            Pay Now
+          <button
+            onClick={() => navigate(`/portal/payment?bill=${bill.id}`)}
+            className="btn-primary flex-1"
+          >
+            <Send className="w-4 h-4" /> Submit Payment
           </button>
         )}
       </div>
-
-      {/* Pay result modal */}
-      <Modal open={!!payResult} onClose={() => setPayResult(null)} title="Payment" size="sm">
-        <p className="text-sm text-surface-600 leading-relaxed">{payResult}</p>
-        <div className="flex justify-end mt-4">
-          <button className="btn-primary" onClick={() => setPayResult(null)}>Got it</button>
-        </div>
-      </Modal>
     </div>
   )
 }

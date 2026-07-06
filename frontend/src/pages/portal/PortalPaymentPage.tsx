@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  CreditCard, Upload, AlertCircle, CheckCircle,
+  Upload, AlertCircle, CheckCircle,
   ArrowLeft, FileText, Clock, Loader2
 } from 'lucide-react'
-import { portalAPI, paymentsAPI } from '@/api/portalClient'
-import { formatCurrency, formatDate } from '@/utils/helpers'
+import { portalAPI, paymentsAPI, portalPaymentChannelsAPI } from '@/api/portalClient'
+import { PaymentChannelsCard } from '@/components/payments/PaymentChannelsCard'
+import { BkashComingSoon } from '@/components/payments/BkashComingSoon'
+import { formatCurrency } from '@/utils/helpers'
 
 interface PortalPaymentPageProps {}
 
@@ -22,6 +24,11 @@ export default function PortalPaymentPage(_: PortalPaymentPageProps) {
     queryKey: ['portal-bill', billId],
     queryFn: () => billId ? portalAPI.bill(Number(billId)).then(r => r.data) : null,
     enabled: !!billId,
+  })
+
+  const { data: channels } = useQuery({
+    queryKey: ['portal-payment-channels'],
+    queryFn: () => portalPaymentChannelsAPI.get().then(r => r.data),
   })
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -103,6 +110,10 @@ export default function PortalPaymentPage(_: PortalPaymentPageProps) {
           <p className="text-sm text-surface-400">Submit your payment with proof for verification</p>
         </div>
       </div>
+
+      {/* Where to send money, and current online-gateway status */}
+      <PaymentChannelsCard data={channels} />
+      <BkashComingSoon />
 
       {/* Bill summary */}
       {isLoading && <div className="card animate-pulse h-24" />}

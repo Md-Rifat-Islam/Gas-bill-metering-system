@@ -1,5 +1,6 @@
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import { useAuthStore } from '@/store/authStore'
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -28,7 +29,7 @@ api.interceptors.response.use(
         original.headers.Authorization = `Bearer ${data.access}`
         return api(original)
       } catch {
-        localStorage.clear()
+        useAuthStore.getState().clearAuth()
         window.location.href = '/login'
         return Promise.reject(error)
       }
@@ -107,6 +108,14 @@ export const metersAPI = {
       headers: isForm ? { 'Content-Type': 'multipart/form-data' } : {},
     })
   },
+
+  // Quick Reading Dashboard — pre-joined meter cards for a project/building
+  quickDashboard: (params?: { project_id?: string | number; building_id?: string | number; status?: string }) =>
+    api.get('/meters/quick-dashboard/', { params }),
+
+  // Barcode / QR scan-to-select
+  lookupBarcode: (code: string) =>
+    api.get('/meters/lookup-barcode/', { params: { code } }),
 }
 
 export const billingAPI = {
@@ -120,7 +129,19 @@ export const billingAPI = {
 
 export const paymentsAPI = {
   list: (params?: any) => api.get('/payments/', { params }),
-  create: (data: any) => api.post('/payments/', data),
+  get: (id: number) => api.get(`/payments/${id}/`),
+  // Manual entry always requires proof, so this always sends multipart/form-data.
+  create: (data: FormData) =>
+    api.post('/payments/', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+
+  pending: (params?: any) => api.get('/payments/pending/', { params }),
+  approve: (id: number, remarks?: string) => api.post(`/payments/${id}/approve/`, { remarks }),
+  reject:  (id: number, remarks: string) => api.post(`/payments/${id}/reject/`, { remarks }),
+}
+
+export const paymentChannelsAPI = {
+  get: () => api.get('/payments/channel-settings/'),
+  update: (data: any) => api.put('/payments/channel-settings/', data),
 }
 
 export const reportsAPI = {

@@ -1,27 +1,14 @@
 import { useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
-  LayoutDashboard,
-  Building,
-  Home,
-  FileText,
-  CreditCard,
-  BarChart3,
-  LogOut,
-  User,
-  Menu,
-  X,
-  Flame,
-  Users,
-  Layers,
-  Gauge,
-  ShieldCheck,
-  Settings,
+  LayoutDashboard, Building, Home, FileText, CreditCard, BarChart3, LogOut, User, 
+  Menu, X, Flame, Users, Layers, Gauge, ShieldCheck, Settings, Clock, Wallet,
 } from "lucide-react";
 import { cn } from "@/utils/helpers";
 import { useAuthStore } from "@/store/authStore";
 import { usePermissions } from "@/hooks/usePermissions";
-import { authAPI } from "@/api/client";
+import { authAPI, paymentsAPI } from "@/api/client";
 import toast from "react-hot-toast";
 
 const ROLE_COLOR: Record<string, string> = {
@@ -35,8 +22,19 @@ const ROLE_COLOR: Record<string, string> = {
 export default function AppLayout() {
   const [open, setOpen] = useState(true);
   const { user, clearAuth, refresh_token } = useAuthStore();
-  const { can } = usePermissions();
+  const { can, role } = usePermissions();
   const navigate = useNavigate();
+
+  // Matches backend PaymentWritePermission (SA, Admin, Accountant can write/approve).
+  const canApprovePayments = role === "super_admin" || role === "admin" || role === "accountant";
+
+  const { data: pendingData } = useQuery({
+    queryKey: ["payments-pending-count"],
+    queryFn: () => paymentsAPI.pending().then((r) => r.data),
+    enabled: canApprovePayments,
+    refetchInterval: 60_000,
+  });
+  const pendingCount = pendingData?.count ?? pendingData?.results?.length ?? 0;
 
   const handleLogout = async () => {
     try {
@@ -69,12 +67,20 @@ export default function AppLayout() {
     },
     { icon: Home, label: "Units", path: "/units", show: can.viewBuildings },
     { icon: Gauge, label: "Meters", path: "/meters", show: can.viewBuildings },
+    { icon: Flame, label: "Quick Reading", path: "/meters/quick-reading", show: can.viewBuildings },
     { icon: FileText, label: "Billing", path: "/billing", show: can.viewBills },
     {
       icon: CreditCard,
       label: "Payments",
       path: "/payments",
       show: can.viewPayments,
+    },
+    {
+      icon: Clock,
+      label: "Pending Approvals",
+      path: "/payments/pending",
+      show: canApprovePayments,
+      badge: pendingCount > 0 ? pendingCount : undefined,
     },
     {
       icon: BarChart3,
@@ -96,6 +102,12 @@ export default function AppLayout() {
       label: "Roles & RBAC",
       path: "/settings/roles",
       show: can.manageRBAC,
+    },
+    {
+      icon: Wallet,
+      label: "Payment Channels",
+      path: "/settings/payment-channels",
+      show: can.viewSystemSettings,
     },
   ].filter((i) => i.show);
 
@@ -134,17 +146,27 @@ export default function AppLayout() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-0.5">
-          {navItems.map(({ icon: Icon, label, path }) => (
+          {navItems.map(({ icon: Icon, label, path, badge }) => (
             <NavLink
               key={path}
               to={path}
               title={!open ? label : undefined}
               className={({ isActive }) =>
-                cn("sidebar-link", isActive && "active")
+                cn("sidebar-link relative", isActive && "active")
               }
             >
               <Icon className="w-[18px] h-[18px] shrink-0" />
-              {open && <span className="animate-fadeIn truncate">{label}</span>}
+              {open && <span className="animate-fadeIn truncate flex-1">{label}</span>}
+              {badge !== undefined && (
+                <span
+                  className={cn(
+                    "bg-danger-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 shrink-0",
+                    !open && "absolute top-1 right-1"
+                  )}
+                >
+                  {badge}
+                </span>
+              )}
             </NavLink>
           ))}
 

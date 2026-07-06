@@ -1,123 +1,16 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import {
-  Plus, Gauge, Search, BookOpen, Camera, X, Upload,
-  Calendar, CalendarDays, Filter, Eye, ZoomIn
+  Plus, Gauge, Search, BookOpen, Eye, X,
+  Calendar, CalendarDays, Filter, LayoutGrid,
 } from 'lucide-react'
 import { metersAPI, unitsAPI } from '@/api/client'
 import { Modal, PageLoader, EmptyState, Pagination } from '@/components/ui'
+import { ReadingModal } from '@/components/meters/ReadingModal'
 import { formatDate } from '@/utils/helpers'
 import toast from 'react-hot-toast'
-
-// ── Photo capture component ───────────────────────────────────────────────────
-function PhotoCapture({ value, onChange }: {
-  value: File | null
-  onChange: (file: File | null) => void
-}) {
-  const fileRef     = useRef<HTMLInputElement>(null)
-  const cameraRef   = useRef<HTMLInputElement>(null)
-  const [preview, setPreview] = useState<string | null>(null)
-  const [lightbox, setLightbox] = useState(false)
-
-  const handleFile = (file: File | null) => {
-    if (!file) { setPreview(null); onChange(null); return }
-    const url = URL.createObjectURL(file)
-    setPreview(url)
-    onChange(file)
-  }
-
-  return (
-    <div>
-      <label className="label">Meter Photo <span className="text-surface-400 font-normal text-xs">(optional)</span></label>
-
-      {preview ? (
-        <div className="relative w-full rounded-xl overflow-hidden border border-surface-200 bg-surface-50">
-          <img
-            src={preview}
-            alt="Meter reading"
-            className="w-full h-44 object-cover cursor-zoom-in"
-            onClick={() => setLightbox(true)}
-          />
-          <div className="absolute top-2 right-2 flex gap-1">
-            <button
-              type="button"
-              title="Zoom In"
-              onClick={() => setLightbox(true)}
-              className="w-8 h-8 rounded-lg bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              title="Remove Photo"
-              onClick={() => handleFile(null)}
-              className="w-8 h-8 rounded-lg bg-black/50 text-white flex items-center justify-center hover:bg-red-500/80 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded-lg">
-            {value?.name}
-          </div>
-        </div>
-      ) : (
-        <div className="border-2 border-dashed border-surface-200 rounded-xl p-6 text-center bg-surface-50">
-          <Gauge className="w-8 h-8 text-surface-300 mx-auto mb-2" />
-          <p className="text-sm text-surface-400 mb-4">Take a photo or upload from gallery</p>
-          <div className="flex gap-3 justify-center">
-            {/* Camera capture (mobile) */}
-            <button
-              type="button"
-              onClick={() => cameraRef.current?.click()}
-              className="btn-secondary btn-sm"
-            >
-              <Camera className="w-3.5 h-3.5" /> Camera
-            </button>
-            {/* File upload */}
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="btn-secondary btn-sm"
-            >
-              <Upload className="w-3.5 h-3.5" /> Upload
-            </button>
-          </div>
-          <input
-            ref={cameraRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            aria-label="Capture meter photo using camera"
-            onChange={e => handleFile(e.target.files?.[0] ?? null)}
-          />
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            aria-label="Upload meter photo"
-            onChange={e => handleFile(e.target.files?.[0] ?? null)}
-          />
-        </div>
-      )}
-
-      {/* Lightbox */}
-      {lightbox && preview && (
-        <div
-          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setLightbox(false)}
-        >
-          <img src={preview} alt="Meter reading" className="max-w-full max-h-full rounded-xl object-contain" />
-          <button className="absolute top-4 right-4 text-white" onClick={() => setLightbox(false)} title="Close">
-            <X className="w-8 h-8" />
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ── Date range filter bar ─────────────────────────────────────────────────────
 type DateMode = 'all' | 'month' | 'week' | 'custom'
@@ -255,6 +148,10 @@ function MeterModal({ open, onClose, units }: any) {
           <input {...register('meter_no', { required: true })} className="input" placeholder="MTR-00001" />
         </div>
         <div>
+          <label className="label">Barcode / QR <span className="text-surface-400 font-normal text-xs">(optional)</span></label>
+          <input {...register('barcode')} className="input" placeholder="Scan or type barcode payload" />
+        </div>
+        <div>
           <label className="label">Meter Type</label>
           <input {...register('meter_type')} className="input" placeholder="Standard" defaultValue="Standard" />
         </div>
@@ -262,110 +159,6 @@ function MeterModal({ open, onClose, units }: any) {
           <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
           <button type="submit" className="btn-primary" disabled={save.isPending}>
             {save.isPending ? 'Saving…' : 'Assign Meter'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
-
-// ── Record Reading Modal ──────────────────────────────────────────────────────
-function ReadingModal({ open, onClose, meters }: any) {
-  const qc = useQueryClient()
-  const { register, handleSubmit, reset, watch, setValue } = useForm({
-    defaultValues: {
-      meter: '' as string | number,
-      previous_reading: 0,
-      current_reading: 0,
-      reading_date: new Date().toISOString().slice(0, 10),
-      notes: '',
-    },
-  })
-  const [photo, setPhoto] = useState<File | null>(null)
-  const prev  = watch('previous_reading') || 0
-  const curr  = watch('current_reading')  || 0
-  const usage = Math.max(0, Number(curr) - Number(prev))
-
-  const save = useMutation({
-    mutationFn: (data: any) => {
-      const fd = new FormData()
-      Object.entries(data).forEach(([k, v]) => { if (v !== undefined && v !== null) fd.append(k, String(v)) })
-      if (photo) fd.append('reading_photo', photo)
-      return metersAPI.createReading(fd)
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['meter-readings'] })
-      toast.success('Meter reading recorded')
-      onClose(); reset(); setPhoto(null)
-    },
-  })
-
-  return (
-    <Modal open={open} onClose={onClose} title="Record Meter Reading" size="lg">
-      <form onSubmit={handleSubmit(d => save.mutate(d))} className="space-y-5">
-        <div className="grid grid-cols-2 gap-4">
-          {/* Left */}
-          <div className="space-y-4">
-            <div>
-              <label className="label">Meter *</label>
-              <select {...register('meter', { required: true })} className="input">
-                <option value="">— Select meter —</option>
-                {meters?.map((m: any) => (
-                  <option key={m.id} value={m.id}>
-                    {m.meter_no} — {m.building_name}
-                    {m.allottee_name ? ` (${m.allottee_name})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Previous (m³)</label>
-                <input {...register('previous_reading', { min: 0 })} type="number" step="0.01" className="input" />
-              </div>
-              <div>
-                <label className="label">Current (m³) *</label>
-                <input {...register('current_reading', { required: true, min: 0 })} type="number" step="0.01" className="input" />
-              </div>
-            </div>
-
-            {/* Live usage display */}
-            <div className={`rounded-xl px-4 py-3 flex justify-between items-center text-sm transition-colors ${
-              usage > 0 ? 'bg-brand-50 border border-brand-100' : 'bg-surface-50 border border-surface-100'
-            }`}>
-              <span className="text-surface-500">Usage</span>
-              <span className={`text-xl font-bold font-mono ${usage > 0 ? 'text-brand-700' : 'text-surface-400'}`}>
-                {usage.toFixed(2)} <span className="text-sm font-normal">m³</span>
-              </span>
-            </div>
-
-            <div>
-              <label className="label">Reading Date *</label>
-              <input {...register('reading_date', { required: true })} type="date" className="input" />
-            </div>
-
-            <div>
-              <label className="label">Notes</label>
-              <textarea {...register('notes')} className="input" rows={2} placeholder="Any observations…" />
-            </div>
-          </div>
-
-          {/* Right — photo */}
-          <div>
-            <PhotoCapture value={photo} onChange={setPhoto} />
-            <p className="text-xs text-surface-400 mt-2">
-              Point camera at the meter display and tap capture. Photo is stored with the reading for audit.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex gap-3 justify-end pt-2 border-t border-surface-100">
-          <button type="button" className="btn-secondary" onClick={() => { onClose(); reset(); setPhoto(null) }}>
-            Cancel
-          </button>
-          <button type="submit" className="btn-primary" disabled={save.isPending}>
-            {save.isPending ? 'Saving…' : 'Record Reading'}
           </button>
         </div>
       </form>
@@ -399,6 +192,7 @@ function PhotoThumb({ url }: { url: string | null }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MetersPage() {
+  const navigate = useNavigate()
   const [search,      setSearch]      = useState('')
   const [page,        setPage]        = useState(1)
   const [meterModal,  setMeterModal]  = useState(false)
@@ -465,10 +259,13 @@ export default function MetersPage() {
           <p className="page-subtitle">Meter assignments and readings</p>
         </div>
         <div className="flex gap-3">
+          <button className="btn-primary" onClick={() => navigate('/meters/quick-reading')}>
+            <LayoutGrid className="w-4 h-4" /> Quick Reading Dashboard
+          </button>
           <button className="btn-secondary" onClick={() => setReadingModal(true)}>
             <BookOpen className="w-4 h-4" /> Record Reading
           </button>
-          <button className="btn-primary" onClick={() => setMeterModal(true)}>
+          <button className="btn-secondary" onClick={() => setMeterModal(true)}>
             <Plus className="w-4 h-4" /> Assign Meter
           </button>
         </div>
@@ -494,7 +291,7 @@ export default function MetersPage() {
         <>
           <div className="relative mb-4 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
-            <input className="input pl-9" placeholder="Search meter no., unit, allottee…"
+            <input className="input pl-9" placeholder="Search meter no., barcode, unit, allottee…"
               value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
           </div>
           {loadingMeters ? <PageLoader /> : (
@@ -504,6 +301,7 @@ export default function MetersPage() {
                   <thead>
                     <tr>
                       <th>Meter No.</th>
+                      <th>Barcode</th>
                       <th>Type</th>
                       <th>Unit</th>
                       <th>Floor</th>
@@ -514,10 +312,11 @@ export default function MetersPage() {
                   </thead>
                   <tbody>
                     {meters.length === 0 ? (
-                      <tr><td colSpan={7}><EmptyState icon={Gauge} title="No meters assigned" /></td></tr>
+                      <tr><td colSpan={8}><EmptyState icon={Gauge} title="No meters assigned" /></td></tr>
                     ) : meters.map((m: any) => (
                       <tr key={m.id}>
                         <td><span className="font-mono font-semibold text-brand-700">{m.meter_no}</span></td>
+                        <td className="font-mono text-xs text-surface-500">{m.barcode || '—'}</td>
                         <td className="text-surface-500 text-sm">{m.meter_type}</td>
                         <td className="font-medium">{m.unit_no}</td>
                         <td className="text-center text-surface-500">{m.floor_no}</td>

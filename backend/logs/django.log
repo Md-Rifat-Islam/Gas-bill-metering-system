@@ -224,3 +224,91 @@ WARNING 2026-07-02 11:18:13,709 log Not Found: /api/v1/billing/NaN/
 WARNING 2026-07-02 11:18:13,713 basehttp "GET /api/v1/billing/NaN/ HTTP/1.1" 404 3804
 ERROR 2026-07-02 11:18:13,770 log Internal Server Error: /api/v1/payments/
 ERROR 2026-07-02 11:18:13,772 basehttp "GET /api/v1/payments/?bill=undefined HTTP/1.1" 500 60
+WARNING 2026-07-04 16:48:55,443 log Unauthorized: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-04 16:48:55,444 log Unauthorized: /api/v1/reports/payment-methods/
+WARNING 2026-07-04 16:48:55,445 log Unauthorized: /api/v1/reports/dashboard/
+WARNING 2026-07-04 16:48:55,448 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 401 483
+WARNING 2026-07-04 16:48:55,450 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 401 483
+WARNING 2026-07-04 16:48:55,455 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 401 483
+WARNING 2026-07-04 16:56:28,362 log Not Found: /
+WARNING 2026-07-04 16:56:28,363 basehttp "GET / HTTP/1.1" 404 3335
+WARNING 2026-07-04 16:56:28,787 log Not Found: /favicon.ico
+WARNING 2026-07-04 16:56:28,787 basehttp "GET /favicon.ico HTTP/1.1" 404 3386
+WARNING 2026-07-04 16:56:34,107 log Not Found: /api/
+WARNING 2026-07-04 16:56:34,108 basehttp "GET /api/ HTTP/1.1" 404 3365
+WARNING 2026-07-04 16:56:49,977 log Unauthorized: /api/v1/buildings/
+WARNING 2026-07-04 16:56:49,978 basehttp "GET /api/v1/buildings/ HTTP/1.1" 401 126
+WARNING 2026-07-04 16:56:50,219 log Not Found: /favicon.ico
+WARNING 2026-07-04 16:56:50,220 basehttp "GET /favicon.ico HTTP/1.1" 404 3386
+WARNING 2026-07-04 16:57:05,282 log Not Found: /api/
+WARNING 2026-07-04 16:57:05,283 basehttp "GET /api/ HTTP/1.1" 404 3365
+WARNING 2026-07-04 16:57:24,311 log Not Found: /v1/buildings/
+WARNING 2026-07-04 16:57:24,312 basehttp "GET /v1/buildings/ HTTP/1.1" 404 3392
+WARNING 2026-07-04 16:57:31,322 log Unauthorized: /api/v1/buildings/
+WARNING 2026-07-04 16:57:31,323 basehttp "GET /api/v1/buildings/ HTTP/1.1" 401 126
+WARNING 2026-07-04 16:57:31,502 log Not Found: /favicon.ico
+WARNING 2026-07-04 16:57:31,503 basehttp "GET /favicon.ico HTTP/1.1" 404 3386
+WARNING 2026-07-04 16:57:40,077 log Unauthorized: /api/v1/buildings/
+WARNING 2026-07-04 16:57:40,078 basehttp "GET /api/v1/buildings/ HTTP/1.1" 401 126
+WARNING 2026-07-04 16:57:40,329 log Not Found: /favicon.ico
+WARNING 2026-07-04 16:57:40,330 basehttp "GET /favicon.ico HTTP/1.1" 404 3386
+WARNING 2026-07-04 16:57:48,529 log Not Found: /favicon.ico
+WARNING 2026-07-04 16:57:48,531 basehttp "GET /favicon.ico HTTP/1.1" 404 3386
+WARNING 2026-07-04 16:57:51,289 log Not Found: /
+WARNING 2026-07-04 16:57:51,290 basehttp "GET / HTTP/1.1" 404 3335
+WARNING 2026-07-04 16:58:16,087 log Unauthorized: /api/v1/projects/
+WARNING 2026-07-04 16:58:16,088 basehttp "GET /api/v1/projects/ HTTP/1.1" 401 126
+WARNING 2026-07-04 16:58:16,319 log Not Found: /favicon.ico
+WARNING 2026-07-04 16:58:16,321 basehttp "GET /favicon.ico HTTP/1.1" 404 3386
+WARNING 2026-07-05 10:48:25,674 log Unauthorized: /api/v1/reports/dashboard/
+WARNING 2026-07-05 10:48:25,676 log Unauthorized: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-05 10:48:25,684 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 401 483
+WARNING 2026-07-05 10:48:25,686 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 401 483
+WARNING 2026-07-05 10:48:25,677 log Unauthorized: /api/v1/reports/payment-methods/
+WARNING 2026-07-05 10:48:25,690 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 401 483
+WARNING 2026-07-05 10:48:25,933 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-07-05 10:48:25,937 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 119
+WARNING 2026-07-05 10:48:25,945 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-07-05 10:48:25,949 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 119
+WARNING 2026-07-05 10:48:25,946 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-07-05 10:48:25,957 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 119
+WARNING 2026-07-05 10:48:26,169 log Unauthorized: /api/v1/reports/dashboard/
+WARNING 2026-07-05 10:48:26,169 basehttp "GET /api/v1/reports/dashboard/ HTTP/1.1" 401 483
+WARNING 2026-07-05 10:48:26,212 log Unauthorized: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-05 10:48:26,214 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 401 483
+WARNING 2026-07-05 10:48:26,644 log Not Found: /
+WARNING 2026-07-05 10:48:26,646 basehttp "GET / HTTP/1.1" 404 3335
+WARNING 2026-07-05 10:48:52,907 log Unauthorized: /api/v1/buildings/
+WARNING 2026-07-05 10:48:52,908 basehttp "GET /api/v1/buildings/ HTTP/1.1" 401 126
+WARNING 2026-07-05 10:48:53,203 log Not Found: /favicon.ico
+WARNING 2026-07-05 10:48:53,204 basehttp "GET /favicon.ico HTTP/1.1" 404 3386
+WARNING 2026-07-05 10:49:34,122 log Unauthorized: /api/v1/auth/login/
+WARNING 2026-07-05 10:49:34,123 basehttp "POST /api/v1/auth/login/ HTTP/1.1" 401 483
+WARNING 2026-07-05 10:50:28,693 log Not Found: /
+WARNING 2026-07-05 10:50:28,694 basehttp "GET / HTTP/1.1" 404 3335
+WARNING 2026-07-05 10:51:06,459 log Not Found: /admin/billing/user/
+WARNING 2026-07-05 10:51:06,459 basehttp "GET /admin/billing/user/ HTTP/1.1" 404 4564
+WARNING 2026-07-05 10:51:26,757 log Not Found: /api/billing/user/
+WARNING 2026-07-05 10:51:26,758 basehttp "GET /api/billing/user/ HTTP/1.1" 404 3404
+WARNING 2026-07-05 10:51:44,001 log Not Found: /api/v1/billing/user/
+WARNING 2026-07-05 10:51:44,002 basehttp "GET /api/v1/billing/user/ HTTP/1.1" 404 3807
+WARNING 2026-07-05 10:51:48,593 log Unauthorized: /api/v1/billing/
+WARNING 2026-07-05 10:51:48,594 basehttp "GET /api/v1/billing/ HTTP/1.1" 401 126
+WARNING 2026-07-05 10:51:48,788 log Not Found: /favicon.ico
+WARNING 2026-07-05 10:51:48,789 basehttp "GET /favicon.ico HTTP/1.1" 404 3386
+WARNING 2026-07-05 11:15:50,728 log Not Found: /api/v1/
+WARNING 2026-07-05 11:15:50,729 basehttp "GET /api/v1/ HTTP/1.1" 404 3374
+WARNING 2026-07-05 11:15:57,589 log Unauthorized: /api/v1/projects/
+WARNING 2026-07-05 11:15:57,590 basehttp "GET /api/v1/projects/ HTTP/1.1" 401 126
+WARNING 2026-07-05 11:15:57,776 log Not Found: /favicon.ico
+WARNING 2026-07-05 11:15:57,776 basehttp "GET /favicon.ico HTTP/1.1" 404 3386
+WARNING 2026-07-05 11:18:16,862 log Unauthorized: /api/v1/meters/
+WARNING 2026-07-05 11:18:16,863 basehttp "GET /api/v1/meters/ HTTP/1.1" 401 126
+WARNING 2026-07-05 11:18:17,072 log Not Found: /favicon.ico
+WARNING 2026-07-05 11:18:17,073 basehttp "GET /favicon.ico HTTP/1.1" 404 3386
+ERROR 2026-07-05 12:24:13,599 log Internal Server Error: /api/v1/portal/payments/initiate/
+ERROR 2026-07-05 12:24:13,601 basehttp "POST /api/v1/portal/payments/initiate/ HTTP/1.1" 500 60
+ERROR 2026-07-05 12:24:15,385 log Internal Server Error: /api/v1/portal/payments/initiate/
+ERROR 2026-07-05 12:24:15,387 basehttp "POST /api/v1/portal/payments/initiate/ HTTP/1.1" 500 60
+ERROR 2026-07-05 12:28:26,643 log Internal Server Error: /api/v1/portal/payments/initiate/
+ERROR 2026-07-05 12:28:26,643 basehttp "POST /api/v1/portal/payments/initiate/ HTTP/1.1" 500 60

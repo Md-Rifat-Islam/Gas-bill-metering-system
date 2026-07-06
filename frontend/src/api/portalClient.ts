@@ -1,5 +1,6 @@
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import { useCustomerAuthStore } from '@/store/customerAuthStore'
 
 const portalApi = axios.create({
   baseURL: '/api/v1',
@@ -26,8 +27,7 @@ portalApi.interceptors.response.use(
         original.headers.Authorization = `Bearer ${data.access}`
         return portalApi(original)
       } catch {
-        localStorage.removeItem('customer_access_token')
-        localStorage.removeItem('customer_refresh_token')
+        useCustomerAuthStore.getState().clearAuth()
         window.location.href = '/portal/login'
         return Promise.reject(error)
       }
@@ -36,6 +36,7 @@ portalApi.interceptors.response.use(
       const msg =
         error.response?.data?.error ||
         error.response?.data?.detail ||
+        Object.values(error.response?.data || {})[0] ||
         'Something went wrong'
       toast.error(Array.isArray(msg) ? msg[0] : String(msg))
     }
@@ -72,4 +73,18 @@ export const portalAPI = {
     a.remove()
     window.URL.revokeObjectURL(url)
   },
+}
+
+// Customer-submitted payments — proof-based, always lands as Pending until
+// an accountant/admin approves it. Referenced by PortalPaymentPage.tsx.
+export const paymentsAPI = {
+  customerSubmit: (data: FormData) =>
+    portalApi.post('/portal/payments/submit/', data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+}
+
+// Read-only bKash/Nagad/Bank details shown before a customer submits proof.
+export const portalPaymentChannelsAPI = {
+  get: () => portalApi.get('/portal/payment-channels/'),
 }

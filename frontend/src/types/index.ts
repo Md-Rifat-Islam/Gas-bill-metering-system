@@ -87,6 +87,7 @@ export interface Meter {
   building_name: string
   meter_no: string
   meter_type: string
+  barcode?: string | null
   created_at: string
 }
 
@@ -101,6 +102,38 @@ export interface MeterReading {
   notes: string
   recorded_by: number
   created_at: string
+}
+
+// ── Quick Reading Dashboard ───────────────────────────────────────────────────
+export type ReadingStatus = 'Pending' | 'Completed' | 'Problem' | 'Inactive'
+
+export interface MeterCardData {
+  id: number
+  meter_no: string
+  barcode: string | null
+  meter_type: string
+
+  unit_id: number
+  unit_no: string
+  floor_no: number
+
+  building_id: number
+  building_name: string
+  project_id: number
+  project_name: string
+
+  allottee_name: string
+  allottee_mobile: string
+  unit_status: 'Active' | 'Inactive'
+
+  previous_reading: string
+  previous_reading_date: string | null
+
+  reading_status: ReadingStatus
+  billing_status: string
+  reading_due_status: 'Due' | 'Completed'
+
+  warnings?: string[]
 }
 
 // ── Billing ───────────────────────────────────────────────────────────────────
@@ -144,16 +177,32 @@ export interface Bill {
 
 // ── Payments ──────────────────────────────────────────────────────────────────
 export type PaymentMethod = 'Cash' | 'Bank' | 'bKash' | 'Card' | 'SSLCommerz'
+export type PaymentStatus = 'Pending' | 'Approved' | 'Rejected'
+export type PaymentSource = 'staff' | 'customer'
 
 export interface Payment {
   id: number
   bill: number
   bill_number: string
+  unit_no?: string
+  building_name?: string
+  allottee_name?: string
+
   paid_amount: string
   payment_method: PaymentMethod
   transaction_id?: string
   payment_date: string
-  received_by_name: string
+
+  proof_image_url?: string | null
+  proof_invoice_url?: string | null
+
+  status: PaymentStatus
+  source: PaymentSource
+  received_by_name?: string
+  reviewed_by_name?: string
+  submitted_by_customer_name?: string
+  remarks?: string
+
   notes: string
   created_at: string
 }
@@ -198,6 +247,21 @@ export interface AuditLog {
   old_data: Record<string, unknown> | null
   new_data: Record<string, unknown> | null
   changed_at: string
+}
+
+// ── Payment Channel Settings ──────────────────────────────────────────────────
+export interface PaymentChannelSettings {
+  bkash_number: string
+  bkash_type: string
+  nagad_number: string
+  bank_name: string
+  bank_account_name: string
+  bank_account_number: string
+  bank_branch: string
+  bank_routing_number: string
+  instructions: string
+  updated_by_name?: string
+  updated_at?: string
 }
 
 // ── Pagination ────────────────────────────────────────────────────────────────
