@@ -2,8 +2,24 @@ import { useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  LayoutDashboard, Building, Home, FileText, CreditCard, BarChart3, LogOut, User, 
-  Menu, X, Flame, Users, Layers, Gauge, ShieldCheck, Settings, Clock, Wallet,
+  LayoutDashboard,
+  Building,
+  Home,
+  FileText,
+  CreditCard,
+  BarChart3,
+  LogOut,
+  User,
+  Menu,
+  X,
+  Flame,
+  Users,
+  Layers,
+  Gauge,
+  ShieldCheck,
+  Settings,
+  Clock,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/utils/helpers";
 import { useAuthStore } from "@/store/authStore";
@@ -22,11 +38,12 @@ const ROLE_COLOR: Record<string, string> = {
 export default function AppLayout() {
   const [open, setOpen] = useState(true);
   const { user, clearAuth, refresh_token } = useAuthStore();
-  const { can, role } = usePermissions();
+  const { can } = usePermissions();
   const navigate = useNavigate();
 
-  // Matches backend PaymentWritePermission (SA, Admin, Accountant can write/approve).
-  const canApprovePayments = role === "super_admin" || role === "admin" || role === "accountant";
+  // Single source of truth — matches backend PaymentWritePermission exactly,
+  // instead of duplicating the role-string comparison here separately.
+  const canApprovePayments = can.approvePayments;
 
   const { data: pendingData } = useQuery({
     queryKey: ["payments-pending-count"],
@@ -66,8 +83,8 @@ export default function AppLayout() {
       show: can.viewBuildings,
     },
     { icon: Home, label: "Units", path: "/units", show: can.viewBuildings },
-    { icon: Gauge, label: "Meters", path: "/meters", show: can.viewBuildings },
-    { icon: Flame, label: "Quick Reading", path: "/meters/quick-reading", show: can.viewBuildings },
+    { icon: Gauge, label: "Meters", path: "/meters", show: can.viewMeters },
+    { icon: Flame, label: "Quick Reading", path: "/meters/quick-reading", show: can.recordReading },
     { icon: FileText, label: "Billing", path: "/billing", show: can.viewBills },
     {
       icon: CreditCard,

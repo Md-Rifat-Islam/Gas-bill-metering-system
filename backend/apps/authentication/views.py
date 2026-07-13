@@ -13,7 +13,12 @@ from .serializers import (
 from apps.audit.utils import log_action
 from core.permissions import (
     UserModulePermission, RBACPermission, IsAnyStaff,
-    UserPermissionManagePermission, role as get_role, R, A,
+    UserPermissionManagePermission, role as get_role, R, A, BO, AC, V,
+)
+from core.permissions import (
+    ProjectPermission, PackagePermission, BuildingPermission, MeterPermission,
+    BillPermission, BillDeletePermission, PaymentWritePermission,
+    ReportPermission, FinancialReportPermission, AuditLogPermission,
 )
 from core.rbac import ROLE_DEFAULT_PERMISSIONS
 
@@ -228,6 +233,73 @@ class RoleListPublicView(APIView):
         return Response(RoleSerializer(qs, many=True).data)
 
 
+# ── Live Role Permission Matrix (Roles & RBAC page) ───────────────────────────
+
+class _FakeUser:
+    """Minimal stand-in so role(request) resolves correctly without a real DB user."""
+    def __init__(self, role_name):
+        self.role_name = role_name
+        self.is_authenticated = True
+
+
+class _FakeRequest:
+    def __init__(self, role_name, method='GET'):
+        self.user = _FakeUser(role_name)
+        self.method = method
+
+
+# (key, label, permission_class, http_method_to_simulate)
+# http_method_to_simulate is GET for every row except explicitly
+# delete-scoped ones — matches the page's own "checkmark = at least read
+# access" legend.
+_MATRIX_DEFINITION = [
+    ('projects',   'Projects',            ProjectPermission,         'GET'),
+    ('buildings',  'Buildings / Units',   BuildingPermission,        'GET'),
+    ('packages',   'Packages',            PackagePermission,         'GET'),
+    ('meters',     'Meters & Readings',   MeterPermission,           'GET'),
+    ('bills',      'Bills',               BillPermission,            'GET'),
+    ('billDelete', 'Bills (Delete)',      BillDeletePermission,      'DELETE'),
+    ('payments',   'Payments',            PaymentWritePermission,    'GET'),
+    ('reports',    'Financial Reports',   FinancialReportPermission, 'GET'),
+    ('audit',      'Audit Logs',          AuditLogPermission,        'GET'),
+    ('staff',      'Staff Management',    UserModulePermission,      'GET'),
+    ('rbac',       'Roles & RBAC',        RBACPermission,            'GET'),
+]
+
+_ROLE_ORDER = [R, A, BO, AC, V]  # super_admin, admin, billing_staff, accountant, viewer
+
+
+class RolePermissionMatrixView(APIView):
+    """
+    Feeds the dynamic Roles & RBAC permission matrix by calling each real
+    permission class's has_permission() with a simulated request per role,
+    for each row — rather than maintaining a separate hardcoded grid that
+    can silently drift out of sync with the actual enforcement code (as the
+    frontend's old hardcoded MATRIX constant already had — it said Admin
+    could not record payments after PaymentWritePermission had already been
+    changed to allow it).
+
+    Super Admin only — same gate as the page that consumes this.
+    """
+    permission_classes = [permissions.IsAuthenticated, RBACPermission]
+
+    def get(self, request):
+        rows = []
+        for key, label, perm_class, method in _MATRIX_DEFINITION:
+            perm = perm_class()
+            values = []
+            for role_name in _ROLE_ORDER:
+                fake_req = _FakeRequest(role_name, method)
+                try:
+                    allowed = bool(perm.has_permission(fake_req, None))
+                except Exception:
+                    allowed = False
+                values.append(allowed)
+            rows.append({'key': key, 'label': label, 'values': values})
+
+        return Response({'role_order': _ROLE_ORDER, 'rows': rows})
+
+
 # ── Granular per-module permission overrides ──────────────────────────────────
 
 class UserPermissionListView(APIView):
@@ -250,11 +322,6 @@ class UserPermissionListView(APIView):
         except StaffUser.DoesNotExist:
             raise ValidationError({'detail': 'User not found.'})
 
-    # def get(self, request, user_id):
-    #     target = self.get_target(user_id)
-    #     overrides = UserPermission.objects.filter(user=target)
-    #     return Response(UserPermissionSerializer(overrides, many=True).data)
-    
     def get(self, request, user_id):
         target = self.get_target(user_id)
 
@@ -316,20 +383,7 @@ class UserPermissionListView(APIView):
         ).data)
 
         UserPermission.objects.filter(user=target).delete()
-        # created = []
-        # for row in incoming:
-        #     module = row.get('module')
-        #     if module not in valid_modules:
-        #         continue
-        #     created.append(UserPermission.objects.create(
-        #         user=target,
-        #         module=module,
-        #         can_view=bool(row.get('can_view', True)),
-        #         can_edit=bool(row.get('can_edit', False)),
-        #         can_delete=bool(row.get('can_delete', False)),
-        #         granted_by=request.user,
-        #     ))
-        
+
         created = []
 
         defaults = ROLE_DEFAULT_PERMISSIONS.get(target.role_name, {})
@@ -367,7 +421,7 @@ class UserPermissionListView(APIView):
                     granted_by=request.user,
                 )
             )
-        #----------------------
+
         new_state = UserPermissionSerializer(created, many=True).data
         log_action(
             request.user, 'user_permissions', target.id, 'UPDATE',

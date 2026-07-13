@@ -1,16 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useQuery } from '@tanstack/react-query'
 import {
-  Plus, Gauge, Search, BookOpen, Eye, X,
+  Gauge, BookOpen, Eye, X,
   Calendar, CalendarDays, Filter, LayoutGrid,
 } from 'lucide-react'
-import { metersAPI, unitsAPI } from '@/api/client'
-import { Modal, PageLoader, EmptyState, Pagination } from '@/components/ui'
+import { metersAPI } from '@/api/client'
+import { PageLoader, EmptyState, Pagination } from '@/components/ui'
 import { ReadingModal } from '@/components/meters/ReadingModal'
 import { formatDate } from '@/utils/helpers'
-import toast from 'react-hot-toast'
 
 // ── Date range filter bar ─────────────────────────────────────────────────────
 type DateMode = 'all' | 'month' | 'week' | 'custom'
@@ -120,52 +118,6 @@ function DateFilterBar({ value, onChange }: { value: DateFilter; onChange: (v: D
   )
 }
 
-// ── Assign Meter Modal ────────────────────────────────────────────────────────
-function MeterModal({ open, onClose, units }: any) {
-  const qc = useQueryClient()
-  const { register, handleSubmit, reset } = useForm()
-  const save = useMutation({
-    mutationFn: (data: any) => metersAPI.create(data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['meters'] }); toast.success('Meter assigned'); onClose(); reset() },
-  })
-  return (
-    <Modal open={open} onClose={onClose} title="Assign Meter to Unit" size="sm">
-      <form onSubmit={handleSubmit(d => save.mutate(d))} className="space-y-4">
-        <div>
-          <label className="label">Unit *</label>
-          <select {...register('unit_id', { required: true })} className="input">
-            <option value="">— Select unit —</option>
-            {units?.map((u: any) => (
-              <option key={u.id} value={u.id}>
-                {u.building_name} › F{u.floor_no}-{u.unit_no}
-                {u.allottee?.name ? ` (${u.allottee.name})` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label">Meter No. *</label>
-          <input {...register('meter_no', { required: true })} className="input" placeholder="MTR-00001" />
-        </div>
-        <div>
-          <label className="label">Barcode / QR <span className="text-surface-400 font-normal text-xs">(optional)</span></label>
-          <input {...register('barcode')} className="input" placeholder="Scan or type barcode payload" />
-        </div>
-        <div>
-          <label className="label">Meter Type</label>
-          <input {...register('meter_type')} className="input" placeholder="Standard" defaultValue="Standard" />
-        </div>
-        <div className="flex gap-3 justify-end pt-2">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn-primary" disabled={save.isPending}>
-            {save.isPending ? 'Saving…' : 'Assign Meter'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
-
 // ── Photo thumbnail in table ──────────────────────────────────────────────────
 function PhotoThumb({ url }: { url: string | null }) {
   const [show, setShow] = useState(false)
@@ -191,13 +143,18 @@ function PhotoThumb({ url }: { url: string | null }) {
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
+// NOTE: This page previously had a "Meters" tab (list + Assign Meter) that
+// duplicated meter assignment against the Units page — a unit's meter
+// could be set independently in two disconnected places, which caused a
+// unique-constraint error when a meter was assigned to a unit that already
+// had one from the other tab. Meter assignment now lives solely on the
+// Units page (one meter icon per row, handles both assign and edit). This
+// page is meter READING history + recording only.
 export default function MetersPage() {
   const navigate = useNavigate()
-  const [search,      setSearch]      = useState('')
-  const [page,        setPage]        = useState(1)
-  const [meterModal,  setMeterModal]  = useState(false)
-  const [readingModal,setReadingModal]= useState(false)
-  const [tab,         setTab]         = useState<'meters' | 'readings'>('meters')
+  const [page, setPage] = useState(1)
+
+  const [readingModal, setReadingModal] = useState(false)
 
   const now = new Date()
   const [dateFilter, setDateFilter] = useState<DateFilter>({
@@ -231,21 +188,16 @@ export default function MetersPage() {
     return p
   }
 
-  const { data: metersData, isLoading: loadingMeters } = useQuery({
-    queryKey: ['meters', search, page],
-    queryFn: () => metersAPI.list({ search, page }).then(r => r.data),
-    enabled: tab === 'meters',
-  })
   const { data: readingsData, isLoading: loadingReadings } = useQuery({
     queryKey: ['meter-readings', dateFilter, page],
     queryFn: () => metersAPI.readings(readingParams()).then(r => r.data),
-    enabled: tab === 'readings',
   })
-  const { data: units } = useQuery({
-    queryKey: ['units-all'],
-    queryFn: () => unitsAPI.list({ status: 'Active', page_size: 500 }).then(r => {
-      const raw = r.data; return Array.isArray(raw) ? raw : (raw.results ?? [])
-    }),
+
+  // Record Reading needs a meter list to pick from — fetched here since
+  // this page's own "Meters" tab (which used to provide this) is gone.
+  const { data: metersData } = useQuery({
+    queryKey: ['meters-all-for-reading'],
+    queryFn: () => metersAPI.list({ page_size: 500 }).then(r => r.data),
   })
 
   const meters   = metersData?.results   ?? []
@@ -255,8 +207,13 @@ export default function MetersPage() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Meters</h1>
-          <p className="page-subtitle">Meter assignments and readings</p>
+          <h1 className="page-title">Meter Readings</h1>
+          <p className="page-subtitle">
+            Reading history — assign or edit a unit's meter from the{' '}
+            <button className="underline text-brand-600 hover:text-brand-700" onClick={() => navigate('/units')}>
+              Units page
+            </button>
+          </p>
         </div>
         <div className="flex gap-3">
           <button className="btn-primary" onClick={() => navigate('/meters/quick-reading')}>
@@ -265,135 +222,63 @@ export default function MetersPage() {
           <button className="btn-secondary" onClick={() => setReadingModal(true)}>
             <BookOpen className="w-4 h-4" /> Record Reading
           </button>
-          <button className="btn-secondary" onClick={() => setMeterModal(true)}>
-            <Plus className="w-4 h-4" /> Assign Meter
-          </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-surface-100 rounded-xl p-1 w-fit mb-6">
-        {(['meters', 'readings'] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => { setTab(t); setPage(1) }}
-            className={`px-5 py-2 rounded-lg text-sm font-medium transition-all capitalize ${
-              tab === t ? 'bg-white shadow-sm text-surface-900' : 'text-surface-500 hover:text-surface-700'
-            }`}
-          >
-            {t === 'meters' ? 'Meters' : 'Readings'}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Meters tab ── */}
-      {tab === 'meters' && (
+      <DateFilterBar value={dateFilter} onChange={f => { setDateFilter(f); setPage(1) }} />
+      {loadingReadings ? <PageLoader /> : (
         <>
-          <div className="relative mb-4 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
-            <input className="input pl-9" placeholder="Search meter no., barcode, unit, allottee…"
-              value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} />
+          <div className="table-wrapper">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Photo</th>
+                  <th>Date</th>
+                  <th>Meter No.</th>
+                  <th>Unit / Allottee</th>
+                  <th>Building</th>
+                  <th className="text-right">Previous</th>
+                  <th className="text-right">Current</th>
+                  <th className="text-right">Usage (m³)</th>
+                  <th>Recorded By</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {readings.length === 0 ? (
+                  <tr><td colSpan={10}>
+                    <EmptyState
+                      icon={BookOpen}
+                      title="No readings found"
+                      description="No readings match the selected date range"
+                    />
+                  </td></tr>
+                ) : readings.map((r: any) => (
+                  <tr key={r.id}>
+                    <td><PhotoThumb url={r.reading_photo_url} /></td>
+                    <td className="text-surface-600 text-sm font-medium">{formatDate(r.reading_date)}</td>
+                    <td><span className="font-mono text-xs font-semibold">{r.meter_no}</span></td>
+                    <td>
+                      <div className="font-medium text-surface-800">{r.unit_no}</div>
+                      <div className="text-xs text-surface-400">{r.allottee_name || '—'}</div>
+                    </td>
+                    <td className="text-surface-500 text-sm">{r.building_name}</td>
+                    <td className="font-mono text-right text-surface-500">{r.previous_reading}</td>
+                    <td className="font-mono text-right text-surface-700">{r.current_reading}</td>
+                    <td className="text-right">
+                      <span className="font-mono font-bold text-brand-600">{r.usage}</span>
+                    </td>
+                    <td className="text-surface-500 text-sm">{r.recorded_by_name || '—'}</td>
+                    <td className="text-surface-400 text-sm max-w-xs truncate">{r.notes || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          {loadingMeters ? <PageLoader /> : (
-            <>
-              <div className="table-wrapper">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Meter No.</th>
-                      <th>Barcode</th>
-                      <th>Type</th>
-                      <th>Unit</th>
-                      <th>Floor</th>
-                      <th>Building</th>
-                      <th>Allottee</th>
-                      <th>Assigned On</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {meters.length === 0 ? (
-                      <tr><td colSpan={8}><EmptyState icon={Gauge} title="No meters assigned" /></td></tr>
-                    ) : meters.map((m: any) => (
-                      <tr key={m.id}>
-                        <td><span className="font-mono font-semibold text-brand-700">{m.meter_no}</span></td>
-                        <td className="font-mono text-xs text-surface-500">{m.barcode || '—'}</td>
-                        <td className="text-surface-500 text-sm">{m.meter_type}</td>
-                        <td className="font-medium">{m.unit_no}</td>
-                        <td className="text-center text-surface-500">{m.floor_no}</td>
-                        <td className="text-surface-500">{m.building_name}</td>
-                        <td className="text-surface-600">{m.allottee_name || '—'}</td>
-                        <td className="text-surface-400 text-sm">{formatDate(m.created_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <Pagination page={page} count={metersData?.count || 0} onChange={setPage} />
-            </>
-          )}
+          <Pagination page={page} count={readingsData?.count || 0} onChange={setPage} />
         </>
       )}
 
-      {/* ── Readings tab ── */}
-      {tab === 'readings' && (
-        <>
-          <DateFilterBar value={dateFilter} onChange={f => { setDateFilter(f); setPage(1) }} />
-          {loadingReadings ? <PageLoader /> : (
-            <>
-              <div className="table-wrapper">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Photo</th>
-                      <th>Date</th>
-                      <th>Meter No.</th>
-                      <th>Unit / Allottee</th>
-                      <th>Building</th>
-                      <th className="text-right">Previous</th>
-                      <th className="text-right">Current</th>
-                      <th className="text-right">Usage (m³)</th>
-                      <th>Recorded By</th>
-                      <th>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {readings.length === 0 ? (
-                      <tr><td colSpan={10}>
-                        <EmptyState
-                          icon={BookOpen}
-                          title="No readings found"
-                          description="No readings match the selected date range"
-                        />
-                      </td></tr>
-                    ) : readings.map((r: any) => (
-                      <tr key={r.id}>
-                        <td><PhotoThumb url={r.reading_photo_url} /></td>
-                        <td className="text-surface-600 text-sm font-medium">{formatDate(r.reading_date)}</td>
-                        <td><span className="font-mono text-xs font-semibold">{r.meter_no}</span></td>
-                        <td>
-                          <div className="font-medium text-surface-800">{r.unit_no}</div>
-                          <div className="text-xs text-surface-400">{r.allottee_name || '—'}</div>
-                        </td>
-                        <td className="text-surface-500 text-sm">{r.building_name}</td>
-                        <td className="font-mono text-right text-surface-500">{r.previous_reading}</td>
-                        <td className="font-mono text-right text-surface-700">{r.current_reading}</td>
-                        <td className="text-right">
-                          <span className="font-mono font-bold text-brand-600">{r.usage}</span>
-                        </td>
-                        <td className="text-surface-500 text-sm">{r.recorded_by_name || '—'}</td>
-                        <td className="text-surface-400 text-sm max-w-xs truncate">{r.notes || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <Pagination page={page} count={readingsData?.count || 0} onChange={setPage} />
-            </>
-          )}
-        </>
-      )}
-
-      <MeterModal  open={meterModal}   onClose={() => setMeterModal(false)}   units={units} />
       <ReadingModal open={readingModal} onClose={() => setReadingModal(false)} meters={meters} />
     </div>
   )

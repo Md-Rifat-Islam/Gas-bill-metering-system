@@ -2,11 +2,12 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ScanLine, Filter as FilterIcon, ArrowLeft, ArrowRight, Gauge } from 'lucide-react'
 import { projectsAPI, buildingsAPI, metersAPI } from '@/api/client'
-import { PageLoader, EmptyState } from '@/components/ui'
+import { PageLoader, EmptyState, AccessDenied } from '@/components/ui'
 import { SearchInput } from '@/components/forms'
 import { MeterCard } from '@/components/meters/MeterCard'
 import { ReadingModal } from '@/components/meters/ReadingModal'
 import { BarcodeScanner } from '@/components/meters/BarcodeScanner'
+import { usePermissions } from '@/hooks/usePermissions'
 import type { MeterCardData, Project, Building } from '@/types'
 import toast from 'react-hot-toast'
 
@@ -15,6 +16,7 @@ type StatusFilter = typeof STATUS_FILTERS[number]
 
 export default function QuickReadingPage() {
   const qc = useQueryClient()
+  const { can } = usePermissions()
 
   const [projectId,  setProjectId]  = useState<string>('')
   const [buildingId, setBuildingId] = useState<string>('')
@@ -31,6 +33,7 @@ export default function QuickReadingPage() {
     queryFn: () => projectsAPI.list({ page_size: 500 }).then(r => {
       const raw = r.data; return Array.isArray(raw) ? raw : (raw.results ?? [])
     }),
+    enabled: can.recordReading,
   })
 
   const { data: allBuildings } = useQuery({
@@ -38,6 +41,7 @@ export default function QuickReadingPage() {
     queryFn: () => buildingsAPI.list({ page_size: 500 }).then(r => {
       const raw = r.data; return Array.isArray(raw) ? raw : (raw.results ?? [])
     }),
+    enabled: can.recordReading,
   })
 
   const buildings = useMemo(
@@ -56,7 +60,7 @@ export default function QuickReadingPage() {
       project_id: projectId || undefined,
       building_id: buildingId || undefined,
     }).then(r => r.data),
-    enabled: Boolean(buildingId),
+    enabled: Boolean(buildingId) && can.recordReading,
   })
 
   const allCards: MeterCardData[] = cardsData?.results ?? []
@@ -145,6 +149,11 @@ export default function QuickReadingPage() {
     setFocusedId(pendingQueue[nextIdx].id)
   }
 
+  // Guard placed after all hooks (Rules of Hooks) — previously this page had
+  // no permission check at all, relying only on the sidebar hiding the link
+  // (which a direct URL visit bypasses entirely).
+  if (!can.recordReading) return <AccessDenied />
+
   return (
     <div>
       <div className="page-header">
@@ -160,8 +169,8 @@ export default function QuickReadingPage() {
       {/* Project / Building selectors */}
       <div className="flex flex-wrap gap-3 mb-6 p-4 bg-white rounded-2xl border border-surface-100 shadow-card">
         <div className="min-w-[200px]">
-          <label className="label">Project</label>
-          <select className="input" value={projectId} onChange={e => setProjectId(e.target.value)} title="Select a project first">
+          <label className="label" htmlFor="project-select">Project</label>
+          <select id="project-select" className="input" value={projectId} onChange={e => setProjectId(e.target.value)}>
             <option value="">— Select project —</option>
             {(projects ?? []).map((p: Project) => (
               <option key={p.id} value={p.id}>{p.name}</option>
@@ -169,10 +178,10 @@ export default function QuickReadingPage() {
           </select>
         </div>
         <div className="min-w-[200px]">
-          <label className="label">Building</label>
+          <label className="label" htmlFor="building-select">Building</label>
           <select
+            id="building-select"
             className="input"
-            title={projectId ? '' : 'Select a project first'}
             value={buildingId}
             onChange={e => setBuildingId(e.target.value)}
             disabled={!projectId}
@@ -188,8 +197,8 @@ export default function QuickReadingPage() {
           <SearchInput value={search} onChange={setSearch} placeholder="Meter, unit, customer, mobile…" />
         </div>
         <div className="min-w-[160px]">
-          <label className="label">Sort</label>
-          <select className="input" value={sortBy} onChange={e => setSortBy(e.target.value as any)} disabled={!buildingId} title={buildingId ? '' : 'Select a building first'}>
+          <label htmlFor="sort-select" className="label">Sort</label>
+          <select id="sort-select" className="input" value={sortBy} onChange={e => setSortBy(e.target.value as any)}>
             <option value="unit">Floor / Unit</option>
             <option value="status">Status</option>
           </select>

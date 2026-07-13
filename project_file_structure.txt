@@ -13,6 +13,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   ├── apps.py
 │   │   │   ├── migrations
 │   │   │   │   ├── 0001_initial.py
+│   │   │   │   ├── 0002_auditlog_changed_by_customer.py
 │   │   │   │   └── __init__.py
 │   │   │   ├── models.py
 │   │   │   ├── urls.py
@@ -67,6 +68,8 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   │   ├── 0001_initial.py
 │   │   │   │   ├── 0002_meterreading_reading_photo.py
 │   │   │   │   ├── 0003_alter_meterreading_options.py
+│   │   │   │   ├── 0004_meter_barcode_and_indexes.py
+│   │   │   │   ├── 0005_rename_meters_barcode_idx_meters_barcode_f3970e_idx_and_more.py
 │   │   │   │   └── __init__.py
 │   │   │   ├── models.py
 │   │   │   ├── serializers.py
@@ -81,6 +84,9 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   │   ├── 0002_payment_approval_status_payment_approved_at_and_more.py
 │   │   │   │   ├── 0003_payment_proof_image_payment_proof_invoice.py
 │   │   │   │   ├── 0004_remove_payment_approval_status_and_more.py
+│   │   │   │   ├── 0005_payment_approval_workflow.py
+│   │   │   │   ├── 0006_payment_channel_settings.py
+│   │   │   │   ├── 0007_alter_paymentchannelsettings_bkash_type_and_more.py
 │   │   │   │   └── __init__.py
 │   │   │   ├── models.py
 │   │   │   ├── serializers.py
@@ -101,6 +107,8 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   ├── apps.py
 │   │   │   ├── migrations
 │   │   │   │   ├── 0001_initial.py
+│   │   │   │   ├── 0002_package_conversion_factor.py
+│   │   │   │   ├── 0003_alter_package_unit_type.py
 │   │   │   │   └── __init__.py
 │   │   │   ├── models.py
 │   │   │   ├── serializers.py
@@ -135,6 +143,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   ├── exceptions.py
 │   │   ├── pagination.py
 │   │   ├── permissions.py
+│   │   ├── rbac.py
 │   │   └── utils.py
 │   ├── gas_billing
 │   │   ├── __init__.py
@@ -176,6 +185,14 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   ├── layout
 │   │   │   │   ├── AppLayout.tsx
 │   │   │   │   └── PortalLayout.tsx
+│   │   │   ├── meters
+│   │   │   │   ├── BarcodeScanner.tsx
+│   │   │   │   ├── MeterCard.tsx
+│   │   │   │   └── ReadingModal.tsx
+│   │   │   ├── payments
+│   │   │   │   ├── BkashComingSoon.tsx
+│   │   │   │   ├── PaymentChannelsCard.tsx
+│   │   │   │   └── PaymentModal.tsx
 │   │   │   └── ui
 │   │   │       └── index.tsx
 │   │   ├── hooks
@@ -194,9 +211,11 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   ├── dashboard
 │   │   │   │   └── DashboardPage.tsx
 │   │   │   ├── meters
-│   │   │   │   └── MetersPage.tsx
+│   │   │   │   ├── MetersPage.tsx
+│   │   │   │   └── QuickReadingPage.tsx
 │   │   │   ├── payments
-│   │   │   │   └── PaymentsPage.tsx
+│   │   │   │   ├── PaymentsPage.tsx
+│   │   │   │   └── PendingPaymentsPage.tsx
 │   │   │   ├── portal
 │   │   │   │   ├── PortalBillDetailPage.tsx
 │   │   │   │   ├── PortalBillsPage.tsx
@@ -210,6 +229,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   ├── reports
 │   │   │   │   └── ReportsPage.tsx
 │   │   │   ├── settings
+│   │   │   │   ├── PaymentChannelSettingsPage.tsx
 │   │   │   │   ├── RolesPage.tsx
 │   │   │   │   └── StaffPage.tsx
 │   │   │   └── units

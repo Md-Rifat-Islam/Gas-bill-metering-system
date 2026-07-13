@@ -70,6 +70,7 @@ def export_bills_excel(bills_qs, title='Billing Export') -> bytes:
         ws.column_dimensions[get_column_letter(i)].width = w
 
     total_billed = total_paid = total_due = Decimal('0')
+    sl = 0
     for sl, bill in enumerate(bills_qs, start=1):
         r = sl + 2
         allottee = getattr(getattr(bill.unit, 'allottee', None), 'name', '') or ''
@@ -131,17 +132,22 @@ def export_payments_excel(payments_qs, title='Payment Export') -> bytes:
     ws = wb.active
     ws.title = 'Payments'
 
+    # NOTE: previously read p.approval_status, a field that no longer exists
+    # on Payment (it was replaced by `status` + `source` during the approval
+    # workflow rebuild) — this was an unwired, never-exercised code path
+    # that would have crashed with AttributeError on first real use.
     headers = [
         'SL', 'Date', 'Bill No.', 'Project', 'Building', 'Unit', 'Allottee',
-        'Amount', 'Method', 'Transaction ID', 'Status', 'Received By', 'Notes',
+        'Amount', 'Method', 'Transaction ID', 'Status', 'Source', 'Received/Reviewed By', 'Notes',
     ]
     _title_row(ws, title, len(headers))
     _header_row(ws, headers)
 
-    for i, w in enumerate([5, 12, 14, 18, 16, 8, 20, 13, 10, 18, 10, 16, 20], 1):
+    for i, w in enumerate([5, 12, 14, 18, 16, 8, 20, 13, 10, 18, 10, 10, 18, 20], 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
     total = Decimal('0')
+    sl = 0
     for sl, p in enumerate(payments_qs, start=1):
         r = sl + 2
         allottee = getattr(getattr(p.bill.unit, 'allottee', None), 'name', '') or ''
@@ -156,10 +162,11 @@ def export_payments_excel(payments_qs, title='Payment Export') -> bytes:
             float(p.paid_amount),
             p.payment_method,
             p.transaction_id or '—',
-            p.approval_status,
-            p.received_by.name if p.received_by else (
+            p.status,
+            p.source,
+            p.reviewed_by.name if p.reviewed_by else (p.received_by.name if p.received_by else (
                 '(Customer)' if p.submitted_by_customer else '—'
-            ),
+            )),
             p.notes or '',
         ]
         for col, val in enumerate(vals, 1):
@@ -169,7 +176,7 @@ def export_payments_excel(payments_qs, title='Payment Export') -> bytes:
             elif col == 1:
                 _style(c, font=NORMAL_FONT, align=CENTER)
             else:
-                _style(c, font=NORMAL_FONT, align=LEFT if col in (4, 5, 7, 13) else CENTER)
+                _style(c, font=NORMAL_FONT, align=LEFT if col in (4, 5, 7, 14) else CENTER)
         total += p.paid_amount
 
     tr = sl + 3

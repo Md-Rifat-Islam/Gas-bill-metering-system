@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import {
-  CreditCard, Search, ExternalLink, Plus, Clock, Upload, X, ZoomIn,
+  CreditCard, Search, ExternalLink, Plus, Clock, Upload, X, ZoomIn, Download, Loader2,
 } from 'lucide-react'
-import { paymentsAPI, billingAPI } from '@/api/client'
+import { paymentsAPI, billingAPI, reportsAPI } from '@/api/client'
 import { Modal, PageLoader, EmptyState, Pagination } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import toast from 'react-hot-toast'
@@ -95,7 +95,7 @@ function ProofInput({ value, onChange }: { value: File | null; onChange: (f: Fil
 // ── Manual Payment Entry Modal ────────────────────────────────────────────────
 function ManualPaymentModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const qc = useQueryClient()
-  const { register, handleSubmit, reset } = useForm({
+  const { register, handleSubmit, reset, watch } = useForm({
     defaultValues: {
       bill_id: '',
       paid_amount: '',
@@ -107,6 +107,9 @@ function ManualPaymentModal({ open, onClose }: { open: boolean; onClose: () => v
   })
   const [proof, setProof] = useState<File | null>(null)
   const [billSearch, setBillSearch] = useState('')
+
+  const selectedBillId = watch('bill_id')
+  const enteredAmount = Number(watch('paid_amount')) || 0
 
   // Fetch a working set of bills to search/select from — mirrors the
   // page_size:500 + client-side filter pattern already used elsewhere
@@ -127,6 +130,11 @@ function ManualPaymentModal({ open, onClose }: { open: boolean; onClose: () => v
       b.allottee_name?.toLowerCase().includes(billSearch.toLowerCase())
     )
   )
+
+  const selectedBill = (billsData ?? []).find((b: any) => String(b.id) === String(selectedBillId))
+  const previousDue = Number(selectedBill?.due_amount || 0)
+  const remainingDue = Math.max(0, previousDue - enteredAmount)
+  const overpaying = Boolean(selectedBill) && enteredAmount > previousDue
 
   const save = useMutation({
     mutationFn: (data: any) => {
@@ -165,6 +173,20 @@ function ManualPaymentModal({ open, onClose }: { open: boolean; onClose: () => v
           </select>
         </div>
 
+        {/* Previous paid/due for the selected bill */}
+        {selectedBill && (
+          <div className="bg-surface-50 rounded-xl p-3 text-sm space-y-1">
+            <div className="flex justify-between">
+              <span className="text-surface-500">Previous Paid</span>
+              <span className="text-success-600 font-semibold">{formatCurrency(selectedBill.paid_amount)}</span>
+            </div>
+            <div className="flex justify-between border-t border-surface-200 pt-1">
+              <span className="font-semibold text-surface-700">Previous Due</span>
+              <span className="text-danger-600 font-bold">{formatCurrency(previousDue)}</span>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="label">Amount (৳) *</label>
@@ -190,6 +212,22 @@ function ManualPaymentModal({ open, onClose }: { open: boolean; onClose: () => v
           </div>
         </div>
 
+        {/* Live remaining-due preview — recalculates as the amount is typed */}
+        {selectedBill && (
+          <div className={`rounded-xl p-3 flex justify-between items-center text-sm ${
+            overpaying ? 'bg-danger-50' : remainingDue === 0 ? 'bg-success-50' : 'bg-brand-50'
+          }`}>
+            <span className={overpaying ? 'text-danger-600 font-medium' : 'text-surface-600'}>
+              {overpaying ? 'Exceeds due amount' : 'Remaining Due After This Payment'}
+            </span>
+            <span className={`font-bold ${
+              overpaying ? 'text-danger-700' : remainingDue === 0 ? 'text-success-700' : 'text-brand-700'
+            }`}>
+              {formatCurrency(remainingDue)}
+            </span>
+          </div>
+        )}
+
         <ProofInput value={proof} onChange={setProof} />
 
         <div>
@@ -199,7 +237,7 @@ function ManualPaymentModal({ open, onClose }: { open: boolean; onClose: () => v
 
         <div className="flex gap-3 justify-end pt-2 border-t border-surface-100">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn-primary" disabled={save.isPending}>
+          <button type="submit" className="btn-primary" disabled={save.isPending || overpaying}>
             {save.isPending ? 'Saving…' : 'Record Payment'}
           </button>
         </div>
@@ -215,6 +253,7 @@ export default function PaymentsPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
   const [entryModal, setEntryModal] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: ['all-payments', page, methodFilter, statusFilter],
@@ -234,6 +273,22 @@ export default function PaymentsPage() {
 
   const payments = data?.results || []
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      // Exports exactly what's currently filtered — same method/status
+      // params the list query itself is using.
+      await reportsAPI.exportPaymentsExcel({
+        payment_method: methodFilter || undefined,
+        status: statusFilter || undefined,
+      })
+    } catch {
+      toast.error('Could not export payments')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -250,6 +305,10 @@ export default function PaymentsPage() {
                 {pendingCount}
               </span>
             )}
+          </button>
+          <button className="btn-secondary" onClick={handleExport} disabled={exporting} title="Export current view to Excel">
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Export Excel
           </button>
           <button className="btn-primary" onClick={() => setEntryModal(true)}>
             <Plus className="w-4 h-4" /> Record Payment

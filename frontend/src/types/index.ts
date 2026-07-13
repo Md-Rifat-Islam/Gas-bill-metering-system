@@ -28,6 +28,7 @@ export interface Package {
   name: string
   unit_type: 'm3' | 'kg'
   per_unit_cost: string
+  conversion_factor?: string | null
   description: string
   is_active: boolean
 }

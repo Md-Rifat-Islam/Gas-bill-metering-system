@@ -27,43 +27,13 @@ const ROLE_META: Record<string, { label: string; icon: any; color: string; desc:
   },
 }
 
-// Permission matrix — mirrors backend core/permissions.py
-const MODULES: { key: string; label: string }[] = [
-  { key: 'projects',   label: 'Projects' },
-  { key: 'buildings',  label: 'Buildings / Units' },
-  { key: 'packages',   label: 'Packages' },
-  { key: 'meters',     label: 'Meters & Readings' },
-  { key: 'bills',      label: 'Bills (Create/Edit)' },
-  { key: 'billDelete', label: 'Bills (Delete)' },
-  { key: 'payments',   label: 'Record Payments' },
-  { key: 'reports',    label: 'Financial Reports' },
-  { key: 'audit',      label: 'Audit Logs' },
-  { key: 'staff',      label: 'Staff Management' },
-  { key: 'rbac',       label: 'Roles & RBAC' },
-]
-
-// SA, Admin, Billing Officer, Accountant, Viewer
-const MATRIX: Record<string, boolean[]> = {
-  projects:   [true,  false, false, false, false],
-  buildings:  [true,  false, false, false, false],
-  packages:   [true,  false, false, false, false],
-  meters:     [true,  false, true,  false, false],
-  bills:      [true,  false, true,  false, false],
-  billDelete: [true,  false, false, false, false],
-  payments:   [true,  false, false, true,  false],
-  reports:    [true,  false, false, true,  false],
-  audit:      [true,  false, false, false, false],
-  staff:      [true,  true,  false, false, false],
-  rbac:       [true,  false, false, false, false],
-}
-
 const ROLE_ORDER = ['super_admin', 'admin', 'billing_staff', 'accountant', 'viewer']
 
 export default function RolesPage() {
   const { can } = usePermissions()
   if (!can.manageRBAC) return <AccessDenied />
 
-  const { data: staff = [], isLoading } = useQuery({
+  const { data: staff = [], isLoading: loadingStaff } = useQuery({
     queryKey: ['staff'],
     queryFn: async () => {
       const res = await authAPI.staff()
@@ -72,8 +42,18 @@ export default function RolesPage() {
     },
   })
 
+  // Fetched live from the backend — built by calling the actual permission
+  // classes per role rather than a hand-maintained constant, so this can
+  // never silently drift out of sync with real enforcement again.
+  const { data: matrixData, isLoading: loadingMatrix, isError: matrixError } = useQuery({
+    queryKey: ['role-permission-matrix'],
+    queryFn: () => authAPI.rolePermissionMatrix().then(r => r.data),
+  })
+
   const countFor = (roleName: string) =>
     staff.filter((s: any) => s.role?.role_name === roleName).length
+
+  const isLoading = loadingStaff || loadingMatrix
 
   return (
     <div>
@@ -114,39 +94,60 @@ export default function RolesPage() {
             <div className="px-6 py-4 border-b border-surface-100 flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-brand-500" />
               <span className="font-semibold text-surface-800">Permission Matrix</span>
+              <span className="text-xs text-surface-400 font-normal ml-1">(live from backend)</span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th className="min-w-[180px]">Module</th>
-                    {ROLE_ORDER.map(r => (
-                      <th key={r} className="text-center">{ROLE_META[r].label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {MODULES.map(m => (
-                    <tr key={m.key}>
-                      <td className="font-medium text-surface-700">{m.label}</td>
-                      {MATRIX[m.key].map((allowed, i) => (
-                        <td key={i} className="text-center">
-                          {allowed ? (
-                            <span className="inline-flex w-6 h-6 rounded-full bg-success-50 text-success-600 items-center justify-center text-xs font-bold">✓</span>
-                          ) : (
-                            <span className="inline-flex w-6 h-6 rounded-full bg-surface-50 text-surface-300 items-center justify-center text-xs">—</span>
-                          )}
-                        </td>
+
+            {matrixError ? (
+              <div className="p-6 text-sm text-danger-600">
+                Could not load the live permission matrix. Confirm{' '}
+                <code className="font-mono text-xs bg-surface-50 px-1 py-0.5 rounded">
+                  GET /auth/roles/permission-matrix/
+                </code>{' '}
+                is registered and reachable.
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th className="min-w-[180px]">Module</th>
+                        {ROLE_ORDER.map(r => (
+                          <th key={r} className="text-center">{ROLE_META[r].label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {matrixData?.rows?.map((row: any) => (
+                        <tr key={row.key}>
+                          <td className="font-medium text-surface-700">{row.label}</td>
+                          {row.values.map((allowed: boolean, i: number) => (
+                            <td key={i} className="text-center">
+                              {allowed ? (
+                                <span className="inline-flex w-6 h-6 rounded-full bg-success-50 text-success-600 items-center justify-center text-xs font-bold">✓</span>
+                              ) : (
+                                <span className="inline-flex w-6 h-6 rounded-full bg-surface-50 text-surface-300 items-center justify-center text-xs">—</span>
+                              )}
+                            </td>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="px-6 py-3 bg-surface-50 text-xs text-surface-400 border-t border-surface-100">
-              Roles are fixed by system design. To grant a user additional access beyond their role,
-              a Super Admin can change their assigned role under <span className="font-medium text-surface-600">Staff Users</span>.
-            </div>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="px-6 py-3 bg-surface-50 text-xs text-surface-400 border-t border-surface-100 space-y-1">
+                  <p>
+                    A checkmark means the role has at least read access to that module, computed live
+                    from the actual backend permission classes — not a separately maintained list, so
+                    this table can't go stale the way a hardcoded one can.
+                  </p>
+                  <p>
+                    Roles are fixed by system design. To grant a user additional access beyond their role,
+                    a Super Admin can change their assigned role under <span className="font-medium text-surface-600">Staff Users</span>.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </>
       )}

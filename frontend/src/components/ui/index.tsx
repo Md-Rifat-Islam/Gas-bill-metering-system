@@ -1,6 +1,20 @@
-import { Fragment } from 'react'
+import { useEffect, useRef } from 'react'
 import { X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { cn, getBillStatusBadge } from '@/utils/helpers'
+
+// ── Body scroll lock (ref-counted so nested/stacked modals don't fight) ──────
+let openModalCount = 0
+function lockBodyScroll() {
+  openModalCount++
+  document.body.style.overflow = 'hidden'
+}
+function unlockBodyScroll() {
+  openModalCount = Math.max(0, openModalCount - 1)
+  if (openModalCount === 0) document.body.style.overflow = ''
+}
+
+const FOCUSABLE_SELECTOR =
+  'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
 
 // ── Modal ────────────────────────────────────────────────────────────────────
 interface ModalProps {
@@ -11,19 +25,75 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl'
 }
 export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
+  const panelRef = useRef<HTMLDivElement>(null)
+  const previouslyFocused = useRef<HTMLElement | null>(null)
+
+  // Body scroll lock + focus trap + Escape-to-close + restore focus on close.
+  useEffect(() => {
+    if (!open) return
+
+    previouslyFocused.current = document.activeElement as HTMLElement
+    lockBodyScroll()
+
+    // Focus the first focusable element once the panel has mounted.
+    const focusTimer = setTimeout(() => {
+      const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+      first?.focus()
+    }, 0)
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key === 'Tab' && panelRef.current) {
+        const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+        if (focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      clearTimeout(focusTimer)
+      document.removeEventListener('keydown', handleKeyDown)
+      unlockBodyScroll()
+      previouslyFocused.current?.focus?.()
+    }
+  }, [open, onClose])
+
   if (!open) return null
   const sizes = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 py-8 overflow-y-auto">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn('relative bg-white rounded-2xl shadow-2xl w-full animate-fadeIn', sizes[size])}>
-        <div className="flex items-center justify-between p-6 border-b border-surface-100">
-          <h2 className="text-lg font-bold text-surface-900">{title}</h2>
-          <button onClick={onClose} className="btn-ghost btn-sm !p-1.5" title="Close Modal">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        className={cn(
+          'relative bg-white rounded-2xl shadow-2xl w-full animate-fadeIn my-auto',
+          'max-h-[90vh] flex flex-col',
+          sizes[size]
+        )}
+      >
+        <div className="flex items-center justify-between p-6 border-b border-surface-100 shrink-0">
+          <h2 id="modal-title" className="text-lg font-bold text-surface-900">{title}</h2>
+          <button onClick={onClose} className="btn-ghost btn-sm !p-1.5" title="Close Modal" aria-label="Close modal">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-6 overflow-y-auto">{children}</div>
       </div>
     </div>
   )

@@ -9,28 +9,48 @@ import { useConfirm } from '@/hooks'
 import { formatCurrency } from '@/utils/helpers'
 import toast from 'react-hot-toast'
 
-interface PackageForm { name: string; unit_type: string; per_unit_cost: number; description: string }
+interface PackageForm {
+  name: string
+  unit_type: string
+  per_unit_cost: number
+  conversion_factor: number | ''
+  description: string
+}
 interface ProjectForm { name: string; address: string; default_package_id: number | ''; service_charge: number }
 
 function PackageModal({ open, onClose, editItem, readOnly }: any) {
   const qc = useQueryClient()
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<PackageForm>({
-    defaultValues: { name: '', unit_type: 'm3', per_unit_cost: 0, description: '' },
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<PackageForm>({
+    defaultValues: { name: '', unit_type: 'm3', per_unit_cost: 0, conversion_factor: '', description: '' },
   })
+  const unitType = watch('unit_type')
 
   // Fix: re-populate the form whenever the modal opens / target item changes.
   useEffect(() => {
     if (open) {
       reset(editItem
-        ? { name: editItem.name, unit_type: editItem.unit_type, per_unit_cost: editItem.per_unit_cost, description: editItem.description ?? '' }
-        : { name: '', unit_type: 'm3', per_unit_cost: 0, description: '' }
+        ? {
+            name: editItem.name,
+            unit_type: editItem.unit_type,
+            per_unit_cost: editItem.per_unit_cost,
+            conversion_factor: editItem.conversion_factor ?? '',
+            description: editItem.description ?? '',
+          }
+        : { name: '', unit_type: 'm3', per_unit_cost: 0, conversion_factor: '', description: '' }
       )
     }
   }, [open, editItem, reset])
 
   const save = useMutation({
-    mutationFn: (data: PackageForm) =>
-      editItem ? projectsAPI.updatePackage(editItem.id, data) : projectsAPI.createPackage(data),
+    mutationFn: (data: PackageForm) => {
+      const payload = {
+        ...data,
+        // Conversion factor only makes sense for kg-billed packages — don't
+        // send a stale value if the package is m3-billed.
+        conversion_factor: data.unit_type === 'kg' && data.conversion_factor ? data.conversion_factor : null,
+      }
+      return editItem ? projectsAPI.updatePackage(editItem.id, payload) : projectsAPI.createPackage(payload)
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['packages'] })
       toast.success(editItem ? 'Package updated' : 'Package created')
@@ -69,7 +89,9 @@ function PackageModal({ open, onClose, editItem, readOnly }: any) {
             </select>
           </div>
           <div>
-            <label className="label" htmlFor="pkg-price">Price / Unit (৳) <span className="text-danger-500">*</span></label>
+            <label className="label" htmlFor="pkg-price">
+              Price / {unitType === 'kg' ? 'kg' : 'm³'} (৳) <span className="text-danger-500">*</span>
+            </label>
             <input
               id="pkg-price"
               {...register('per_unit_cost', { required: true, min: 0 })}
@@ -82,6 +104,29 @@ function PackageModal({ open, onClose, editItem, readOnly }: any) {
             />
           </div>
         </div>
+
+        {unitType === 'kg' && (
+          <div className="animate-fadeIn">
+            <label className="label" htmlFor="pkg-conversion">
+              Conversion Ratio (kg per m³) <span className="text-danger-500">*</span>
+            </label>
+            <input
+              id="pkg-conversion"
+              {...register('conversion_factor', { required: unitType === 'kg', min: 0.0001 })}
+              type="number"
+              step="0.0001"
+              disabled={readOnly}
+              className="input"
+              placeholder="e.g. 0.75"
+              aria-label="Conversion ratio"
+              title="Conversion ratio"
+            />
+            <p className="text-xs text-surface-400 mt-1">
+              Metered usage (m³) is multiplied by this ratio to get billable KG.
+            </p>
+          </div>
+        )}
+
         <div>
           <label className="label" htmlFor="pkg-desc">Description</label>
           <textarea
@@ -187,9 +232,15 @@ function ProjectModal({ open, onClose, editItem, packages, readOnly }: any) {
             >
               <option value="">— Select package —</option>
               {packages?.map((p: any) => (
-                <option key={p.id} value={p.id}>{p.name} (৳{p.per_unit_cost}/{p.unit_type})</option>
+                <option key={p.id} value={p.id}>
+                  {p.name} (৳{p.per_unit_cost}/{p.unit_type}
+                  {p.unit_type === 'kg' && p.conversion_factor ? `, ${p.conversion_factor} kg/m³` : ''})
+                </option>
               ))}
             </select>
+            <p className="text-xs text-surface-400 mt-1">
+              New bills for this project auto-fill their rate (and conversion ratio, if kg-based) from this package.
+            </p>
           </div>
           <div>
             <label className="label" htmlFor="proj-service-charge">Service Charge (৳)</label>
@@ -315,7 +366,10 @@ export default function ProjectsPage() {
                     <div className="text-2xl font-bold text-brand-600 mt-1">
                       {formatCurrency(p.per_unit_cost)}
                     </div>
-                    <div className="text-xs text-surface-400 mt-0.5">per {p.unit_type}</div>
+                    <div className="text-xs text-surface-400 mt-0.5">
+                      per {p.unit_type}
+                      {p.unit_type === 'kg' && p.conversion_factor && ` · ${p.conversion_factor} kg/m³`}
+                    </div>
                   </div>
                   <button
                     className="btn-ghost btn-sm !p-1"

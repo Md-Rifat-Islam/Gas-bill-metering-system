@@ -51,7 +51,6 @@ const TAB_LABEL: Record<Tab, string> = {
 }
 
 /* ── Permission matrix sub-form (Role & Permission tab) ─────────────────── */
-// function PermissionMatrix({ userId, disabled }: { userId: number | null; disabled: boolean }) 
 function PermissionMatrix({userId, disabled, editItem,}: {
   userId: number | null
   disabled: boolean
@@ -66,44 +65,32 @@ function PermissionMatrix({userId, disabled, editItem,}: {
 
   const [rows, setRows] = useState<Record<string, { can_view: boolean; can_edit: boolean; can_delete: boolean }>>({})
 
-  // useEffect(() => {
-  //   const next: typeof rows = {}
-  //   for (const m of PERMISSION_MODULES) {
-  //     const existing = overrides.find((o: any) => o.module === m.value)
-  //     next[m.value] = existing
-  //       ? { can_view: existing.can_view, can_edit: existing.can_edit, can_delete: existing.can_delete }
-  //       : { can_view: true, can_edit: false, can_delete: false }
-  //   }
-  //   setRows(next)
-  // }, [overrides, userId])
-
-  //updated to fix the issue of not showing the default permissions when no overrides exist 
   useEffect(() => {
-  if (!editItem) return
+    if (!editItem) return
 
-  const next: typeof rows = {}
+    const next: typeof rows = {}
 
-  for (const m of PERMISSION_MODULES) {
-    const existing = overrides.find((o: any) => o.module === m.value)
+    for (const m of PERMISSION_MODULES) {
+      const existing = overrides.find((o: any) => o.module === m.value)
 
-    if (existing) {
-      next[m.value] = {
-        can_view: existing.can_view,
-        can_edit: existing.can_edit,
-        can_delete: existing.can_delete,
-      }
-    } else {
-      // use role defaults from backend
-      next[m.value] = {
-        can_view: editItem.role_permissions?.[m.value]?.can_view ?? false,
-        can_edit: editItem.role_permissions?.[m.value]?.can_edit ?? false,
-        can_delete: editItem.role_permissions?.[m.value]?.can_delete ?? false,
+      if (existing) {
+        next[m.value] = {
+          can_view: existing.can_view,
+          can_edit: existing.can_edit,
+          can_delete: existing.can_delete,
+        }
+      } else {
+        // use role defaults from backend
+        next[m.value] = {
+          can_view: editItem.role_permissions?.[m.value]?.can_view ?? false,
+          can_edit: editItem.role_permissions?.[m.value]?.can_edit ?? false,
+          can_delete: editItem.role_permissions?.[m.value]?.can_delete ?? false,
+        }
       }
     }
-  }
 
-  setRows(next)
-}, [overrides, editItem])
+    setRows(next)
+  }, [overrides, editItem])
 
   const save = useMutation({
     mutationFn: () => {
@@ -134,6 +121,15 @@ function PermissionMatrix({userId, disabled, editItem,}: {
 
   return (
     <div>
+      <div className="flex items-start gap-2 mb-4 p-3 bg-warning-50 border border-warning-200 rounded-xl text-warning-700 text-xs">
+        <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <span>
+          <strong>Not currently enforced.</strong> Access is determined solely by this user's{' '}
+          <span className="font-medium">Role</span> (set on the Basic Information tab). Changes made
+          here are saved but do not yet affect what this user can actually do — this tab reflects a
+          planned per-user override system that isn't wired into permission checks yet.
+        </span>
+      </div>
       <p className="text-xs text-surface-400 mb-4">
         Override what this user can do per module. Unchecked "View" hides the module entirely from their sidebar.
       </p>

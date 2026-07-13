@@ -5,7 +5,8 @@ import {
   Clock, Check, X, ExternalLink, FileText, Image as ImageIcon, ArrowLeft,
 } from 'lucide-react'
 import { paymentsAPI } from '@/api/client'
-import { Modal, PageLoader, EmptyState } from '@/components/ui'
+import { Modal, PageLoader, EmptyState, AccessDenied } from '@/components/ui'
+import { usePermissions } from '@/hooks/usePermissions'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import toast from 'react-hot-toast'
 
@@ -48,11 +49,13 @@ function RejectModal({ open, onClose, onConfirm, submitting }: {
 export default function PendingPaymentsPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { can } = usePermissions()
   const [rejectTarget, setRejectTarget] = useState<any | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['payments-pending'],
     queryFn: () => paymentsAPI.pending().then(r => r.data),
+    enabled: can.approvePayments,
   })
   const pending = data?.results ?? []
 
@@ -76,6 +79,12 @@ export default function PendingPaymentsPage() {
       setRejectTarget(null)
     },
   })
+
+  // Guard placed after all hooks (Rules of Hooks) — previously this page had
+  // no permission check at all, so any authenticated staff member (even
+  // Viewer) could reach /payments/pending directly by URL even though the
+  // sidebar hides the link for them.
+  if (!can.approvePayments) return <AccessDenied />
 
   return (
     <div>

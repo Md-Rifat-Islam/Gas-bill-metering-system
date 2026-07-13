@@ -22,6 +22,23 @@ class MeterSerializer(serializers.ModelSerializer):
             'barcode', 'created_at',
         ]
 
+    def create(self, validated_data):
+        meter = super().create(validated_data)
+        # Keep the legacy Unit.meter_no mirror in sync. It's no longer
+        # read by the API — UnitSerializer now reads through unit.meter —
+        # but keeping the old column consistent avoids surprises for any
+        # direct-DB queries or reports still referencing it, and avoids
+        # the two-sources-of-truth drift that caused the original bug.
+        meter.unit.meter_no = meter.meter_no
+        meter.unit.save(update_fields=['meter_no'])
+        return meter
+
+    def update(self, instance, validated_data):
+        meter = super().update(instance, validated_data)
+        meter.unit.meter_no = meter.meter_no
+        meter.unit.save(update_fields=['meter_no'])
+        return meter
+
 
 class MeterReadingSerializer(serializers.ModelSerializer):
     usage              = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)

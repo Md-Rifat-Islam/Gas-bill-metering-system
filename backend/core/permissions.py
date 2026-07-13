@@ -4,6 +4,12 @@ R  = 'super_admin'
 A  = 'admin'
 BO = 'billing_staff'   # Billing Officer
 AC = 'accountant'
+V  = 'viewer'          # Read-only staff role — previously had no constant
+                       # here at all, meaning no permission class in this
+                       # file ever granted Viewer any access, anywhere,
+                       # despite core/rbac.py's ROLE_DEFAULT_PERMISSIONS
+                       # clearly intending Viewer to have read-only access
+                       # to most modules.
 CU = 'customer'        # Customer / end-user (CustomerUser, not StaffUser)
 
 
@@ -45,7 +51,7 @@ class IsAnyStaff(BasePermission):
     """Any authenticated StaffUser (not customer)."""
     message = 'Staff access required.'
     def has_permission(self, request, view):
-        return role(request) in (R, A, BO, AC)
+        return role(request) in (R, A, BO, AC, V)
 
 
 # ── Module-level RBAC ─────────────────────────────────────────────────────────
@@ -93,7 +99,7 @@ class ProjectPermission(BasePermission):
         r = role(request)
         if r in (R, A):
             return True
-        return request.method in SAFE_METHODS and r in (BO, AC)
+        return request.method in SAFE_METHODS and r in (BO, AC, V)
 
 
 class BuildingPermission(BasePermission):
@@ -101,12 +107,13 @@ class BuildingPermission(BasePermission):
     Super Admin / Admin : full CRUD
     Billing Officer     : read-only
     Accountant          : read-only
+    Viewer              : read-only
     """
     def has_permission(self, request, view):
         r = role(request)
         if r in (R, A):
             return True
-        return request.method in SAFE_METHODS and r in (BO, AC)
+        return request.method in SAFE_METHODS and r in (BO, AC, V)
 
 
 class PackagePermission(BasePermission):
@@ -122,7 +129,7 @@ class PackagePermission(BasePermission):
         if r == A:
             # Admin can read + assign but not create/delete packages
             return request.method in SAFE_METHODS
-        return request.method in SAFE_METHODS and r in (BO, AC)
+        return request.method in SAFE_METHODS and r in (BO, AC, V)
 
 
 class BillPermission(BasePermission):
@@ -131,12 +138,33 @@ class BillPermission(BasePermission):
     Admin          : create/generate/view/adjust (with restrictions)
     Billing Officer: create/edit meter readings/adjust (must add reason)
     Accountant     : read-only (+ financial correction approval if allowed)
+    Viewer         : read-only
     """
     def has_permission(self, request, view):
         r = role(request)
         if r in (R, A, BO):
             return True
-        return request.method in SAFE_METHODS and r == AC
+        return request.method in SAFE_METHODS and r in (AC, V)
+
+
+class MeterPermission(BasePermission):
+    """
+    Super Admin / Admin / Billing Officer : full CRUD
+    Accountant / Viewer                    : read-only
+
+    Added because apps/meters/views.py previously used
+    IsBillingOfficerOrAbove for its basic list/detail views, which blocks
+    Accountant and Viewer from reading meter data at all — contradicting
+    rbac.py's METERS default of (True, False, False) for both roles. The
+    Quick Reading Dashboard / barcode lookup views (the actual operational
+    reading workflow) intentionally stay on IsBillingOfficerOrAbove since
+    those are BO-only tools, not general viewing.
+    """
+    def has_permission(self, request, view):
+        r = role(request)
+        if r in (R, A, BO):
+            return True
+        return request.method in SAFE_METHODS and r in (AC, V)
 
 
 class BillDeletePermission(BasePermission):
@@ -146,16 +174,36 @@ class BillDeletePermission(BasePermission):
         return role(request) == R
 
 
+class BillSpreadsheetEditPermission(BasePermission):
+    """
+    Inline spreadsheet editing on the Billing page: Super Admin / Admin only
+    — deliberately narrower than BillPermission (which also allows Billing
+    Officer), per spec. Enforced here rather than only hiding the UI, since
+    frontend-only restriction isn't sufficient.
+    """
+    message = 'Only Super Admin or Admin can edit bills inline from the spreadsheet view.'
+    def has_permission(self, request, view):
+        return role(request) in (R, A)
+
+
 class PaymentPermission(BasePermission):
     """
     Super Admin : full + reverse
     Admin       : view + approve offline
     Accountant  : view + verify + mark offline as validated
-    Billing Officer: view only
+    Billing Officer / Viewer: view only
+
+    FIX: previously returned True unconditionally for any role in the list
+    regardless of HTTP method — contradicting this class's own docstring
+    that Billing Officer should be view-only. Only safe today because it's
+    applied to a GET-only RetrieveAPIView; fixed properly so it can't
+    silently become writable if ever attached to a different view.
     """
     def has_permission(self, request, view):
         r = role(request)
-        return r in (R, A, AC, BO)
+        if r in (R, A, AC):
+            return True
+        return request.method in SAFE_METHODS and r in (BO, V)
 
 
 class PaymentWritePermission(BasePermission):
@@ -164,7 +212,7 @@ class PaymentWritePermission(BasePermission):
     def has_permission(self, request, view):
         r = role(request)
         if request.method in SAFE_METHODS:
-            return r in (R, A, AC, BO)
+            return r in (R, A, AC, BO, V)
         return r in (R, A, AC)
 
 
@@ -173,9 +221,10 @@ class ReportPermission(BasePermission):
     Super Admin / Accountant : all report types
     Admin                    : project + building level
     Billing Officer          : billing work queue / meter summary only
+    Viewer                   : read-only
     """
     def has_permission(self, request, view):
-        return role(request) in (R, A, AC, BO)
+        return role(request) in (R, A, AC, BO, V)
 
 
 class FinancialReportPermission(BasePermission):

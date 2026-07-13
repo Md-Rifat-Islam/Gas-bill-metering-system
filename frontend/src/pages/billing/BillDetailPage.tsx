@@ -1,109 +1,14 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
 import { ArrowLeft, CreditCard, Printer, History, Trash2 } from 'lucide-react'
 import { billingAPI, paymentsAPI, auditAPI } from '@/api/client'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useConfirm } from '@/hooks'
 import { Modal, PageLoader, StatusBadge, ConfirmDialog } from '@/components/ui'
+import { PaymentModal } from '@/components/payments/PaymentModal'
 import { formatCurrency, formatDate, formatMonth } from '@/utils/helpers'
 import toast from 'react-hot-toast'
-
-function PaymentModal({ open, onClose, bill }: any) {
-  const qc = useQueryClient()
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
-    defaultValues: { paid_amount: bill?.due_amount || 0, payment_method: 'Cash', transaction_id: '', notes: '' }
-  })
-  const pay = useMutation({
-    mutationFn: (data: any) => paymentsAPI.create({ ...data, bill_id: bill.id }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['bill', bill.id] })
-      qc.invalidateQueries({ queryKey: ['payments', bill.id] })
-      toast.success('Payment recorded')
-      onClose(); reset()
-    },
-  })
-  return (
-    <Modal open={open} onClose={onClose} title="Record Payment" size="sm">
-      <form onSubmit={handleSubmit(d => pay.mutate(d))} className="space-y-4">
-        <div className="bg-surface-50 rounded-xl p-4 text-sm space-y-1.5">
-          <div className="flex justify-between"><span className="text-surface-500">Bill</span><span className="font-mono font-semibold">{bill?.bill_number}</span></div>
-          <div className="flex justify-between"><span className="text-surface-500">Total</span><span className="font-semibold">{formatCurrency(bill?.total_amount || 0)}</span></div>
-          <div className="flex justify-between"><span className="text-surface-500">Paid</span><span className="text-success-600 font-semibold">{formatCurrency(bill?.paid_amount || 0)}</span></div>
-          <div className="flex justify-between border-t border-surface-200 pt-1.5">
-            <span className="font-semibold">Due</span>
-            <span className="text-danger-600 font-bold text-base">{formatCurrency(bill?.due_amount || 0)}</span>
-          </div>
-        </div>
-        <div>
-          <label className="label" htmlFor="pay-amount">Amount (৳) <span className="text-danger-500">*</span></label>
-          <input
-            id="pay-amount"
-            {...register('paid_amount', { required: true, min: 0.01 })}
-            type="number"
-            step="0.01"
-            className="input"
-            aria-label="Payment amount"
-            title="Payment amount"
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="pay-method">Payment Method <span className="text-danger-500">*</span></label>
-          <select
-            id="pay-method"
-            {...register('payment_method', { required: true })}
-            className="input"
-            aria-label="Payment method"
-            title="Payment method"
-          >
-            <option value="Cash">Cash</option>
-            <option value="Bank">Bank Transfer</option>
-            <option value="bKash">bKash</option>
-            <option value="Card">Card</option>
-            <option value="SSLCommerz">SSLCommerz</option>
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="pay-txn">Transaction ID</label>
-          <input
-            id="pay-txn"
-            {...register('transaction_id')}
-            className="input"
-            placeholder="Optional"
-            aria-label="Transaction ID"
-            title="Transaction ID"
-          />
-        </div>
-        <div>
-          <label className="label" htmlFor="pay-notes">Notes</label>
-          <textarea
-            id="pay-notes"
-            {...register('notes')}
-            className="input"
-            rows={2}
-            aria-label="Notes"
-            title="Notes"
-          />
-        </div>
-        <div className="flex gap-3 justify-end pt-1">
-          <button type="button" className="btn-secondary" onClick={onClose} aria-label="Cancel" title="Cancel">
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="btn-primary"
-            disabled={pay.isPending}
-            aria-label="Record payment"
-            title="Record payment"
-          >
-            {pay.isPending ? 'Processing…' : 'Record Payment'}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
 
 export default function BillDetailPage() {
   const { id } = useParams()
@@ -209,7 +114,7 @@ export default function BillDetailPage() {
                 <div className="text-xs text-surface-400">m³</div>
               </div>
               <div className="bg-brand-50 rounded-xl p-4">
-                <div className="text-xs text-brand-400 mb-1">Usage</div>
+                <div className="text-xs text-brand-400 mb-1">Consumed</div>
                 <div className="text-2xl font-bold font-mono text-brand-700">{bill.total_usage_m3}</div>
                 <div className="text-xs text-brand-400">m³</div>
               </div>
@@ -219,6 +124,21 @@ export default function BillDetailPage() {
                 <div className="text-xs text-surface-400">m³</div>
               </div>
             </div>
+
+            {bill.conversion_factor && bill.total_usage_kg && (
+              <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+                <div className="bg-surface-50 rounded-xl p-4">
+                  <div className="text-xs text-surface-400 mb-1">Conversion Ratio</div>
+                  <div className="text-lg font-bold font-mono text-surface-700">{bill.conversion_factor}</div>
+                  <div className="text-xs text-surface-400">kg / m³</div>
+                </div>
+                <div className="bg-brand-50 rounded-xl p-4">
+                  <div className="text-xs text-brand-400 mb-1">Final Usage (Billed)</div>
+                  <div className="text-lg font-bold font-mono text-brand-700">{bill.total_usage_kg}</div>
+                  <div className="text-xs text-brand-400">kg</div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Payment history */}
@@ -253,7 +173,11 @@ export default function BillDetailPage() {
             <div className="text-sm font-bold text-surface-500 uppercase tracking-wider mb-4">Bill Summary</div>
             <div className="space-y-2.5 text-sm">
               <SummaryRow label="Base Amount"   value={formatCurrency(bill.base_amount)} />
-              <SummaryRow label="Unit Price"    value={`${formatCurrency(bill.unit_price)}/m³`} muted />
+              <SummaryRow
+                label="Unit Price"
+                value={`${formatCurrency(bill.unit_price)}/${bill.total_usage_kg ? 'kg' : 'm³'}`}
+                muted
+              />
               <SummaryRow label="Service Charge" value={`+ ${formatCurrency(bill.service_charge)}`} />
               {Number(bill.extra_charge) > 0 && (
                 <SummaryRow label="Extra Charge" value={`+ ${formatCurrency(bill.extra_charge)}`} />

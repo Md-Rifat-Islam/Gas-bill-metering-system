@@ -63,6 +63,7 @@ export const authAPI = {
 
   roles: () => api.get('/auth/roles/'),
   rolesDropdown: () => api.get('/auth/roles/dropdown/'),
+  rolePermissionMatrix: () => api.get('/auth/roles/permission-matrix/'),
 
   // Granular per-module permission overrides for one staff user
   getUserPermissions: (userId: number) => api.get(`/auth/staff/${userId}/permissions/`),
@@ -100,7 +101,9 @@ export const unitsAPI = {
 
 export const metersAPI = {
   list: (params?: any) => api.get('/meters/', { params }),
+  get: (id: number) => api.get(`/meters/${id}/`),
   create: (data: any) => api.post('/meters/', data),
+  update: (id: number, data: any) => api.patch(`/meters/${id}/`, data),
   readings: (params?: any) => api.get('/meters/readings/', { params }),
   createReading: (data: FormData | any) => {
     const isForm = data instanceof FormData
@@ -125,6 +128,15 @@ export const billingAPI = {
   update: (id: number, data: any) => api.patch(`/billing/${id}/`, data),
   delete: (id: number) => api.delete(`/billing/${id}/`),
   summary: () => api.get('/billing/summary/'),
+  // Dedicated spreadsheet-save endpoint — Super Admin/Admin only (enforced backend-side too).
+  quickEdit: (id: number, data: any) => api.patch(`/billing/${id}/quick-edit/`, data),
+  // Creates a bill for every active unit in a building with a recorded
+  // meter reading for the month, auto-filling rate from the package.
+  bulkCreate: (data: { building_id: string | number; billing_month: string }) =>
+    api.post('/billing/bulk-create/', data),
+  // Fetches the latest reading for a unit, if any, to pre-fill the "Previous Reading" field when creating a new bill.
+  latestReading: (unitId: string | number) =>
+    api.get(`/billing/latest-reading/${unitId}/`),
 }
 
 export const paymentsAPI = {
@@ -161,6 +173,32 @@ export const reportsAPI = {
     const a = document.createElement('a')
     a.href = url
     a.download = `${buildingName.replace(/\s+/g, '_')}_gas_bill_export.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  },
+
+  // Exports exactly whatever filters are passed — pass the same params the
+  // list page is currently querying with (status, search, date range, etc.)
+  exportBillsExcel: async (params?: Record<string, any>) => {
+    const res = await api.get('/reports/export/bills/', { params, responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([res.data]))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'billing_export.xlsx'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  },
+
+  exportPaymentsExcel: async (params?: Record<string, any>) => {
+    const res = await api.get('/reports/export/payments/', { params, responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([res.data]))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'payments_export.xlsx'
     document.body.appendChild(a)
     a.click()
     a.remove()

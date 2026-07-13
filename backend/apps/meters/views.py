@@ -10,14 +10,14 @@ from django.utils import timezone
 
 from .models import Meter, MeterReading
 from .serializers import MeterSerializer, MeterReadingSerializer, MeterCardSerializer
-from core.permissions import IsBillingOfficerOrAbove, IsAnyStaff
+from core.permissions import IsBillingOfficerOrAbove, IsAnyStaff, MeterPermission
 from apps.billing.models import Bill
 
 
 class MeterListCreateView(generics.ListCreateAPIView):
     queryset           = Meter.objects.all().select_related('unit__building__project', 'unit__allottee')
     serializer_class   = MeterSerializer
-    permission_classes = [IsAuthenticated, IsBillingOfficerOrAbove]
+    permission_classes = [IsAuthenticated, MeterPermission]
     filter_backends    = [filters.SearchFilter, DjangoFilterBackend]
     search_fields      = ['meter_no', 'barcode', 'unit__unit_no', 'unit__allottee__name']
     filterset_fields   = ['unit__building', 'unit__building__project']
@@ -26,7 +26,7 @@ class MeterListCreateView(generics.ListCreateAPIView):
 class MeterDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset           = Meter.objects.all()
     serializer_class   = MeterSerializer
-    permission_classes = [IsAuthenticated, IsBillingOfficerOrAbove]
+    permission_classes = [IsAuthenticated, MeterPermission]
 
 
 # ── Date-range filter for readings ────────────────────────────────────────────
@@ -50,7 +50,7 @@ class MeterReadingListCreateView(generics.ListCreateAPIView):
         'meter__unit__building__project', 'meter__unit__allottee', 'recorded_by'
     )
     serializer_class   = MeterReadingSerializer
-    permission_classes = [IsAuthenticated, IsBillingOfficerOrAbove]
+    permission_classes = [IsAuthenticated, MeterPermission]
     parser_classes     = [MultiPartParser, FormParser, JSONParser]   # needed for photo upload
     filter_backends    = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_class    = MeterReadingFilter
@@ -63,7 +63,7 @@ class MeterReadingDetailView(generics.RetrieveUpdateDestroyAPIView):
         'meter__unit__building__project', 'recorded_by'
     )
     serializer_class   = MeterReadingSerializer
-    permission_classes = [IsAuthenticated, IsBillingOfficerOrAbove]
+    permission_classes = [IsAuthenticated, MeterPermission]
     parser_classes     = [MultiPartParser, FormParser, JSONParser]
 
 

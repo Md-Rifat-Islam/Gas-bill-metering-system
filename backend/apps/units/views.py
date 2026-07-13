@@ -7,7 +7,7 @@ from core.permissions import BuildingPermission   # same rules as buildings
 
 
 class UnitListCreateView(generics.ListCreateAPIView):
-    queryset           = Unit.objects.all().select_related('building__project', 'package', 'allottee')
+    queryset           = Unit.objects.all().select_related('building__project', 'package', 'allottee', 'meter')
     serializer_class   = UnitSerializer
     permission_classes = [IsAuthenticated, BuildingPermission]
     filter_backends    = [DjangoFilterBackend, filters.SearchFilter]
@@ -16,7 +16,7 @@ class UnitListCreateView(generics.ListCreateAPIView):
 
 
 class UnitDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset           = Unit.objects.all().select_related('building__project', 'package', 'allottee')
+    queryset           = Unit.objects.all().select_related('building__project', 'package', 'allottee', 'meter')
     serializer_class   = UnitSerializer
     permission_classes = [IsAuthenticated, BuildingPermission]
 

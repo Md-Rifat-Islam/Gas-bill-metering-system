@@ -52,8 +52,8 @@ class Bill(models.Model):
         'authentication.StaffUser', on_delete=models.SET_NULL, null=True, related_name='bills_created'
     )
     last_updated_by = models.ForeignKey(
-    'authentication.StaffUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='bills_updated'
-)
+        'authentication.StaffUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='bills_updated'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -66,13 +66,26 @@ class Bill(models.Model):
         return f"Bill #{self.bill_number} - {self.unit} ({self.billing_month.strftime('%B %Y')})"
 
     def calculate(self):
-        """Server-side calculation - never trust client values"""
+        """
+        Server-side calculation - never trust client values.
+
+        FIX: previously this always billed on total_usage_m3 even when a
+        conversion_factor was set — it computed total_usage_kg but then
+        ignored it for base_amount. A kg-priced package (unit_price meant
+        per-KG) was silently being charged at the m³ rate instead. Now:
+        if conversion_factor is set, usage is converted to KG and billing
+        is based on that; otherwise billing stays on m³ as before.
+        """
         self.total_usage_m3 = self.current_reading - self.previous_reading
 
         if self.conversion_factor:
-            self.total_usage_kg = self.total_usage_m3 * self.conversion_factor
+            self.total_usage_kg = round(self.total_usage_m3 * self.conversion_factor, 2)
+            billable_usage = self.total_usage_kg
+        else:
+            self.total_usage_kg = None
+            billable_usage = self.total_usage_m3
 
-        self.base_amount = round(self.total_usage_m3 * self.unit_price, 2)
+        self.base_amount = round(billable_usage * self.unit_price, 2)
 
         self.total_amount = round(
             self.base_amount + self.service_charge + self.extra_charge + self.late_fee - self.discount, 2

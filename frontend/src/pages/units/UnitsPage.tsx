@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { Plus, Pencil, Trash2, Home, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Home, Search, Gauge, PlusCircle } from 'lucide-react'
 import { unitsAPI, buildingsAPI, projectsAPI } from '@/api/client'
 import { Modal, PageLoader, EmptyState, Pagination, ConfirmDialog } from '@/components/ui'
+import { MeterAssignModal } from '@/components/meters/MeterAssignModal'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useConfirm } from '@/hooks'
 import toast from 'react-hot-toast'
@@ -12,7 +13,7 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
   const qc = useQueryClient()
   const { register, handleSubmit, reset } = useForm({
     defaultValues: {
-      building_id: '', floor_no: '', unit_no: '', meter_no: '', mobile_number: '',
+      building_id: '', floor_no: '', unit_no: '', mobile_number: '',
       package_id: '', status: 'Active', allottee_name: '', allottee_email: '', allottee_nid: '',
     },
   })
@@ -28,7 +29,6 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
             building_id: editItem.building_id ?? editItem.building?.id ?? '',
             floor_no: editItem.floor_no ?? '',
             unit_no: editItem.unit_no ?? '',
-            meter_no: editItem.meter_no ?? '',
             mobile_number: editItem.mobile_number ?? '',
             package_id: editItem.package_id ?? '',
             status: editItem.status ?? 'Active',
@@ -37,7 +37,7 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
             allottee_nid: editItem.allottee?.nid ?? '',
           }
         : {
-            building_id: '', floor_no: '', unit_no: '', meter_no: '', mobile_number: '',
+            building_id: '', floor_no: '', unit_no: '', mobile_number: '',
             package_id: '', status: 'Active', allottee_name: '', allottee_email: '', allottee_nid: '',
           }
       )
@@ -99,18 +99,6 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
             />
           </div>
           <div>
-            <label className="label" htmlFor="unit-meter">Meter No.</label>
-            <input
-              id="unit-meter"
-              {...register('meter_no')}
-              disabled={readOnly}
-              className="input"
-              placeholder="MTR-00001"
-              aria-label="Meter number"
-              title="Meter number"
-            />
-          </div>
-          <div>
             <label className="label" htmlFor="unit-mobile">Mobile Number</label>
             <input
               id="unit-mobile"
@@ -153,6 +141,12 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
             </select>
           </div>
         </div>
+
+        {editItem && (
+          <p className="text-xs text-surface-400 -mt-2">
+            Meter assignment moved to its own action — use the meter icon on this unit's row after saving.
+          </p>
+        )}
 
         <div className="border-t border-surface-100 pt-4">
           <div className="text-sm font-semibold text-surface-700 mb-3">Allottee Information</div>
@@ -226,6 +220,7 @@ export default function UnitsPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
   const [modal, setModal] = useState<{ open: boolean; item?: any }>({ open: false })
+  const [meterModal, setMeterModal] = useState<{ open: boolean; unit?: any }>({ open: false })
   const { confirmState, confirm, handleClose } = useConfirm()
 
   const { data, isLoading } = useQuery({
@@ -269,7 +264,7 @@ export default function UnitsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Units</h1>
-          <p className="page-subtitle">Manage residential / commercial units and allottees</p>
+          <p className="page-subtitle">Manage residential / commercial units, allottees, and meters</p>
         </div>
         {can.editBuildings && (
           <button
@@ -326,7 +321,7 @@ export default function UnitsPage() {
                 <tr>
                   <th>Unit</th>
                   <th>Building / Project</th>
-                  <th>Meter No.</th>
+                  <th>Meter</th>
                   <th>Allottee</th>
                   <th>Mobile</th>
                   <th>Package</th>
@@ -350,7 +345,25 @@ export default function UnitsPage() {
                       <div className="text-surface-700 text-sm">{u.building_name}</div>
                       <div className="text-surface-400 text-xs">{u.project_name}</div>
                     </td>
-                    <td><span className="font-mono text-xs">{u.meter_no || '—'}</span></td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        {u.meter_no ? (
+                          <span className="font-mono text-xs">{u.meter_no}</span>
+                        ) : (
+                          <span className="text-surface-400 text-xs">Not assigned</span>
+                        )}
+                        {can.editMeters && (
+                          <button
+                            className="btn-ghost btn-sm !p-1"
+                            onClick={() => setMeterModal({ open: true, unit: u })}
+                            title={u.meter_id ? 'Edit meter' : 'Assign meter'}
+                            aria-label={u.meter_id ? `Edit meter for unit ${u.unit_no}` : `Assign meter to unit ${u.unit_no}`}
+                          >
+                            {u.meter_id ? <Gauge className="w-3.5 h-3.5 text-brand-500" /> : <PlusCircle className="w-3.5 h-3.5 text-surface-400" />}
+                          </button>
+                        )}
+                      </div>
+                    </td>
                     <td className="text-surface-700">{u.allottee?.name || '—'}</td>
                     <td className="font-mono text-sm">{u.mobile_number || '—'}</td>
                     <td>
@@ -397,6 +410,12 @@ export default function UnitsPage() {
         buildings={buildings}
         packages={packages}
         readOnly={!can.editBuildings}
+      />
+
+      <MeterAssignModal
+        open={meterModal.open}
+        onClose={() => setMeterModal({ open: false })}
+        unit={meterModal.unit}
       />
 
       <ConfirmDialog

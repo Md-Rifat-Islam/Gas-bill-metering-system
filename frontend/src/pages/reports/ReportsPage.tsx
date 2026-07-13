@@ -3,6 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts'
+import { Lock } from 'lucide-react'
 import { reportsAPI } from '@/api/client'
 import { usePermissions } from '@/hooks/usePermissions'
 import { PageLoader, StatusBadge } from '@/components/ui'
@@ -10,23 +11,41 @@ import { formatCurrency, formatMonth } from '@/utils/helpers'
 
 const COLORS = ['#0062f5', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
 
+// Shown in place of a financial widget for roles that can view the Reports
+// page but aren't allowed the financial-totals endpoints (matches backend
+// FinancialReportPermission: Super Admin + Accountant only). Previously
+// these widgets queried anyway, firing requests that 403'd and threw error
+// toasts for Admin/Billing Officer/Viewer every time they opened the page.
+function FinancialLocked({ label }: { label: string }) {
+  return (
+    <div className="h-40 flex flex-col items-center justify-center text-center gap-2 text-surface-400 text-sm">
+      <Lock className="w-5 h-5" />
+      <span>{label} requires Accountant or Super Admin access</span>
+    </div>
+  )
+}
+
 export default function ReportsPage() {
+  const { can } = usePermissions()
+
   const { data: monthly = [], isLoading: loadingMonthly } = useQuery({
     queryKey: ['monthly-revenue'],
     queryFn: () => reportsAPI.monthlyRevenue().then(r => r.data),
+    enabled: can.viewFinancialReports,
   })
   const { data: projectRevenue = [], isLoading: loadingProjects } = useQuery({
     queryKey: ['project-revenue'],
     queryFn: () => reportsAPI.projectRevenue().then(r => r.data),
+    enabled: can.viewFinancialReports,
   })
   const { data: unpaid = [], isLoading: loadingUnpaid } = useQuery({
     queryKey: ['unpaid-bills'],
     queryFn: () => reportsAPI.unpaidBills().then(r => r.data),
   })
-  const { can } = usePermissions()
   const { data: payMethods = [] } = useQuery({
     queryKey: ['payment-methods'],
     queryFn: () => reportsAPI.paymentMethods().then(r => r.data),
+    enabled: can.viewFinancialReports,
   })
 
   const chartData = [...monthly].reverse().map((m: any) => ({
@@ -54,7 +73,9 @@ export default function ReportsPage() {
       {/* Monthly Revenue */}
       <div className="card mb-6">
         <div className="text-base font-semibold text-surface-800 mb-6">Monthly Revenue — Last 12 Months</div>
-        {loadingMonthly ? <PageLoader /> : chartData.length === 0 ? (
+        {!can.viewFinancialReports ? (
+          <FinancialLocked label="Monthly revenue" />
+        ) : loadingMonthly ? <PageLoader /> : chartData.length === 0 ? (
           <div className="h-60 flex items-center justify-center text-surface-400 text-sm">No data yet</div>
         ) : (
           <ResponsiveContainer width="100%" height={280}>
@@ -77,7 +98,9 @@ export default function ReportsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="card lg:col-span-2">
           <div className="text-base font-semibold text-surface-800 mb-6">Revenue by Project</div>
-          {loadingProjects ? <PageLoader /> : projectData.length === 0 ? (
+          {!can.viewFinancialReports ? (
+            <FinancialLocked label="Revenue by project" />
+          ) : loadingProjects ? <PageLoader /> : projectData.length === 0 ? (
             <div className="h-40 flex items-center justify-center text-surface-400 text-sm">No data yet</div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
@@ -97,7 +120,9 @@ export default function ReportsPage() {
 
         <div className="card">
           <div className="text-base font-semibold text-surface-800 mb-6">Payment Methods</div>
-          {payMethods.length === 0 ? (
+          {!can.viewFinancialReports ? (
+            <FinancialLocked label="Payment method breakdown" />
+          ) : payMethods.length === 0 ? (
             <div className="h-40 flex items-center justify-center text-surface-400 text-sm">No data yet</div>
           ) : (
             <>
@@ -131,7 +156,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Unpaid bills */}
+      {/* Unpaid bills — available to all Reports-viewing roles, not financial-locked */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <div className="text-base font-semibold text-surface-800">Outstanding Bills</div>
