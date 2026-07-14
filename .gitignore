@@ -2,15 +2,32 @@
 # Django Backend
 # ======================
 backend/__pycache__/
+backend/**/__pycache__/
 backend/**/*.pyc
 backend/db.sqlite3
+backend/*.sqlite3
 backend/.env
+backend/.env.*
+!backend/.env.example
 backend/media/
 backend/staticfiles/
+backend/logs/
+backend/*.log
 
 # Python virtual environment
 backend/venv/
 backend/.venv/
+
+# Python packaging / test artifacts
+backend/*.egg-info/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/htmlcov/
+backend/.coverage
+
+# Celery
+backend/celerybeat-schedule
+backend/celerybeat.pid
 
 
 # ======================
@@ -20,6 +37,10 @@ frontend/node_modules/
 frontend/dist/
 frontend/build/
 frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+!frontend/.env.example
+frontend/coverage/
 
 
 # ======================
@@ -34,6 +55,8 @@ docker-compose.override.yml
 # ======================
 .vscode/
 .idea/
+*.swp
+*.swo
 
 
 # ======================
