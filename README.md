@@ -4,10 +4,10 @@ A full-stack DECO Utility Billing Management System built with **Django REST Fra
 
 ---
 ## System Images
-![Dashboard Screenshot](docs/images/deco daashboard.png)
+![Dashboard Screenshot](docs/images/deco-daashboard.png)
 
-![System Login](docs/images/deco login.png)
-![System Quick-Reading Page](docs/images/deco quickreading.png)
+![System Login](docs/images/deco-login.png)
+![System Quick-Reading Page](docs/images/deco-quickreading.png)
 
 ## 📁 Project Structure
 
