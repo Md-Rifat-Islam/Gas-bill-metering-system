@@ -3,11 +3,18 @@
 A full-stack DECO Utility Billing Management System built with **Django REST Framework** (backend) and **React + Vite + TypeScript** (frontend), with a Tailwind CSS UI.
 
 ---
-## System Images
-![Dashboard Screenshot](docs/images/deco-daashboard.png)
+## 📸 System Images
 
-![System Login](docs/images/deco-login.png)
-![System Quick-Reading Page](docs/images/deco-quickreading.png)
+<p align="center">
+  <img src="docs/images/deco-daashboard.png" alt="Dashboard Screenshot" width="640">
+</p>
+
+<p align="center">
+  <img src="docs/images/deco-login.png" alt="System Login" width="320">
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/images/deco-quickreading.png" alt="System Quick Reading" width="320">
+</p>
+
 
 ## 📁 Project Structure
 
