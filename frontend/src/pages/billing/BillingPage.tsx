@@ -171,10 +171,10 @@ function CreateBillModal({ open, onClose }: any) {
   return (
     <Modal open={open} onClose={onClose} title="Create New Bill" size="xl">
       <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Left column */}
-          <div className="col-span-2 space-y-5">
-            <div className="grid grid-cols-3 gap-4">
+          <div className="lg:col-span-2 space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="label">Project *</label>
                 <select
@@ -228,7 +228,7 @@ function CreateBillModal({ open, onClose }: any) {
             </div>
 
             {selectedUnit && (
-              <div className="bg-brand-50 rounded-xl p-3 text-sm flex gap-4">
+              <div className="bg-brand-50 rounded-xl p-3 text-sm flex flex-wrap gap-x-4 gap-y-1">
                 <span className="text-surface-500">Allottee:</span>
                 <span className="font-semibold">
                   {selectedUnit.allottee?.name || "—"}
@@ -276,11 +276,11 @@ function CreateBillModal({ open, onClose }: any) {
               <input
                 {...register("billing_month", { required: true })}
                 type="month"
-                className="input max-w-[200px]"
+                className="input w-full sm:max-w-[200px]"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="label">Previous Reading (m³)</label>
                 <input
@@ -304,7 +304,7 @@ function CreateBillModal({ open, onClose }: any) {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="label">Unit Price *</label>
                 <input
@@ -360,7 +360,7 @@ function CreateBillModal({ open, onClose }: any) {
                 </label>
               </div>
               {isAdjusted && (
-                <div className="grid grid-cols-3 gap-4 animate-fadeIn">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fadeIn">
                   <div>
                     <label className="label">Extra Charge (৳)</label>
                     <input
@@ -388,7 +388,7 @@ function CreateBillModal({ open, onClose }: any) {
                       className="input"
                     />
                   </div>
-                  <div className="col-span-3">
+                  <div className="sm:col-span-3">
                     <label className="label">Adjustment Reason *</label>
                     <input
                       {...register("adjustment_reason")}
@@ -403,7 +403,7 @@ function CreateBillModal({ open, onClose }: any) {
 
           {/* Right — Bill summary */}
           <div>
-            <div className="bg-surface-50 rounded-2xl p-5 sticky top-0">
+            <div className="bg-surface-50 rounded-2xl p-5 lg:sticky lg:top-0">
               <div className="text-sm font-bold text-surface-700 mb-4 uppercase tracking-wider">
                 Bill Summary
               </div>
@@ -470,13 +470,13 @@ function CreateBillModal({ open, onClose }: any) {
           </div>
         </div>
 
-        <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-surface-100">
-          <button type="button" className="btn-secondary" onClick={onClose}>
+        <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end mt-6 pt-4 border-t border-surface-100">
+          <button type="button" className="btn-secondary w-full sm:w-auto justify-center" onClick={onClose}>
             Cancel
           </button>
           <button
             type="submit"
-            className="btn-primary"
+            className="btn-primary w-full sm:w-auto justify-center"
             disabled={save.isPending}
           >
             {save.isPending ? "Creating Bill…" : "Create Bill"}
@@ -548,7 +548,7 @@ function BulkCreateBillModal({ open, onClose }: any) {
           record their reading first via the Quick Reading Dashboard.
         </p>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label htmlFor="bulk-create-project" className="label">
               Project *
@@ -646,12 +646,12 @@ function BulkCreateBillModal({ open, onClose }: any) {
           </div>
         )}
 
-        <div className="flex gap-3 justify-end pt-2 border-t border-surface-100">
-          <button className="btn-secondary" onClick={handleClose}>
+        <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end pt-2 border-t border-surface-100">
+          <button className="btn-secondary w-full sm:w-auto justify-center" onClick={handleClose}>
             Close
           </button>
           <button
-            className="btn-primary"
+            className="btn-primary w-full sm:w-auto justify-center"
             disabled={!buildingId || bulkCreate.isPending}
             onClick={() => bulkCreate.mutate()}
           >
@@ -756,8 +756,10 @@ function SpreadsheetBillingTable({ bills }: { bills: any[] }) {
   };
 
   return (
-    <div className="table-wrapper">
-      <table className="table">
+    // Many editable columns won't fit a phone screen — scroll horizontally
+    // instead of squashing the inputs unusably small.
+    <div className="table-wrapper overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+      <table className="table min-w-[1100px] sm:min-w-0">
         <thead>
           <tr>
             <th>Bill No.</th>
@@ -909,16 +911,16 @@ export default function BillingPage() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:gap-4">
         <div>
           <h1 className="page-title">Billing</h1>
           <p className="page-subtitle">
             Create and manage gas bills for all units
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full lg:w-auto">
           {can.editBillSpreadsheet && (
-            <div className="flex gap-1 bg-surface-100 rounded-xl p-1">
+            <div className="flex gap-1 bg-surface-100 rounded-xl p-1 self-start">
               <button
                 onClick={() => setView("table")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
@@ -942,7 +944,7 @@ export default function BillingPage() {
             </div>
           )}
           <button
-            className="btn-secondary"
+            className="btn-secondary w-full sm:w-auto justify-center"
             onClick={handleExport}
             disabled={exporting}
             title="Export current view to Excel"
@@ -956,7 +958,7 @@ export default function BillingPage() {
           </button>
           {can.createBill && (
             <button
-              className="btn-secondary"
+              className="btn-secondary w-full sm:w-auto justify-center"
               onClick={() => setBulkModal(true)}
               title="Create bills for multiple units at once"
             >
@@ -965,7 +967,7 @@ export default function BillingPage() {
           )}
           {can.createBill && (
             <button
-              className="btn-primary"
+              className="btn-primary w-full sm:w-auto justify-center"
               onClick={() => setCreateModal(true)}
             >
               <Plus className="w-4 h-4" /> Create Bill
@@ -974,11 +976,11 @@ export default function BillingPage() {
         </div>
       </div>
 
-      <div className="flex gap-3 mb-6 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6 sm:flex-wrap">
+        <div className="relative flex-1 sm:min-w-[200px] sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
           <input
-            className="input pl-9"
+            className="input pl-9 w-full"
             placeholder="Search bill no., unit, allottee…"
             value={search}
             onChange={(e) => {
@@ -988,7 +990,7 @@ export default function BillingPage() {
           />
         </div>
         <select
-          className="input max-w-[140px]"
+          className="input w-full sm:w-auto sm:max-w-[140px]"
           value={statusFilter}
           aria-label="Filter bills by status"
           onChange={(e) => {
@@ -1012,8 +1014,9 @@ export default function BillingPage() {
         </>
       ) : (
         <>
-          <div className="table-wrapper">
-            <table className="table">
+          {/* Horizontal scroll on narrow viewports instead of squashing columns */}
+          <div className="table-wrapper overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <table className="table min-w-[980px] sm:min-w-0">
               <thead>
                 <tr>
                   <th>Bill No.</th>

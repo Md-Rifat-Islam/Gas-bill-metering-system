@@ -38,7 +38,7 @@ export function MeterCard({ data, focused, onOpen }: MeterCardProps) {
         }
       }}
       className={cn(
-        'relative rounded-2xl border-2 p-4 flex flex-col gap-2 transition-all cursor-pointer',
+        'relative rounded-2xl border-2 p-5 flex flex-col gap-2 transition-all cursor-pointer',
         'hover:shadow-card focus:outline-none focus:ring-2 focus:ring-brand-400',
         disabled && 'cursor-not-allowed',
         STATUS_STYLES[data.reading_status] || 'border-surface-200 bg-white',
@@ -48,9 +48,9 @@ export function MeterCard({ data, focused, onOpen }: MeterCardProps) {
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2">
           <span className={cn('w-2.5 h-2.5 rounded-full shrink-0', STATUS_DOT[data.reading_status])} />
-          <span className="font-mono font-bold text-sm text-surface-900">{data.meter_no}</span>
+          <span className="font-mono font-bold text-base text-surface-900">{data.meter_no}</span>
         </div>
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-surface-400">
+        <span className="text-5 font-semibold uppercase tracking-wide text-surface-400">
           {data.reading_status}
         </span>
       </div>

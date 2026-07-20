@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { useCustomerAuthStore } from "@/store/customerAuthStore";
+import { authAPI } from "@/api/client";
 
 // Staff app
 import AppLayout from "@/components/layout/AppLayout";
@@ -45,6 +47,20 @@ function PortalPrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+    const { isAuthenticated, setUser, clearAuth } = useAuthStore();
+
+    // Roles/permissions can change server-side (e.g. Super Admin edits a staff
+    // member's role) but the persisted `user` in localStorage doesn't know
+    // that. Refetch the authoritative record on every app load/reload so
+    // usePermissions() and the sidebar always reflect current access.
+    useEffect(() => {
+      if (isAuthenticated) {
+        authAPI.me()
+          .then((res) => setUser(res.data))
+          .catch(() => clearAuth());
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
   return (
     <Routes>
       {/* ── Staff app ─────────────────────────────────────────────────────── */}

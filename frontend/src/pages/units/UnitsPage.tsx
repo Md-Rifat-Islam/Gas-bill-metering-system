@@ -57,8 +57,8 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
   return (
     <Modal open={open} onClose={onClose} title={editItem ? 'Edit Unit' : 'New Unit'} size="lg">
       <form onSubmit={handleSubmit(d => save.mutate(d))} className="space-y-5">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
             <label className="label" htmlFor="unit-building">Building <span className="text-danger-500">*</span></label>
             <select
               id="unit-building"
@@ -150,7 +150,7 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
 
         <div className="border-t border-surface-100 pt-4">
           <div className="text-sm font-semibold text-surface-700 mb-3">Allottee Information</div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="label" htmlFor="allottee-name">Name</label>
               <input
@@ -192,13 +192,13 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
         </div>
 
         {!readOnly && (
-          <div className="flex gap-3 justify-end pt-2">
-            <button type="button" className="btn-secondary" onClick={onClose} aria-label="Cancel" title="Cancel">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end pt-2">
+            <button type="button" className="btn-secondary w-full sm:w-auto justify-center" onClick={onClose} aria-label="Cancel" title="Cancel">
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary"
+              className="btn-primary w-full sm:w-auto justify-center"
               disabled={save.isPending}
               aria-label="Save unit"
               title="Save unit"
@@ -261,14 +261,14 @@ export default function UnitsPage() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
         <div>
           <h1 className="page-title">Units</h1>
           <p className="page-subtitle">Manage residential / commercial units, allottees, and meters</p>
         </div>
         {can.editBuildings && (
           <button
-            className="btn-primary"
+            className="btn-primary w-full sm:w-auto justify-center"
             onClick={() => setModal({ open: true })}
             aria-label="Create new unit"
             title="Create new unit"
@@ -278,11 +278,11 @@ export default function UnitsPage() {
         )}
       </div>
 
-      <div className="flex gap-3 mb-6 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6 sm:flex-wrap">
+        <div className="relative flex-1 sm:min-w-[200px] sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
           <input
-            className="input pl-9"
+            className="input pl-9 w-full"
             placeholder="Search units, allottees…"
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
@@ -290,33 +290,36 @@ export default function UnitsPage() {
             title="Search units and allottees"
           />
         </div>
-        <select
-          className="input max-w-[200px]"
-          value={buildingFilter}
-          onChange={e => { setBuildingFilter(e.target.value); setPage(1) }}
-          aria-label="Filter by building"
-          title="Filter by building"
-        >
-          <option value="">All Buildings</option>
-          {buildings?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
-        <select
-          className="input max-w-[140px]"
-          value={statusFilter}
-          onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
-          aria-label="Filter by status"
-          title="Filter by status"
-        >
-          <option value="">All Status</option>
-          <option value="Active">Active</option>
-          <option value="Inactive">Inactive</option>
-        </select>
+        <div className="flex gap-3">
+          <select
+            className="input flex-1 sm:flex-none sm:max-w-[200px]"
+            value={buildingFilter}
+            onChange={e => { setBuildingFilter(e.target.value); setPage(1) }}
+            aria-label="Filter by building"
+            title="Filter by building"
+          >
+            <option value="">All Buildings</option>
+            {buildings?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+          <select
+            className="input flex-1 sm:flex-none sm:max-w-[140px]"
+            value={statusFilter}
+            onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
+            aria-label="Filter by status"
+            title="Filter by status"
+          >
+            <option value="">All Status</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
       </div>
 
       {isLoading ? <PageLoader /> : (
         <>
-          <div className="table-wrapper">
-            <table className="table">
+          {/* Horizontal scroll on narrow viewports instead of squashing columns */}
+          <div className="table-wrapper overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <table className="table min-w-[900px] sm:min-w-0">
               <thead>
                 <tr>
                   <th>Unit</th>

@@ -24,6 +24,7 @@ const PERMISSION_MODULES: { value: string; label: string }[] = [
   { value: 'buildings', label: 'Buildings' },
   { value: 'units',     label: 'Units' },
   { value: 'meters',    label: 'Meters' },
+  { value: 'quick_reading', label: 'Quick Reading' },   
   { value: 'billing',   label: 'Billing' },
   { value: 'payments',  label: 'Payments' },
   { value: 'reports',   label: 'Reports' },
@@ -124,17 +125,18 @@ function PermissionMatrix({userId, disabled, editItem,}: {
       <div className="flex items-start gap-2 mb-4 p-3 bg-warning-50 border border-warning-200 rounded-xl text-warning-700 text-xs">
         <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
         <span>
-          <strong>Not currently enforced.</strong> Access is determined solely by this user's{' '}
-          <span className="font-medium">Role</span> (set on the Basic Information tab). Changes made
-          here are saved but do not yet affect what this user can actually do — this tab reflects a
-          planned per-user override system that isn't wired into permission checks yet.
+          <strong>Mostly not enforced yet.</strong> Access is primarily determined by this user's{' '}
+          <span className="font-medium">Role</span>. The one exception: the <strong>Payments → View</strong>{' '}
+          checkbox below is live — checking it grants this user Payments visibility even if their role
+          wouldn't normally allow it. All other checkboxes on this tab are saved but not yet enforced.
         </span>
       </div>
       <p className="text-xs text-surface-400 mb-4">
         Override what this user can do per module. Unchecked "View" hides the module entirely from their sidebar.
       </p>
-      <div className="table-wrapper !shadow-none">
-        <table className="table">
+      {/* Scrolls horizontally on narrow screens instead of squashing the 4 columns */}
+      <div className="table-wrapper !shadow-none overflow-x-auto">
+        <table className="table min-w-[420px]">
           <thead>
             <tr>
               <th>Module</th>
@@ -247,6 +249,9 @@ function StaffModal({ open, onClose, editItem, roles, canManageThis }: {
       toast.success(editItem ? 'Staff member updated' : 'Staff member created')
       onClose()
     },
+    onError: (err: any) => {
+    toast.error(err?.response?.data?.detail || 'Failed to save staff member')
+    },
   })
 
   const readOnly = !!editItem && !canManageThis
@@ -260,7 +265,7 @@ function StaffModal({ open, onClose, editItem, roles, canManageThis }: {
         </div>
       )}
 
-      {/* Tabs */}
+      {/* Tabs — already horizontally scrollable, keep as-is */}
       <div className="flex gap-1 bg-surface-100 rounded-xl p-1 mb-5 overflow-x-auto" role="tablist">
         {TABS.map(t => (
           <button
@@ -282,7 +287,7 @@ function StaffModal({ open, onClose, editItem, roles, canManageThis }: {
       <form onSubmit={handleSubmit(d => save.mutate(d))}>
         {/* ── Basic Information ── */}
         <div className={tab === 'basic' ? 'block' : 'hidden'}>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label" htmlFor="staff-name">Full Name <span className="text-danger-500">*</span></label>
               <input
@@ -313,7 +318,7 @@ function StaffModal({ open, onClose, editItem, roles, canManageThis }: {
               </select>
               {errors.role_id && <p className="text-xs text-danger-600 mt-1">{errors.role_id.message}</p>}
             </div>
-            <div className="col-span-2 flex items-center gap-2 pt-1">
+            <div className="sm:col-span-2 flex items-center gap-2 pt-1">
               <input
                 {...register('is_active')}
                 type="checkbox"
@@ -332,7 +337,7 @@ function StaffModal({ open, onClose, editItem, roles, canManageThis }: {
 
         {/* ── Contact Information ── */}
         <div className={tab === 'contact' ? 'block' : 'hidden'}>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label" htmlFor="staff-email">Email <span className="text-danger-500">*</span></label>
               <input
@@ -359,7 +364,7 @@ function StaffModal({ open, onClose, editItem, roles, canManageThis }: {
                 title="Mobile number"
               />
             </div>
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className="label" htmlFor="staff-password">
                 {editItem ? 'New Password' : 'Password'}{' '}
                 {!editItem && <span className="text-danger-500">*</span>}
@@ -413,7 +418,7 @@ function StaffModal({ open, onClose, editItem, roles, canManageThis }: {
             title="Additional notes"
           />
           {editItem && (
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div className="bg-surface-50 rounded-xl p-3">
                 <div className="text-xs text-surface-400">Created By</div>
                 <div className="font-medium text-surface-700">{editItem.created_by_name || '—'}</div>
@@ -429,10 +434,10 @@ function StaffModal({ open, onClose, editItem, roles, canManageThis }: {
         </div>
 
         {!readOnly && (
-          <div className="flex gap-3 justify-end pt-5 mt-5 border-t border-surface-100">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end pt-5 mt-5 border-t border-surface-100">
             <button
               type="button"
-              className="btn-secondary"
+              className="btn-secondary w-full sm:w-auto justify-center"
               onClick={onClose}
               aria-label="Cancel"
               title="Cancel"
@@ -441,7 +446,7 @@ function StaffModal({ open, onClose, editItem, roles, canManageThis }: {
             </button>
             <button
               type="submit"
-              className="btn-primary"
+              className="btn-primary w-full sm:w-auto justify-center"
               disabled={save.isPending}
               aria-label={editItem ? 'Update staff member' : 'Create staff member'}
               title={editItem ? 'Update staff member' : 'Create staff member'}
@@ -513,13 +518,13 @@ export default function StaffPage() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
         <div>
           <h1 className="page-title">Staff Users</h1>
           <p className="page-subtitle">Manage staff accounts and role permissions</p>
         </div>
         <button
-          className="btn-primary"
+          className="btn-primary w-full sm:w-auto justify-center"
           onClick={() => setModal({ open: true })}
           aria-label="Add new staff member"
           title="Add new staff member"
@@ -561,8 +566,10 @@ export default function StaffPage() {
       {loadingStaff || loadingRoles ? (
         <PageLoader />
       ) : (
-        <div className="table-wrapper">
-          <table className="table">
+        // Horizontal scroll on narrow viewports — 8 columns won't fit a phone
+        // screen, so let the table keep its layout and scroll instead.
+        <div className="table-wrapper overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <table className="table min-w-[820px] sm:min-w-0">
             <thead>
               <tr>
                 <th>Name</th>

@@ -43,6 +43,8 @@ class StaffUserManager(BaseUserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
+        if 'role' not in extra_fields:
+            extra_fields['role'] = Role.objects.get_or_create(role_name=Role.SUPER_ADMIN)[0]
         return self.create_user(email, password, **extra_fields)
 
 
@@ -106,11 +108,11 @@ class StaffUser(AbstractBaseUser, PermissionsMixin):
 
 
 class PermissionModule(models.TextChoices):
-    """Modules that can have granular per-user permission overrides."""
     PROJECTS = 'projects', 'Projects'
     BUILDINGS = 'buildings', 'Buildings'
     UNITS = 'units', 'Units'
     METERS = 'meters', 'Meters'
+    QUICK_READING = 'quick_reading', 'Quick Reading'  
     BILLING = 'billing', 'Billing'
     PAYMENTS = 'payments', 'Payments'
     REPORTS = 'reports', 'Reports'

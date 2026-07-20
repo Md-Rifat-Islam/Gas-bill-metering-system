@@ -41,14 +41,14 @@ function DateFilterBar({ value, onChange }: { value: DateFilter; onChange: (v: D
   ]
 
   return (
-    <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-white rounded-2xl border border-surface-100 shadow-card">
-      {/* Mode selector */}
-      <div className="flex gap-1 bg-surface-100 rounded-xl p-1">
+    <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 mb-6 p-3 sm:p-4 bg-white rounded-2xl border border-surface-100 shadow-card">
+      {/* Mode selector — horizontally scrollable on narrow screens instead of wrapping/crushing */}
+      <div className="flex gap-1 bg-surface-100 rounded-xl p-1 overflow-x-auto max-w-full">
         {MODES.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => onChange({ ...value, mode: key })}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               value.mode === key
                 ? 'bg-white shadow-sm text-surface-900'
                 : 'text-surface-500 hover:text-surface-700'
@@ -62,12 +62,12 @@ function DateFilterBar({ value, onChange }: { value: DateFilter; onChange: (v: D
 
       {/* Month picker */}
       {value.mode === 'month' && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <select
             value={value.month}
             aria-label="Select month"
             onChange={e => onChange({ ...value, month: Number(e.target.value) })}
-            className="input !py-1.5 !text-sm max-w-[130px]"
+            className="input !py-1.5 !text-sm w-full sm:w-auto sm:max-w-[130px]"
           >
             {['January','February','March','April','May','June',
               'July','August','September','October','November','December'
@@ -79,7 +79,7 @@ function DateFilterBar({ value, onChange }: { value: DateFilter; onChange: (v: D
             value={value.year}
             aria-label="Select year"
             onChange={e => onChange({ ...value, year: Number(e.target.value) })}
-            className="input !py-1.5 !text-sm max-w-[100px]"
+            className="input !py-1.5 !text-sm w-full sm:w-auto sm:max-w-[100px]"
           >
             {Array.from({ length: 5 }, (_, i) => now.getFullYear() - i).map(y => (
               <option key={y} value={y}>{y}</option>
@@ -90,21 +90,21 @@ function DateFilterBar({ value, onChange }: { value: DateFilter; onChange: (v: D
 
       {/* Custom range */}
       {value.mode === 'custom' && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <input
             type="date"
             value={value.from}
             title="From Date"
             onChange={e => onChange({ ...value, from: e.target.value })}
-            className="input !py-1.5 !text-sm max-w-[150px]"
+            className="input !py-1.5 !text-sm w-full sm:w-auto sm:max-w-[150px]"
           />
-          <span className="text-surface-400 text-sm">to</span>
+          <span className="text-surface-400 text-sm hidden sm:inline">to</span>
           <input
             type="date"
             value={value.to}
             title="To Date"
             onChange={e => onChange({ ...value, to: e.target.value })}
-            className="input !py-1.5 !text-sm max-w-[150px]"
+            className="input !py-1.5 !text-sm w-full sm:w-auto sm:max-w-[150px]"
           />
         </div>
       )}
@@ -205,7 +205,7 @@ export default function MetersPage() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
         <div>
           <h1 className="page-title">Meter Readings</h1>
           <p className="page-subtitle">
@@ -215,11 +215,11 @@ export default function MetersPage() {
             </button>
           </p>
         </div>
-        <div className="flex gap-3">
-          <button className="btn-primary" onClick={() => navigate('/meters/quick-reading')}>
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <button className="btn-primary w-full sm:w-auto justify-center" onClick={() => navigate('/meters/quick-reading')}>
             <LayoutGrid className="w-4 h-4" /> Quick Reading Dashboard
           </button>
-          <button className="btn-secondary" onClick={() => setReadingModal(true)}>
+          <button className="btn-secondary w-full sm:w-auto justify-center" onClick={() => setReadingModal(true)}>
             <BookOpen className="w-4 h-4" /> Record Reading
           </button>
         </div>
@@ -228,8 +228,10 @@ export default function MetersPage() {
       <DateFilterBar value={dateFilter} onChange={f => { setDateFilter(f); setPage(1) }} />
       {loadingReadings ? <PageLoader /> : (
         <>
-          <div className="table-wrapper">
-            <table className="table">
+          {/* Horizontal scroll on narrow viewports — table keeps its columns
+              instead of squashing them unreadably; user swipes to see more. */}
+          <div className="table-wrapper overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <table className="table min-w-[900px] sm:min-w-0">
               <thead>
                 <tr>
                   <th>Photo</th>

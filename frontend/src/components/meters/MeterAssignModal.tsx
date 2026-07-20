@@ -108,7 +108,7 @@ export function MeterAssignModal({ open, onClose, unit }: MeterAssignModalProps)
           />
         </div>
 
-        <div className="flex gap-3 justify-end pt-2 border-t border-surface-100">
+        <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end pt-2 border-t border-surface-100">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
           <button type="submit" className="btn-primary" disabled={save.isPending}>
             {save.isPending ? 'Saving…' : isEdit ? 'Update Meter' : 'Assign Meter'}

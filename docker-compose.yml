@@ -17,10 +17,22 @@ services:
       timeout: 5s
       retries: 5
 
+  # Provisioned for future async work (Excel export generation, the
+  # still-TODO SMS sending in OTPRequestView) — Celery is configured in
+  # settings.py (CELERY_BROKER_URL / CELERY_RESULT_BACKEND) but no worker
+  # is running yet and no task has been written, so this container is
+  # currently idle. Uncomment the `celery` service below once a real task
+  # exists rather than removing this — Django will otherwise fail to read
+  # REDIS_URL at import time if a task module is added without it.
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   backend:
     build:
@@ -41,10 +53,37 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     command: >
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&
              gunicorn gas_billing.wsgi:application --bind 0.0.0.0:8000 --workers 2 --reload"
+
+  # Uncomment once an actual @shared_task exists somewhere in the codebase.
+  # Until then this would start and immediately sit idle consuming no work,
+  # so it's left disabled rather than shipped as a no-op container.
+  #
+  # celery:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   env_file: ./backend/.env
+  #   environment:
+  #     DB_HOST: db
+  #     DB_NAME: gas_billing_db
+  #     DB_USER: postgres
+  #     DB_PASSWORD: postgres
+  #     REDIS_URL: redis://redis:6379/0
+  #   volumes:
+  #     - ./backend:/app
+  #     - media_files:/app/media
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   command: celery -A gas_billing worker -l info
 
   frontend:
     build:

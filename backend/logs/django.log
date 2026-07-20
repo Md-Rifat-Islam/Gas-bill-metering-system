@@ -570,3 +570,249 @@ WARNING 2026-07-14 11:00:33,287 log Forbidden: /api/v1/reports/monthly-revenue/
 WARNING 2026-07-14 11:00:33,289 log Forbidden: /api/v1/reports/payment-methods/
 WARNING 2026-07-14 11:00:33,290 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
 WARNING 2026-07-14 11:00:33,292 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-15 12:20:00,623 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-15 12:20:00,633 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-15 12:20:00,644 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-15 12:20:00,645 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-15 12:20:01,707 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-15 12:20:01,709 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-15 12:20:01,732 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-15 12:20:01,734 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-15 12:20:10,845 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-15 12:20:10,846 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-15 12:20:10,848 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-15 12:20:10,850 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-15 12:20:11,900 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-15 12:20:11,902 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-15 12:20:11,907 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-15 12:20:11,908 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-15 14:47:09,560 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-15 14:47:09,564 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-15 14:47:09,621 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-15 14:47:09,647 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-15 14:47:10,671 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-15 14:47:10,671 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-15 14:47:10,760 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-15 14:47:10,761 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-15 14:47:28,682 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-15 14:47:28,686 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-15 14:47:28,687 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-15 14:47:28,688 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-15 14:47:29,743 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-15 14:47:29,743 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-15 14:47:29,756 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-15 14:47:29,757 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-15 15:32:53,834 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-15 15:32:53,837 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-15 16:18:08,783 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-15 16:18:08,785 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-15 16:22:47,648 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-15 16:22:47,651 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-15 16:22:47,652 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-15 16:22:47,662 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-15 16:22:48,872 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-15 16:22:48,875 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-15 16:22:48,893 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-15 16:22:48,894 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-15 16:24:39,552 log Forbidden: /api/v1/payments/
+WARNING 2026-07-15 16:24:39,553 basehttp "POST /api/v1/payments/ HTTP/1.1" 403 152
+WARNING 2026-07-15 16:24:41,323 log Forbidden: /api/v1/payments/
+WARNING 2026-07-15 16:24:41,324 basehttp "POST /api/v1/payments/ HTTP/1.1" 403 152
+WARNING 2026-07-15 16:28:49,485 log Forbidden: /api/v1/payments/
+WARNING 2026-07-15 16:28:49,487 basehttp "POST /api/v1/payments/ HTTP/1.1" 403 152
+WARNING 2026-07-15 16:53:48,474 log Forbidden: /api/v1/payments/
+WARNING 2026-07-15 16:53:48,475 basehttp "POST /api/v1/payments/ HTTP/1.1" 403 152
+WARNING 2026-07-15 16:58:45,757 log Forbidden: /api/v1/payments/pending/
+WARNING 2026-07-15 16:58:45,758 basehttp "GET /api/v1/payments/pending/ HTTP/1.1" 403 152
+WARNING 2026-07-15 16:59:31,817 log Forbidden: /api/v1/payments/pending/
+WARNING 2026-07-15 16:59:31,818 basehttp "GET /api/v1/payments/pending/ HTTP/1.1" 403 152
+WARNING 2026-07-15 16:59:32,114 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-15 16:59:32,118 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-15 16:59:32,131 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-15 16:59:32,132 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-15 16:59:33,144 log Forbidden: /api/v1/payments/pending/
+WARNING 2026-07-15 16:59:33,145 basehttp "GET /api/v1/payments/pending/ HTTP/1.1" 403 152
+WARNING 2026-07-15 16:59:33,338 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-15 16:59:33,339 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-15 16:59:33,373 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-15 16:59:33,375 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+ERROR 2026-07-15 17:09:34,942 log Internal Server Error: /api/v1/billing/
+ERROR 2026-07-15 17:09:34,943 basehttp "POST /api/v1/billing/ HTTP/1.1" 500 60
+WARNING 2026-07-16 13:06:20,066 log Forbidden: /api/v1/payments/pending/
+WARNING 2026-07-16 13:06:20,071 basehttp "GET /api/v1/payments/pending/ HTTP/1.1" 403 136
+WARNING 2026-07-16 13:06:20,227 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-16 13:06:20,236 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-16 13:06:20,236 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-16 13:06:20,241 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-16 13:06:21,237 log Forbidden: /api/v1/payments/pending/
+WARNING 2026-07-16 13:06:21,238 basehttp "GET /api/v1/payments/pending/ HTTP/1.1" 403 136
+WARNING 2026-07-16 13:06:21,324 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-16 13:06:21,327 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-16 13:06:21,330 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-16 13:06:21,335 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-16 13:06:28,904 log Forbidden: /api/v1/projects/
+WARNING 2026-07-16 13:06:28,905 basehttp "GET /api/v1/projects/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:06:28,907 log Forbidden: /api/v1/buildings/
+WARNING 2026-07-16 13:06:28,908 basehttp "GET /api/v1/buildings/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:06:29,969 log Forbidden: /api/v1/buildings/
+WARNING 2026-07-16 13:06:29,971 basehttp "GET /api/v1/buildings/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:06:29,976 log Forbidden: /api/v1/projects/
+WARNING 2026-07-16 13:06:29,977 basehttp "GET /api/v1/projects/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:06:58,079 log Forbidden: /api/v1/projects/
+WARNING 2026-07-16 13:06:58,080 basehttp "GET /api/v1/projects/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:06:58,083 log Forbidden: /api/v1/buildings/
+WARNING 2026-07-16 13:06:58,084 basehttp "GET /api/v1/buildings/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:06:59,157 log Forbidden: /api/v1/projects/
+WARNING 2026-07-16 13:06:59,158 basehttp "GET /api/v1/projects/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:06:59,160 log Forbidden: /api/v1/buildings/
+WARNING 2026-07-16 13:06:59,161 basehttp "GET /api/v1/buildings/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:07:47,452 log Forbidden: /api/v1/payments/pending/
+WARNING 2026-07-16 13:07:47,453 basehttp "GET /api/v1/payments/pending/ HTTP/1.1" 403 136
+WARNING 2026-07-16 13:07:47,615 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-16 13:07:47,620 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-16 13:07:47,622 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-16 13:07:47,653 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-16 13:07:48,562 log Forbidden: /api/v1/payments/pending/
+WARNING 2026-07-16 13:07:48,563 basehttp "GET /api/v1/payments/pending/ HTTP/1.1" 403 136
+WARNING 2026-07-16 13:07:48,728 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-16 13:07:48,731 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-16 13:07:48,736 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-16 13:07:48,740 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-16 13:07:52,089 log Forbidden: /api/v1/projects/
+WARNING 2026-07-16 13:07:52,089 basehttp "GET /api/v1/projects/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:07:52,094 log Forbidden: /api/v1/buildings/
+WARNING 2026-07-16 13:07:52,095 basehttp "GET /api/v1/buildings/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:07:53,149 log Forbidden: /api/v1/projects/
+WARNING 2026-07-16 13:07:53,151 basehttp "GET /api/v1/projects/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:07:53,167 log Forbidden: /api/v1/buildings/
+WARNING 2026-07-16 13:07:53,168 basehttp "GET /api/v1/buildings/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:10:12,707 log Forbidden: /api/v1/projects/
+WARNING 2026-07-16 13:10:12,708 basehttp "GET /api/v1/projects/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:10:12,712 log Forbidden: /api/v1/buildings/
+WARNING 2026-07-16 13:10:12,713 basehttp "GET /api/v1/buildings/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:10:13,796 log Forbidden: /api/v1/buildings/
+WARNING 2026-07-16 13:10:13,799 basehttp "GET /api/v1/buildings/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 13:10:13,804 log Forbidden: /api/v1/projects/
+WARNING 2026-07-16 13:10:13,805 basehttp "GET /api/v1/projects/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:50:02,093 log Forbidden: /api/v1/payments/pending/
+WARNING 2026-07-16 15:50:02,094 basehttp "GET /api/v1/payments/pending/ HTTP/1.1" 403 136
+WARNING 2026-07-16 15:50:02,283 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-16 15:50:02,284 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-16 15:50:02,355 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-16 15:50:02,359 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-16 15:50:03,196 log Forbidden: /api/v1/payments/pending/
+WARNING 2026-07-16 15:50:03,197 basehttp "GET /api/v1/payments/pending/ HTTP/1.1" 403 136
+WARNING 2026-07-16 15:50:03,352 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-16 15:50:03,353 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-16 15:50:03,434 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-16 15:50:03,434 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-16 15:50:13,512 log Forbidden: /api/v1/buildings/
+WARNING 2026-07-16 15:50:13,514 log Forbidden: /api/v1/projects/
+WARNING 2026-07-16 15:50:13,515 basehttp "GET /api/v1/buildings/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:50:13,515 basehttp "GET /api/v1/projects/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:50:14,574 log Forbidden: /api/v1/buildings/
+WARNING 2026-07-16 15:50:14,578 basehttp "GET /api/v1/buildings/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:50:14,592 log Forbidden: /api/v1/projects/
+WARNING 2026-07-16 15:50:14,595 basehttp "GET /api/v1/projects/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:50:19,732 log Forbidden: /api/v1/projects/
+WARNING 2026-07-16 15:50:19,732 basehttp "GET /api/v1/projects/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:50:19,734 log Forbidden: /api/v1/buildings/
+WARNING 2026-07-16 15:50:19,735 basehttp "GET /api/v1/buildings/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:50:20,788 log Forbidden: /api/v1/projects/
+WARNING 2026-07-16 15:50:20,790 log Forbidden: /api/v1/buildings/
+WARNING 2026-07-16 15:50:20,790 basehttp "GET /api/v1/projects/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:50:20,791 basehttp "GET /api/v1/buildings/?page_size=500 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:51:55,853 log Forbidden: /api/v1/payments/pending/
+WARNING 2026-07-16 15:51:55,855 basehttp "GET /api/v1/payments/pending/ HTTP/1.1" 403 136
+WARNING 2026-07-16 15:51:56,039 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-16 15:51:56,043 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-16 15:51:56,052 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-16 15:51:56,056 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-16 15:51:56,981 log Forbidden: /api/v1/payments/pending/
+WARNING 2026-07-16 15:51:56,981 basehttp "GET /api/v1/payments/pending/ HTTP/1.1" 403 136
+WARNING 2026-07-16 15:51:57,119 log Forbidden: /api/v1/reports/payment-methods/
+WARNING 2026-07-16 15:51:57,121 basehttp "GET /api/v1/reports/payment-methods/ HTTP/1.1" 403 154
+WARNING 2026-07-16 15:51:57,167 log Forbidden: /api/v1/reports/monthly-revenue/
+WARNING 2026-07-16 15:51:57,172 basehttp "GET /api/v1/reports/monthly-revenue/ HTTP/1.1" 403 154
+WARNING 2026-07-16 15:52:02,695 log Forbidden: /api/v1/units/
+WARNING 2026-07-16 15:52:02,696 basehttp "GET /api/v1/units/?search=&page=1 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:52:03,750 log Forbidden: /api/v1/units/
+WARNING 2026-07-16 15:52:03,750 basehttp "GET /api/v1/units/?search=&page=1 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:52:08,340 log Forbidden: /api/v1/units/
+WARNING 2026-07-16 15:52:08,340 basehttp "GET /api/v1/units/?search=&building=2&page=1 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:52:09,401 log Forbidden: /api/v1/units/
+WARNING 2026-07-16 15:52:09,402 basehttp "GET /api/v1/units/?search=&building=2&page=1 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:52:13,732 log Forbidden: /api/v1/units/
+WARNING 2026-07-16 15:52:13,733 basehttp "GET /api/v1/units/?search=&building=3&page=1 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:52:14,787 log Forbidden: /api/v1/units/
+WARNING 2026-07-16 15:52:14,788 basehttp "GET /api/v1/units/?search=&building=3&page=1 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:52:38,083 log Forbidden: /api/v1/units/
+WARNING 2026-07-16 15:52:38,083 basehttp "GET /api/v1/units/?search=&page=1 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:52:39,138 log Forbidden: /api/v1/units/
+WARNING 2026-07-16 15:52:39,139 basehttp "GET /api/v1/units/?search=&page=1 HTTP/1.1" 403 136
+WARNING 2026-07-16 15:59:27,822 log Forbidden: /api/v1/billing/
+WARNING 2026-07-16 15:59:27,822 basehttp "POST /api/v1/billing/ HTTP/1.1" 403 136
+WARNING 2026-07-20 12:11:29,086 log Unauthorized: /api/v1/auth/me/
+WARNING 2026-07-20 12:11:29,089 log Unauthorized: /api/v1/auth/me/permissions/
+WARNING 2026-07-20 12:11:29,090 basehttp "GET /api/v1/auth/me/ HTTP/1.1" 401 483
+WARNING 2026-07-20 12:11:29,091 basehttp "GET /api/v1/auth/me/permissions/ HTTP/1.1" 401 483
+WARNING 2026-07-20 12:11:29,110 log Unauthorized: /api/v1/payments/pending/
+WARNING 2026-07-20 12:11:29,111 basehttp "GET /api/v1/payments/pending/ HTTP/1.1" 401 483
+WARNING 2026-07-20 12:11:29,116 log Unauthorized: /api/v1/auth/me/
+WARNING 2026-07-20 12:11:29,117 basehttp "GET /api/v1/auth/me/ HTTP/1.1" 401 483
+WARNING 2026-07-20 12:11:29,199 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-07-20 12:11:29,202 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 111
+WARNING 2026-07-20 12:11:29,256 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-07-20 12:11:29,262 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 111
+WARNING 2026-07-20 12:11:29,272 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-07-20 12:11:29,274 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 111
+WARNING 2026-07-20 12:11:29,286 log Unauthorized: /api/v1/auth/token/refresh/
+WARNING 2026-07-20 12:11:29,287 basehttp "POST /api/v1/auth/token/refresh/ HTTP/1.1" 401 111
+WARNING 2026-07-20 12:12:17,217 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 12:12:17,218 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 12:12:18,335 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 12:12:18,339 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 12:21:45,609 log Unauthorized: /api/v1/auth/me/
+WARNING 2026-07-20 12:21:45,610 basehttp "GET /api/v1/auth/me/ HTTP/1.1" 401 483
+WARNING 2026-07-20 12:21:45,613 log Unauthorized: /api/v1/auth/me/permissions/
+WARNING 2026-07-20 12:21:45,614 basehttp "GET /api/v1/auth/me/permissions/ HTTP/1.1" 401 483
+WARNING 2026-07-20 12:21:45,669 log Unauthorized: /api/v1/payments/pending/
+WARNING 2026-07-20 12:21:45,670 basehttp "GET /api/v1/payments/pending/ HTTP/1.1" 401 483
+WARNING 2026-07-20 12:21:45,679 log Unauthorized: /api/v1/auth/me/
+WARNING 2026-07-20 12:21:45,682 basehttp "GET /api/v1/auth/me/ HTTP/1.1" 401 483
+WARNING 2026-07-20 16:09:27,090 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:09:27,094 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:09:28,173 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:09:28,174 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:09:43,655 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:09:43,657 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:09:44,992 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:09:44,993 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:10:25,236 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:10:25,237 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:10:26,340 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:10:26,341 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:10:46,908 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:10:46,909 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:10:48,078 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:10:48,079 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:11:17,864 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:11:17,865 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:11:18,957 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:11:18,958 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:11:36,538 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:11:36,539 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:11:37,699 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:11:37,700 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:11:47,783 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:11:47,792 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:11:48,893 log Not Found: /api/v1/auth/roles/permission-matrix/
+WARNING 2026-07-20 16:11:48,894 basehttp "GET /api/v1/auth/roles/permission-matrix/ HTTP/1.1" 404 5621
+WARNING 2026-07-20 16:27:06,220 log Not Found: /api/v1/billing/NaN/
+WARNING 2026-07-20 16:27:06,224 basehttp "GET /api/v1/billing/NaN/ HTTP/1.1" 404 4391
+WARNING 2026-07-20 16:27:07,291 log Not Found: /api/v1/billing/NaN/
+WARNING 2026-07-20 16:27:07,291 basehttp "GET /api/v1/billing/NaN/ HTTP/1.1" 404 4391
+WARNING 2026-07-20 16:27:42,788 log Not Found: /api/v1/billing/NaN/
+WARNING 2026-07-20 16:27:42,792 basehttp "GET /api/v1/billing/NaN/ HTTP/1.1" 404 4391
+WARNING 2026-07-20 16:27:44,114 log Not Found: /api/v1/billing/NaN/
+WARNING 2026-07-20 16:27:44,115 basehttp "GET /api/v1/billing/NaN/ HTTP/1.1" 404 4391

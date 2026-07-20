@@ -52,7 +52,10 @@ export default function BillDetailPage() {
 
   return (
     <div className="max-w-4xl">
-      <div className="flex items-center gap-4 mb-8">
+      {/* Header — wraps to multiple rows on narrow screens instead of
+          squeezing the back button, title, badge, and action buttons
+          into one unbreakable row. */}
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-8">
         <button
           className="btn-ghost btn-sm"
           onClick={() => navigate('/billing')}
@@ -61,41 +64,43 @@ export default function BillDetailPage() {
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-[160px]">
           <h1 className="page-title">Bill #{bill.bill_number}</h1>
           <p className="page-subtitle">{formatMonth(bill.billing_month)}</p>
         </div>
         <StatusBadge status={bill.status} />
-        {!isPaid && can.recordPayment && (
-          <button
-            className="btn-primary"
-            onClick={() => setPayModal(true)}
-            aria-label="Record payment"
-            title="Record payment"
-          >
-            <CreditCard className="w-4 h-4" /> Record Payment
-          </button>
-        )}
-        {can.deleteBill && (
-          <button
-            className="btn-secondary text-danger-600 border-danger-200 hover:bg-danger-50"
-            onClick={handleDelete}
-            disabled={deleteBill.isPending}
-            aria-label="Delete bill"
-            title="Delete bill"
-          >
-            <Trash2 className="w-4 h-4" /> Delete
-          </button>
-        )}
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          {!isPaid && can.recordPayment && (
+            <button
+              className="btn-primary flex-1 sm:flex-none justify-center"
+              onClick={() => setPayModal(true)}
+              aria-label="Record payment"
+              title="Record payment"
+            >
+              <CreditCard className="w-4 h-4" /> Record Payment
+            </button>
+          )}
+          {can.deleteBill && (
+            <button
+              className="btn-secondary flex-1 sm:flex-none justify-center text-danger-600 border-danger-200 hover:bg-danger-50"
+              onClick={handleDelete}
+              disabled={deleteBill.isPending}
+              aria-label="Delete bill"
+              title="Delete bill"
+            >
+              <Trash2 className="w-4 h-4" /> Delete
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Bill details */}
-        <div className="col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           {/* Unit info */}
           <div className="card">
             <div className="text-sm font-bold text-surface-500 uppercase tracking-wider mb-4">Unit Details</div>
-            <div className="grid grid-cols-2 gap-y-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 text-sm">
               <InfoRow label="Project"  value={bill.project_name} />
               <InfoRow label="Building" value={bill.building_name} />
               <InfoRow label="Unit"     value={bill.unit_no} />
@@ -107,7 +112,7 @@ export default function BillDetailPage() {
           {/* Meter readings */}
           <div className="card">
             <div className="text-sm font-bold text-surface-500 uppercase tracking-wider mb-4">Meter Readings</div>
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
               <div className="bg-surface-50 rounded-xl p-4">
                 <div className="text-xs text-surface-400 mb-1">Previous</div>
                 <div className="text-2xl font-bold font-mono text-surface-700">{bill.previous_reading}</div>
@@ -126,7 +131,7 @@ export default function BillDetailPage() {
             </div>
 
             {bill.conversion_factor && bill.total_usage_kg && (
-              <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-center">
                 <div className="bg-surface-50 rounded-xl p-4">
                   <div className="text-xs text-surface-400 mb-1">Conversion Ratio</div>
                   <div className="text-lg font-bold font-mono text-surface-700">{bill.conversion_factor}</div>
@@ -151,7 +156,7 @@ export default function BillDetailPage() {
             ) : (
               <div className="space-y-2">
                 {payments.map((p: any) => (
-                  <div key={p.id} className="flex items-center justify-between py-2.5 px-3 bg-surface-50 rounded-xl text-sm">
+                  <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 px-3 bg-surface-50 rounded-xl text-sm">
                     <div>
                       <span className="font-semibold text-surface-800">{formatCurrency(p.paid_amount)}</span>
                       <span className="ml-2 badge-blue">{p.payment_method}</span>
@@ -169,7 +174,7 @@ export default function BillDetailPage() {
 
         {/* Amount summary */}
         <div>
-          <div className="card sticky top-4">
+          <div className="card lg:sticky lg:top-4">
             <div className="text-sm font-bold text-surface-500 uppercase tracking-wider mb-4">Bill Summary</div>
             <div className="space-y-2.5 text-sm">
               <SummaryRow label="Base Amount"   value={formatCurrency(bill.base_amount)} />

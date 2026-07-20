@@ -32,7 +32,7 @@ export function PhotoCapture({ value, onChange }: {
           <img
             src={preview}
             alt="Meter reading"
-            className="w-full h-44 object-cover cursor-zoom-in"
+            className="w-full h-52 md:h-44 object-cover cursor-zoom-in"
             onClick={() => setLightbox(true)}
           />
           <div className="absolute top-2 right-2 flex gap-1">
@@ -61,12 +61,12 @@ export function PhotoCapture({ value, onChange }: {
         <div className="border-2 border-dashed border-surface-200 rounded-xl p-6 text-center bg-surface-50">
           <Camera className="w-8 h-8 text-surface-300 mx-auto mb-2" />
           <p className="text-sm text-surface-400 mb-4">Take a photo or upload from gallery</p>
-          <div className="flex gap-3 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             {/* Camera capture (mobile) */}
             <button
               type="button"
               onClick={() => cameraRef.current?.click()}
-              className="btn-secondary btn-sm"
+              className="w-full btn-secondary btn-sm"
             >
               <Camera className="w-3.5 h-3.5" /> Camera
             </button>
@@ -186,7 +186,7 @@ export function ReadingModal({
   return (
     <Modal open={open} onClose={onClose} title="Record Meter Reading" size="lg">
       <form onSubmit={handleSubmit(d => save.mutate(d))} className="space-y-5">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left */}
           <div className="space-y-4">
             <div>
@@ -218,7 +218,7 @@ export function ReadingModal({
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="label">Previous (m³)</label>
                 <input
@@ -267,8 +267,8 @@ export function ReadingModal({
           </div>
         </div>
 
-        <div className="flex gap-3 justify-end pt-2 border-t border-surface-100">
-          <button type="button" className="btn-secondary" onClick={() => { onClose(); reset(); setPhoto(null) }}>
+        <div className="flex-col-reverse sm:flex-row flex gap-3 justify-end pt-2 border-t border-surface-100">
+          <button type="button" className="btn-secondary w-full sm:w-auto" onClick={() => { onClose(); reset(); setPhoto(null) }}>
             Cancel
           </button>
           <button type="submit" className="btn-primary" disabled={save.isPending}>

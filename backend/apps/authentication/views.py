@@ -16,11 +16,15 @@ from core.permissions import (
     UserPermissionManagePermission, role as get_role, R, A, BO, AC, V,
 )
 from core.permissions import (
-    ProjectPermission, PackagePermission, BuildingPermission, MeterPermission,
-    BillPermission, BillDeletePermission, PaymentWritePermission,
+    ProjectPermission, PackagePermission, BuildingPermission, UnitPermission,
+    MeterPermission, QuickReadingPermission,
+    BillPermission, BillDeletePermission, BillSpreadsheetEditPermission,
+    PaymentWritePermission, PaymentPermission,
     ReportPermission, FinancialReportPermission, AuditLogPermission,
+    SystemSettingsPermission, dashboard_scope,
 )
 from core.rbac import ROLE_DEFAULT_PERMISSIONS
+
 
 class StaffLoginView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -227,8 +231,6 @@ class RoleListPublicView(APIView):
     def get(self, request):
         qs = Role.objects.all().order_by('id')
         if request.user.role_name == Role.ADMIN:
-            # Admin cannot see/assign Super Admin or Admin roles when creating
-            # or editing a user — they can only grant the operational roles.
             qs = qs.exclude(role_name__in=[Role.SUPER_ADMIN, Role.ADMIN])
         return Response(RoleSerializer(qs, many=True).data)
 
@@ -243,20 +245,28 @@ class _FakeUser:
 
 
 class _FakeRequest:
+    """
+    NOTE: because this has no real user id, `_module_override()` in
+    core/permissions.py always returns None for it — every
+    ModuleOverridePermission subclass therefore reports the ROLE DEFAULT
+    only when checked against a _FakeRequest. That's exactly what
+    RolePermissionMatrixView wants (it's a role matrix, not a per-user
+    one). MyPermissionsView below uses this same simulation for its base
+    pass, then explicitly overlays the real per-user override afterward
+    using the true request.user — see _apply_real_overrides().
+    """
     def __init__(self, role_name, method='GET'):
         self.user = _FakeUser(role_name)
         self.method = method
 
 
-# (key, label, permission_class, http_method_to_simulate)
-# http_method_to_simulate is GET for every row except explicitly
-# delete-scoped ones — matches the page's own "checkmark = at least read
-# access" legend.
 _MATRIX_DEFINITION = [
     ('projects',   'Projects',            ProjectPermission,         'GET'),
-    ('buildings',  'Buildings / Units',   BuildingPermission,        'GET'),
+    ('buildings',  'Buildings',           BuildingPermission,        'GET'),
+    ('units',      'Units',               UnitPermission,            'GET'),
     ('packages',   'Packages',            PackagePermission,         'GET'),
     ('meters',     'Meters & Readings',   MeterPermission,           'GET'),
+    ('quickread',  'Quick Reading',       QuickReadingPermission,    'GET'),
     ('bills',      'Bills',               BillPermission,            'GET'),
     ('billDelete', 'Bills (Delete)',      BillDeletePermission,      'DELETE'),
     ('payments',   'Payments',            PaymentWritePermission,    'GET'),
@@ -266,18 +276,16 @@ _MATRIX_DEFINITION = [
     ('rbac',       'Roles & RBAC',        RBACPermission,            'GET'),
 ]
 
-_ROLE_ORDER = [R, A, BO, AC, V]  # super_admin, admin, billing_staff, accountant, viewer
+_ROLE_ORDER = [R, A, BO, AC, V]
 
 
 class RolePermissionMatrixView(APIView):
     """
-    Feeds the dynamic Roles & RBAC permission matrix by calling each real
-    permission class's has_permission() with a simulated request per role,
-    for each row — rather than maintaining a separate hardcoded grid that
-    can silently drift out of sync with the actual enforcement code (as the
-    frontend's old hardcoded MATRIX constant already had — it said Admin
-    could not record payments after PaymentWritePermission had already been
-    changed to allow it).
+    Feeds the dynamic Roles & RBAC permission matrix — ROLE DEFAULTS only,
+    computed live from the real permission classes. Per-user overrides are
+    intentionally not reflected here (see _FakeRequest docstring above);
+    this page answers "what can this role do by default," not "what can
+    this specific user do."
 
     Super Admin only — same gate as the page that consumes this.
     """
@@ -308,11 +316,13 @@ class UserPermissionListView(APIView):
     PUT  /auth/staff/<user_id>/permissions/   — replace the full set in one call
          body: [{"module": "billing", "can_view": true, "can_edit": false, "can_delete": false}, ...]
 
-    Enforced by UserPermissionManagePermission:
-      - Super Admin can edit anyone's permissions.
-      - Admin can edit permissions only for users they created, and never
-        for a Super Admin or another Admin (those targets 403 before
-        reaching this view, since can_manage() returns False for them).
+    Enforced by UserPermissionManagePermission (Super Admin: any user;
+    Admin: only users they created, never Super Admin/Admin targets).
+
+    Every module row here is now genuinely enforced EXCEPT 'staff' and
+    'audit', which stay hard-locked to role alone (see UserModulePermission
+    / AuditLogPermission docstrings in core/permissions.py) — saving a
+    'staff' or 'audit' override row here has no effect, by design.
     """
     permission_classes = [permissions.IsAuthenticated, UserPermissionManagePermission]
 
@@ -324,25 +334,18 @@ class UserPermissionListView(APIView):
 
     def get(self, request, user_id):
         target = self.get_target(user_id)
-
-        # Default permissions for the user's role
         role_defaults = ROLE_DEFAULT_PERMISSIONS.get(target.role_name, {})
 
-        # Existing overrides keyed by module name
         overrides = {
             p.module: p
             for p in UserPermission.objects.filter(user=target)
         }
 
         result = []
-
         for module in PermissionModule:
-            # Get the default permissions for this module
             default_view, default_edit, default_delete = role_defaults.get(
-                module,
-                (False, False, False)
+                module, (False, False, False)
             )
-
             override = overrides.get(module.value)
 
             if override:
@@ -370,8 +373,6 @@ class UserPermissionListView(APIView):
     def put(self, request, user_id):
         target = self.get_target(user_id)
 
-        # Belt-and-suspenders: re-verify hierarchy even though the permission
-        # class already checked it, in case of a future refactor.
         if not request.user.can_manage(target):
             raise PermissionDenied("You do not have permission to manage this user's permissions.")
 
@@ -385,25 +386,21 @@ class UserPermissionListView(APIView):
         UserPermission.objects.filter(user=target).delete()
 
         created = []
-
         defaults = ROLE_DEFAULT_PERMISSIONS.get(target.role_name, {})
 
         for row in incoming:
             module = row.get("module")
-
             if module not in valid_modules:
                 continue
 
             default_view, default_edit, default_delete = defaults.get(
-                module,
-                (False, False, False)
+                module, (False, False, False)
             )
 
             can_view = bool(row.get("can_view"))
             can_edit = bool(row.get("can_edit"))
             can_delete = bool(row.get("can_delete"))
 
-            # Skip storing if identical to role defaults
             if (
                 can_view == default_view and
                 can_edit == default_edit and
@@ -428,3 +425,115 @@ class UserPermissionListView(APIView):
             {'overrides': old_state}, {'overrides': new_state},
         )
         return Response(new_state)
+
+
+# ── Live capability flags for the CURRENT user (drives sidebar + `can`) ───────
+
+# key -> (permission_class, http_method to simulate)
+_CAPABILITY_DEFINITION = {
+    'viewUsers':           (UserModulePermission, 'GET'),
+    'manageUsers':         (UserModulePermission, 'POST'),
+    'deleteStaff':         (UserModulePermission, 'DELETE'),
+    'manageRBAC':          (RBACPermission, 'GET'),
+
+    'viewProjects':        (ProjectPermission, 'GET'),
+    'createProject':       (ProjectPermission, 'POST'),
+    'editProject':         (ProjectPermission, 'POST'),
+    'deleteProject':       (ProjectPermission, 'DELETE'),
+
+    'viewBuildings':       (BuildingPermission, 'GET'),
+    'editBuildings':       (BuildingPermission, 'POST'),
+    'deleteBuildings':     (BuildingPermission, 'DELETE'),
+
+    'viewUnits':           (UnitPermission, 'GET'),
+
+    'viewPackages':        (PackagePermission, 'GET'),
+    'editPackages':        (PackagePermission, 'POST'),
+
+    'viewMeters':          (MeterPermission, 'GET'),
+    'editMeters':          (MeterPermission, 'POST'),
+    'recordReading':       (QuickReadingPermission, 'POST'),
+
+    'viewBills':           (BillPermission, 'GET'),
+    'createBill':          (BillPermission, 'POST'),
+    'editBill':            (BillPermission, 'PATCH'),
+    'deleteBill':          (BillDeletePermission, 'DELETE'),
+    'editBillSpreadsheet': (BillSpreadsheetEditPermission, 'PATCH'),
+
+    'viewPayments':        (PaymentPermission, 'GET'),
+    'recordPayment':       (PaymentWritePermission, 'POST'),
+    'approvePayments':     (PaymentWritePermission, 'POST'),
+
+    'viewReports':          (ReportPermission, 'GET'),
+    'viewFinancialReports': (FinancialReportPermission, 'GET'),
+
+    'viewAuditLogs':       (AuditLogPermission, 'GET'),
+    'viewSystemSettings':  (SystemSettingsPermission, 'GET'),
+}
+
+# module -> (view_flag, edit_flag_or_None, delete_flag_or_None)
+# Used to overlay the REAL per-user override (using the true request.user,
+# not the _FakeRequest simulation above, which can never see it) onto the
+# simulated flags. Staff and Audit are deliberately absent — they're
+# hard-locked and never take an override, by design.
+_MODULE_FLAG_MAP = {
+    'projects':      ('viewProjects',  'editProject',  'deleteProject'),
+    'buildings':     ('viewBuildings', 'editBuildings', 'deleteBuildings'),
+    'units':         ('viewUnits',     None,            None),
+    'meters':        ('viewMeters',    'editMeters',    None),
+    'quick_reading': ('recordReading', 'recordReading', None),
+    'billing':       ('viewBills',     'editBill',      'deleteBill'),
+    'payments':      ('viewPayments',  'recordPayment', None),
+    'reports':       ('viewReports',   None,            None),
+}
+
+
+class MyPermissionsView(APIView):
+    """Live capability flags + dashboard scope for the CURRENT user."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        flags = {}
+        for key, (perm_class, method) in _CAPABILITY_DEFINITION.items():
+            fake_req = _FakeRequest(request.user.role_name, method)
+            try:
+                flags[key] = bool(perm_class().has_permission(fake_req, None))
+            except Exception:
+                flags[key] = False
+
+        # Capabilities without a dedicated permission class — direct role
+        # checks (unaffected by the module override system).
+        r = request.user.role_name
+        flags['viewDashboard']      = r in (R, A, BO, AC)
+        flags['adjustBill']         = r in (R, A, BO)
+        flags['assignPackages']     = r in (R, A)
+        flags['viewProjectReports'] = r in (R, A, AC)
+        flags['viewBillingQueue']   = r in (R, A, BO)
+        flags['editPayments']       = r == R
+        flags['viewAllHistory']     = r == R
+        flags['reversePayment']     = r == R
+        flags['verifyPayment']      = r in (R, A, AC)
+
+        # Overlay the REAL per-user override for every override-able module,
+        # using request.user's actual id — the simulated pass above can
+        # only ever see role defaults, since _FakeRequest has no real user.
+        overrides = {
+            o.module: o
+            for o in UserPermission.objects.filter(user=request.user)
+        }
+        for module, (view_key, edit_key, delete_key) in _MODULE_FLAG_MAP.items():
+            o = overrides.get(module)
+            if o is None:
+                continue
+            if view_key:
+                flags[view_key] = o.can_view
+            if edit_key:
+                flags[edit_key] = o.can_edit
+            if delete_key:
+                flags[delete_key] = o.can_delete
+
+        return Response({
+            'role': request.user.role_name,
+            'capabilities': flags,
+            'dashboard_modules': dashboard_scope(request),
+        })

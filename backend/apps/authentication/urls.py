@@ -1,6 +1,12 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
+from .views import (
+    StaffLoginView, LogoutView, OTPRequestView, OTPVerifyView,
+    StaffUserListCreateView, StaffUserDetailView, MeView,
+    RoleListView, RoleListPublicView, RolePermissionMatrixView,
+    UserPermissionListView, MyPermissionsView,
+)
 
 urlpatterns = [
     path('login/',         views.StaffLoginView.as_view(),     name='staff-login'),
@@ -16,4 +22,7 @@ urlpatterns = [
     path('roles/',         views.RoleListView.as_view(),       name='roles'),
     # roles/dropdown/ for any staff picking a role in a form
     path('roles/dropdown/', views.RoleListPublicView.as_view(), name='roles-dropdown'),
+    # roles/permission-matrix/ — live role×module matrix for the Roles & RBAC page
+    path('roles/permission-matrix/', RolePermissionMatrixView.as_view(), name='roles-permission-matrix'),
+    path('me/permissions/', MyPermissionsView.as_view()),
 ]

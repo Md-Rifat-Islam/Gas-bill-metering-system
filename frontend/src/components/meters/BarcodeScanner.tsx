@@ -35,7 +35,7 @@ export function BarcodeScanner({ open, onClose, onDetected }: BarcodeScannerProp
     scanner
       .start(
         { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
+        { fps: 10, qrbox: { width: 350, height: 350 } },
         (decodedText: string) => {
           onDetected(decodedText)
           stop()
@@ -67,8 +67,8 @@ export function BarcodeScanner({ open, onClose, onDetected }: BarcodeScannerProp
   if (!open) return null
 
   return (
-    <Modal open={open} onClose={handleClose} title="Scan Meter Barcode" size="sm">
-      <div className="space-y-4">
+    <Modal open={open} onClose={handleClose} title="Scan Meter Barcode" size="md">
+      <div className="space-y-6">
         <div
           id={SCANNER_ELEMENT_ID}
           className="w-full rounded-xl overflow-hidden bg-surface-900 aspect-square flex items-center justify-center"

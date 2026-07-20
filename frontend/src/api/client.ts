@@ -65,6 +65,8 @@ export const authAPI = {
   rolesDropdown: () => api.get('/auth/roles/dropdown/'),
   rolePermissionMatrix: () => api.get('/auth/roles/permission-matrix/'),
 
+  myPermissions: () => api.get('/auth/me/permissions/'),
+
   // Granular per-module permission overrides for one staff user
   getUserPermissions: (userId: number) => api.get(`/auth/staff/${userId}/permissions/`),
   setUserPermissions: (userId: number, overrides: Array<{

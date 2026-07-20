@@ -65,7 +65,7 @@ function BuildingModal({ open, onClose, editItem, projects, readOnly }: any) {
             ))}
           </select>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="label" htmlFor="bld-name">Building Name <span className="text-danger-500">*</span></label>
             <input
@@ -104,13 +104,13 @@ function BuildingModal({ open, onClose, editItem, projects, readOnly }: any) {
           />
         </div>
         {!readOnly && (
-          <div className="flex gap-3 justify-end pt-2">
-            <button type="button" className="btn-secondary" onClick={onClose} aria-label="Cancel" title="Cancel">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end pt-2">
+            <button type="button" className="btn-secondary w-full sm:w-auto justify-center" onClick={onClose} aria-label="Cancel" title="Cancel">
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary"
+              className="btn-primary w-full sm:w-auto justify-center"
               disabled={save.isPending}
               aria-label="Save building"
               title="Save building"
@@ -175,14 +175,14 @@ export default function BuildingsPage() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
         <div>
           <h1 className="page-title">Buildings</h1>
           <p className="page-subtitle">Manage buildings within your projects</p>
         </div>
         {can.editBuildings && (
           <button
-            className="btn-primary"
+            className="btn-primary w-full sm:w-auto justify-center"
             onClick={() => setModal({ open: true })}
             aria-label="Create new building"
             title="Create new building"
@@ -192,11 +192,11 @@ export default function BuildingsPage() {
         )}
       </div>
 
-      <div className="flex gap-3 mb-6">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
           <input
-            className="input pl-9"
+            className="input pl-9 w-full"
             placeholder="Search buildings…"
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
@@ -205,7 +205,7 @@ export default function BuildingsPage() {
           />
         </div>
         <select
-          className="input max-w-[200px]"
+          className="input w-full sm:max-w-[200px]"
           value={projectFilter}
           onChange={e => { setProjectFilter(e.target.value); setPage(1) }}
           aria-label="Filter by project"
@@ -218,8 +218,9 @@ export default function BuildingsPage() {
 
       {isLoading ? <PageLoader /> : (
         <>
-          <div className="table-wrapper">
-            <table className="table">
+          {/* Horizontal scroll on narrow viewports instead of squashing columns */}
+          <div className="table-wrapper overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <table className="table min-w-[760px] sm:min-w-0">
               <thead>
                 <tr>
                   <th>Building</th>

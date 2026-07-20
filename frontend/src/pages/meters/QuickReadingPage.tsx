@@ -156,19 +156,19 @@ export default function QuickReadingPage() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <h1 className="page-title">Quick Reading Dashboard</h1>
           <p className="page-subtitle">Select a project and building to load meters for reading</p>
         </div>
-        <button className="btn-primary" onClick={() => setScannerOpen(true)}>
+        <button className="btn-primary w-full md:w-auto flex items-center justify-center gap-2" onClick={() => setScannerOpen(true)}>
           <ScanLine className="w-4 h-4" /> Scan Barcode
         </button>
       </div>
 
       {/* Project / Building selectors */}
-      <div className="flex flex-wrap gap-3 mb-6 p-4 bg-white rounded-2xl border border-surface-100 shadow-card">
-        <div className="min-w-[200px]">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6 p-4 bg-white rounded-2xl border border-surface-100 shadow-card">
+        <div className="w-full">
           <label className="label" htmlFor="project-select">Project</label>
           <select id="project-select" className="input" value={projectId} onChange={e => setProjectId(e.target.value)}>
             <option value="">— Select project —</option>
@@ -177,7 +177,7 @@ export default function QuickReadingPage() {
             ))}
           </select>
         </div>
-        <div className="min-w-[200px]">
+        <div className="w-full">
           <label className="label" htmlFor="building-select">Building</label>
           <select
             id="building-select"
@@ -192,11 +192,11 @@ export default function QuickReadingPage() {
             ))}
           </select>
         </div>
-        <div className="flex-1 min-w-[220px]">
+        <div className="w-full">
           <label className="label">Search</label>
           <SearchInput value={search} onChange={setSearch} placeholder="Meter, unit, customer, mobile…" />
         </div>
-        <div className="min-w-[160px]">
+        <div className="w-full">
           <label htmlFor="sort-select" className="label">Sort</label>
           <select id="sort-select" className="input" value={sortBy} onChange={e => setSortBy(e.target.value as any)}>
             <option value="unit">Floor / Unit</option>
@@ -216,7 +216,8 @@ export default function QuickReadingPage() {
       ) : (
         <>
           {/* Status legend / filter chips */}
-          <div className="flex flex-wrap items-center gap-2 mb-5">
+          <div className="flex flex-col gap-4 mb-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex gap-2 overflow-x-auto pb-2 md:flex-wrap md:overflow-visible">
             {STATUS_FILTERS.map(s => (
               <button
                 key={s}
@@ -230,8 +231,9 @@ export default function QuickReadingPage() {
                 {s} ({counts[s] ?? 0})
               </button>
             ))}
+            </div>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="flex items-center justify-between md:justify-end gap-2 w-full md:w-auto">
               <button className="btn-secondary btn-sm" onClick={() => goToIndex(-1)} title="Previous pending meter">
                 <ArrowLeft className="w-3.5 h-3.5" />
               </button>
@@ -247,7 +249,7 @@ export default function QuickReadingPage() {
           {filteredCards.length === 0 ? (
             <EmptyState icon={FilterIcon} title="No meters match this filter" />
           ) : (
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
               {filteredCards.map(card => (
                 <MeterCard
                   key={card.id}

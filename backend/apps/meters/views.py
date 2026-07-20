@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from .models import Meter, MeterReading
 from .serializers import MeterSerializer, MeterReadingSerializer, MeterCardSerializer
-from core.permissions import IsBillingOfficerOrAbove, IsAnyStaff, MeterPermission
+from core.permissions import MeterPermission, QuickReadingPermission
 from apps.billing.models import Bill
 
 
@@ -74,9 +74,15 @@ class MeterReadingDetailView(generics.RetrieveUpdateDestroyAPIView):
 # per-meter queries, then joined in Python — safe for the hundreds-of-meters
 # scale this feature targets. Not paginated on purpose: the grid needs the
 # full building in one shot.
+#
+# Uses QuickReadingPermission (module='quick_reading') rather than
+# MeterPermission — this is a distinct, override-able capability from
+# general Meters access, per the Role & Permission tab's "Quick Reading"
+# row. A user can be granted/denied this specific workflow independently
+# of whether they can view/edit meters generally.
 class MeterQuickDashboardView(generics.ListAPIView):
     serializer_class   = MeterCardSerializer
-    permission_classes = [IsAuthenticated, IsBillingOfficerOrAbove]
+    permission_classes = [IsAuthenticated, QuickReadingPermission]
     filter_backends    = [filters.SearchFilter]
     search_fields      = ['meter_no', 'barcode', 'unit__unit_no', 'unit__allottee__name']
     pagination_class   = None
@@ -140,8 +146,11 @@ class MeterBarcodeLookupView(APIView):
     in one call. Falls back to matching on meter_no so meters without a
     printed barcode can still be scanned via a QR that just encodes the
     meter number.
+
+    Same permission as the Quick Reading Dashboard (QuickReadingPermission)
+    since barcode scan-to-select is part of that same workflow.
     """
-    permission_classes = [IsAuthenticated, IsBillingOfficerOrAbove]
+    permission_classes = [IsAuthenticated, QuickReadingPermission]
 
     def get(self, request):
         code = (request.query_params.get('code') or '').strip()

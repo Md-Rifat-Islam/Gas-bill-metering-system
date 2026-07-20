@@ -73,7 +73,7 @@ function PackageModal({ open, onClose, editItem, readOnly }: any) {
             title="Package name"
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="label" htmlFor="pkg-unit-type">Unit Type</label>
             <select
@@ -140,13 +140,13 @@ function PackageModal({ open, onClose, editItem, readOnly }: any) {
           />
         </div>
         {!readOnly && (
-          <div className="flex gap-3 justify-end pt-2">
-            <button type="button" className="btn-secondary" onClick={onClose} aria-label="Cancel" title="Cancel">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end pt-2">
+            <button type="button" className="btn-secondary w-full sm:w-auto justify-center" onClick={onClose} aria-label="Cancel" title="Cancel">
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary"
+              className="btn-primary w-full sm:w-auto justify-center"
               disabled={save.isPending}
               aria-label="Save package"
               title="Save package"
@@ -219,7 +219,7 @@ function ProjectModal({ open, onClose, editItem, packages, readOnly }: any) {
             title="Address"
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="label" htmlFor="proj-package">Default Package</label>
             <select
@@ -257,13 +257,13 @@ function ProjectModal({ open, onClose, editItem, packages, readOnly }: any) {
           </div>
         </div>
         {!readOnly && (
-          <div className="flex gap-3 justify-end pt-2">
-            <button type="button" className="btn-secondary" onClick={onClose} aria-label="Cancel" title="Cancel">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end pt-2">
+            <button type="button" className="btn-secondary w-full sm:w-auto justify-center" onClick={onClose} aria-label="Cancel" title="Cancel">
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary"
+              className="btn-primary w-full sm:w-auto justify-center"
               disabled={save.isPending}
               aria-label="Save project"
               title="Save project"
@@ -315,14 +315,14 @@ export default function ProjectsPage() {
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4">
         <div>
           <h1 className="page-title">Projects</h1>
           <p className="page-subtitle">Manage housing projects and pricing packages</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <button
-            className="btn-secondary"
+            className="btn-secondary w-full sm:w-auto justify-center"
             onClick={() => setPackageModal({ open: true })}
             aria-label="Manage packages"
             title="Manage packages"
@@ -331,7 +331,7 @@ export default function ProjectsPage() {
           </button>
           {can.createProject && (
             <button
-              className="btn-primary"
+              className="btn-primary w-full sm:w-auto justify-center"
               onClick={() => setProjectModal({ open: true })}
               aria-label="Create new project"
               title="Create new project"
@@ -342,10 +342,10 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      <div className="relative mb-6 max-w-sm">
+      <div className="relative mb-6 sm:max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
         <input
-          className="input pl-9"
+          className="input pl-9 w-full"
           placeholder="Search projects…"
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(1) }}
@@ -357,7 +357,7 @@ export default function ProjectsPage() {
       {pkgs?.length > 0 && (
         <div className="mb-8">
           <div className="text-sm font-semibold text-surface-600 mb-3">Pricing Packages</div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             {pkgs.map((p: any) => (
               <div key={p.id} className="card-hover cursor-pointer" onClick={() => setPackageModal({ open: true, item: p })}>
                 <div className="flex items-start justify-between">
@@ -388,8 +388,9 @@ export default function ProjectsPage() {
 
       {isLoading ? <PageLoader /> : (
         <>
-          <div className="table-wrapper">
-            <table className="table">
+          {/* Horizontal scroll on narrow viewports instead of squashing columns */}
+          <div className="table-wrapper overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <table className="table min-w-[760px] sm:min-w-0">
               <thead>
                 <tr>
                   <th>Project</th>
