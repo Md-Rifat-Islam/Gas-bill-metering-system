@@ -7,15 +7,17 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Sum
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
 
 from apps.billing.models import Bill
 from apps.payments.models import Payment, PaymentTransaction, PaymentChannelSettings
 from apps.payments.serializers import PaymentChannelSettingsSerializer
 from apps.authentication.customer_auth import CustomerJWTAuthentication
 from core.permissions import IsCustomer
+from .models import Notification
 from .serializers import (
     PortalProfileSerializer, PortalBillSerializer, PortalPaymentSerializer,
-    PortalPaymentSubmitSerializer,
+    PortalPaymentSubmitSerializer, NotificationSerializer,
 )
 
 
@@ -59,6 +61,10 @@ class PortalDashboardView(CustomerScopedMixin, APIView):
             for b in reversed(recent)
         ]
 
+        unread_notifications = Notification.objects.filter(
+            customer=request.user, is_read=False
+        ).count()
+
         return Response({
             'total_due':   total_due,
             'total_paid':  total_paid,
@@ -66,6 +72,7 @@ class PortalDashboardView(CustomerScopedMixin, APIView):
             'unpaid_count': bills.filter(status__in=['Unpaid', 'Partial']).count(),
             'latest_bill': PortalBillSerializer(latest).data if latest else None,
             'usage_trend': usage_trend,
+            'unread_notifications': unread_notifications,
         })
 
 
@@ -162,6 +169,44 @@ class PortalPaymentChannelView(APIView):
     def get(self, request):
         settings_obj = PaymentChannelSettings.get_solo()
         return Response(PaymentChannelSettingsSerializer(settings_obj).data)
+
+
+# ── Notifications ───────────────────────────────────────────────────────────────
+
+class NotificationListView(CustomerScopedMixin, generics.ListAPIView):
+    """
+    GET /api/v1/portal/notifications/
+
+    All notifications for the logged-in customer — bill-created events and
+    day-5/day-10 payment reminders (see signals.py / tasks.py), newest
+    first. Not paginated: a customer's notification volume is small enough
+    (one per bill created, up to two reminders per bill) that this is safe.
+    """
+    serializer_class = NotificationSerializer
+
+    def get_queryset(self):
+        return Notification.objects.filter(customer=self.request.user)
+
+
+class NotificationMarkReadView(CustomerScopedMixin, APIView):
+    """POST /api/v1/portal/notifications/<id>/read/ — marks one as read."""
+
+    def post(self, request, pk):
+        notification = get_object_or_404(Notification, pk=pk, customer=request.user)
+        if not notification.is_read:
+            notification.is_read = True
+            notification.save(update_fields=['is_read'])
+        return Response(NotificationSerializer(notification).data)
+
+
+class NotificationMarkAllReadView(CustomerScopedMixin, APIView):
+    """POST /api/v1/portal/notifications/read-all/ — marks every unread one as read."""
+
+    def post(self, request):
+        updated = Notification.objects.filter(
+            customer=request.user, is_read=False
+        ).update(is_read=True)
+        return Response({'marked_read': updated})
 
 
 # ── Invoice PDF ───────────────────────────────────────────────────────────────

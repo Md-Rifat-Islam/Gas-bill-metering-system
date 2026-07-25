@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Download, Send, Loader2 } from 'lucide-react'
+import { ArrowLeft, Download, Send, Loader2, Clock } from 'lucide-react'
 import { portalAPI, portalPaymentChannelsAPI } from '@/api/portalClient'
 import { PageLoader, StatusBadge } from '@/components/ui'
 import { PaymentChannelsCard } from '@/components/payments/PaymentChannelsCard'
 import { BkashComingSoon } from '@/components/payments/BkashComingSoon'
-import { formatCurrency } from '@/utils/helpers'
+import { formatCurrency, formatDate } from '@/utils/helpers'
 import toast from 'react-hot-toast'
 
 export default function PortalBillDetailPage() {
@@ -23,6 +23,23 @@ export default function PortalBillDetailPage() {
     queryKey: ['portal-payment-channels'],
     queryFn: () => portalPaymentChannelsAPI.get().then(r => r.data),
   })
+
+  // All of this customer's payments — filtered client-side to this bill.
+  // Reuses the same query key/cache as PortalPaymentsPage, so no extra
+  // network round trip if that page was visited already this session.
+  const { data: paymentsData } = useQuery({
+    queryKey: ['portal-payments'],
+    queryFn: async () => {
+      const res = await portalAPI.payments()
+      const raw = res.data
+      return Array.isArray(raw) ? raw : (raw.results ?? [])
+    },
+    enabled: !!bill,
+  })
+
+  const pendingPayment = (paymentsData ?? []).find(
+    (p: any) => p.bill === bill?.id && p.status === 'Pending'
+  )
 
   const handleDownload = async () => {
     if (!bill) return
@@ -54,6 +71,24 @@ export default function PortalBillDetailPage() {
         </div>
         <StatusBadge status={bill.status} />
       </div>
+
+      {/* Pending payment notice — the bill balance intentionally isn't
+          updated until an accountant/admin approves it, but the customer
+          still needs to know their submission was received. */}
+      {pendingPayment && (
+        <div className="flex items-start gap-3 p-3.5 bg-warning-50 border border-warning-200 rounded-xl">
+          <Clock className="w-4 h-4 text-warning-600 mt-0.5 shrink-0" />
+          <div className="text-sm">
+            <div className="font-semibold text-warning-700">
+              {formatCurrency(pendingPayment.paid_amount)} payment pending review
+            </div>
+            <div className="text-xs text-warning-600 mt-0.5">
+              Submitted {formatDate(pendingPayment.payment_date)} via {pendingPayment.payment_method}.
+              Your bill will update once it's approved.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Amount card */}
       <div className="card text-center !py-6">
@@ -125,7 +160,7 @@ export default function PortalBillDetailPage() {
           {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           Invoice
         </button>
-        {!isPaid && (
+        {!isPaid && !pendingPayment && (
           <button
             onClick={() => navigate(`/portal/payment?bill=${bill.id}`)}
             className="btn-primary flex-1"

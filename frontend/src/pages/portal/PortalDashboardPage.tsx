@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Wallet, CheckCircle2, FileText, ChevronRight, AlertCircle } from 'lucide-react'
+import { Wallet, CheckCircle2, FileText, ChevronRight, AlertCircle, Clock } from 'lucide-react'
 import { portalAPI } from '@/api/portalClient'
 import { PageLoader, StatusBadge } from '@/components/ui'
 import { formatCurrency, formatMonth } from '@/utils/helpers'
@@ -16,10 +16,23 @@ export default function PortalDashboardPage() {
     queryFn: () => portalAPI.dashboard().then(r => r.data),
   })
 
+  const { data: paymentsData } = useQuery({
+    queryKey: ['portal-payments'],
+    queryFn: async () => {
+      const res = await portalAPI.payments()
+      const raw = res.data
+      return Array.isArray(raw) ? raw : (raw.results ?? [])
+    },
+  })
+
   if (isLoading) return <PageLoader />
 
   const latest = data?.latest_bill
   const hasDue = Number(data?.total_due || 0) > 0
+
+  const latestHasPendingPayment = !!(paymentsData ?? []).find(
+    (p: any) => p.bill === latest?.id && p.status === 'Pending'
+  )
 
   return (
     <div className="space-y-5">
@@ -31,8 +44,9 @@ export default function PortalDashboardPage() {
         <p className="text-sm text-surface-400">Here's your gas billing overview</p>
       </div>
 
-      {/* Due alert */}
-      {hasDue && (
+      {/* Due alert — suppressed once a payment covering it is already
+          under review, so the customer isn't nudged to pay again. */}
+      {hasDue && !latestHasPendingPayment && (
         <div className="bg-danger-50 border border-danger-100 rounded-2xl p-4 flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-danger-500 shrink-0" />
           <div className="flex-1">
@@ -41,6 +55,18 @@ export default function PortalDashboardPage() {
             </div>
             <div className="text-xs text-danger-500">
               {data.unpaid_count} bill{data.unpaid_count !== 1 ? 's' : ''} pending
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hasDue && latestHasPendingPayment && (
+        <div className="bg-warning-50 border border-warning-100 rounded-2xl p-4 flex items-center gap-3">
+          <Clock className="w-5 h-5 text-warning-600 shrink-0" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-warning-700">Payment under review</div>
+            <div className="text-xs text-warning-600">
+              We've received your payment for the latest bill — it'll reflect here once approved.
             </div>
           </div>
         </div>
@@ -77,7 +103,14 @@ export default function PortalDashboardPage() {
                 <div className="text-xs text-surface-400">{latest.billing_month_display}</div>
               </div>
             </div>
-            <StatusBadge status={latest.status} />
+            <div className="flex flex-col items-end gap-1">
+              <StatusBadge status={latest.status} />
+              {latestHasPendingPayment && (
+                <span className="badge-yellow text-[10px] flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> Payment pending
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-end justify-between">
             <div>

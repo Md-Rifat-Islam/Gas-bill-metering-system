@@ -2,6 +2,7 @@ from rest_framework import serializers
 from apps.billing.models import Bill
 from apps.payments.models import Payment
 from apps.authentication.models import CustomerUser
+from .models import Notification
 
 # Re-exported here so portal views can import everything portal-related from
 # one place; the actual submit serializer lives in apps.payments since it
@@ -41,6 +42,11 @@ class PortalBillSerializer(serializers.ModelSerializer):
 
 
 class PortalPaymentSerializer(serializers.ModelSerializer):
+    """
+    Payment history entry for the customer portal. Extended to support the
+    pending-payment banner (Bill Detail / Dashboard) and the payment detail
+    modal (Payment History row click).
+    """
     bill_number = serializers.CharField(source='bill.bill_number', read_only=True)
     billing_month_display = serializers.SerializerMethodField()
 
@@ -50,7 +56,21 @@ class PortalPaymentSerializer(serializers.ModelSerializer):
             'id', 'bill', 'bill_number', 'billing_month_display',
             'paid_amount', 'payment_method', 'transaction_id', 'payment_date',
             'status', 'remarks', 'notes',
+            'proof_image', 'proof_invoice',
+            'created_at', 'reviewed_at',
         ]
 
     def get_billing_month_display(self, obj):
         return obj.bill.billing_month.strftime('%B %Y')
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    bill_number = serializers.CharField(source='bill.bill_number', read_only=True, default=None)
+
+    class Meta:
+        model  = Notification
+        fields = [
+            'id', 'notification_type', 'title', 'message',
+            'bill', 'bill_number', 'is_read', 'created_at',
+        ]
+        read_only_fields = fields

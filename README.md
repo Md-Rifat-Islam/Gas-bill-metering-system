@@ -111,7 +111,7 @@ docker compose up --build
 **Access:**
 - 🌐 Frontend: http://localhost:5173
 - 🔌 API: http://localhost:8000/api/v1/
-- 🔑 Default admin: `admin@gasbill.com` / `Admin@1234` (**development only** — change before any shared or production deployment)
+- 🔑 Default admin: `admin@gasbill.com` / `Admin@1234` (**development only** — changed before the shared or production deployment)
 
 ---
 

@@ -504,7 +504,7 @@ class MyPermissionsView(APIView):
         # Capabilities without a dedicated permission class — direct role
         # checks (unaffected by the module override system).
         r = request.user.role_name
-        flags['viewDashboard']      = r in (R, A, BO, AC)
+        flags['viewDashboard']      = r in (R, A, AC)  # (R, A, BO, AC) -> # everyone except Viewer, matching dashboardModules()
         flags['adjustBill']         = r in (R, A, BO)
         flags['assignPackages']     = r in (R, A)
         flags['viewProjectReports'] = r in (R, A, AC)

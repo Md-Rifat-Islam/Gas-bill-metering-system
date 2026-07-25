@@ -56,7 +56,7 @@ ROLE_DEFAULT_PERMISSIONS = {
         PermissionModule.METERS:        (True, False, False),
         PermissionModule.QUICK_READING: (False, False, False),
         PermissionModule.BILLING:       (True, False, False),
-        PermissionModule.PAYMENTS:      (False, False, False),
+        PermissionModule.PAYMENTS:      (False, False, False),  
         PermissionModule.REPORTS:       (True, False, False),
         PermissionModule.STAFF:         (False, False, False),
         PermissionModule.AUDIT:         (False, False, False),

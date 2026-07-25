@@ -11,4 +11,7 @@ urlpatterns = [
     path('payments/submit/',        views.PortalPaymentSubmitView.as_view()),
     path('payments/initiate/',      views.PortalPaymentInitiateView.as_view()),
     path('payment-channels/',       views.PortalPaymentChannelView.as_view()),
+    path('notifications/',          views.NotificationListView.as_view(), name='portal-notifications'),
+    path('notifications/<int:pk>/read/', views.NotificationMarkReadView.as_view(), name='portal-notification-read'),
+    path('notifications/read-all/', views.NotificationMarkAllReadView.as_view(), name='portal-notifications-read-all'),
 ]

@@ -61,6 +61,12 @@ export const portalAPI = {
   payments:     (params?: any) => portalApi.get('/portal/payments/', { params }),
   payInitiate:  (bill_id: number) => portalApi.post('/portal/payments/initiate/', { bill_id }),
 
+  // Notifications — must use portalApi (customer JWT), not the staff `api`
+  // instance, or every call here would send the wrong auth token entirely.
+  notifications:            () => portalApi.get('/portal/notifications/'),
+  markNotificationRead:     (id: number) => portalApi.post(`/portal/notifications/${id}/read/`),
+  markAllNotificationsRead: () => portalApi.post('/portal/notifications/read-all/'),
+
   // Download invoice as a blob (auth header required, so can't use a plain <a href>)
   downloadInvoice: async (billId: number, billNumber: string) => {
     const res = await portalApi.get(`/portal/bills/${billId}/invoice/`, { responseType: 'blob' })

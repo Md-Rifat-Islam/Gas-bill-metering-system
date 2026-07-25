@@ -21,6 +21,14 @@ class PaymentSerializer(serializers.ModelSerializer):
     proof_image_url   = serializers.SerializerMethodField()
     proof_invoice_url = serializers.SerializerMethodField()
 
+    # Read-only plain PK — this is what the frontend reads as `p.bill` (e.g.
+    # PendingPaymentsPage's "View Bill" navigate(`/billing/${p.bill}`)).
+    # Without this, GET responses had no `bill` field at all — only the
+    # write-only `bill_id` below — so `p.bill` was always undefined.
+    bill = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    # Write-only — used when CREATING/UPDATING a payment (request body sends
+    # bill_id). Unrelated to reads; left exactly as before.
     bill_id = serializers.PrimaryKeyRelatedField(
         queryset=Bill.objects.all(), source='bill', write_only=True
     )
@@ -28,7 +36,7 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Payment
         fields = [
-            'id', 'bill_id', 'bill_number', 'unit_no', 'building_name', 'allottee_name',
+            'id', 'bill', 'bill_id', 'bill_number', 'unit_no', 'building_name', 'allottee_name',
             'paid_amount', 'payment_method', 'transaction_id', 'payment_date',
             'proof_image', 'proof_image_url', 'proof_invoice', 'proof_invoice_url',
             'status', 'source', 'received_by_name', 'reviewed_by_name',
@@ -146,15 +154,6 @@ class PortalPaymentSubmitSerializer(serializers.ModelSerializer):
         validated_data['submitted_by_customer'] = customer
 
         payment = Payment.objects.create(**validated_data)
-        # Deliberately no bill.apply_payment() here — deferred until an
-        # accountant/admin approves it (see PaymentApproveView).
-        #
-        # NOTE: log_action's `changed_by` appears to expect a StaffUser
-        # instance (unconfirmed — apps/audit/models.py not available at the
-        # time this was written). Passing the CustomerUser directly could
-        # silently fail there, so we pass None and record the customer's
-        # identity in the JSON payload instead. Revisit once audit's model
-        # is confirmed to support a customer actor.
         log_action(None, 'payments', payment.id, 'CREATE', None, {
             'bill_id': payment.bill.id,
             'amount': str(payment.paid_amount),

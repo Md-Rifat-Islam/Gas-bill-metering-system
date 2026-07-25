@@ -4,6 +4,7 @@ Gas Billing Management System — Django Settings
 import os
 from pathlib import Path
 from datetime import timedelta
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -168,6 +169,13 @@ SMS_SENDER_ID = os.getenv('SMS_SENDER_ID', 'GasBill')
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_BROKER_URL    = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
+
+CELERY_BEAT_SCHEDULE = {
+    'daily-bill-reminders': {
+        'task': 'apps.portal.tasks.send_daily_bill_reminders',
+        'schedule': crontab(hour=9, minute=0),  # once daily; task itself checks day==5/10
+    },
+}
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 LOGS_DIR = BASE_DIR / 'logs'
