@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { Plus, Pencil, Trash2, Home, Search, Gauge, PlusCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Home, Search, Gauge, PlusCircle, Upload, Download } from 'lucide-react'
 import { unitsAPI, buildingsAPI, projectsAPI } from '@/api/client'
 import { Modal, PageLoader, EmptyState, Pagination, ConfirmDialog } from '@/components/ui'
 import { MeterAssignModal } from '@/components/meters/MeterAssignModal'
@@ -9,9 +9,13 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { useConfirm } from '@/hooks'
 import toast from 'react-hot-toast'
 
-function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: any) {
+function UnitModal({ open, onClose, editItem, buildings, projects, packages, readOnly }: any) {
   const qc = useQueryClient()
-  const { register, handleSubmit, reset } = useForm({
+  // Project is a UI-only selector used to narrow the Building dropdown —
+  // it is never submitted to the backend, only building_id is.
+  const [projectId, setProjectId] = useState('')
+
+  const { register, handleSubmit, reset, setValue } = useForm({
     defaultValues: {
       building_id: '', floor_no: '', unit_no: '', mobile_number: '',
       package_id: '', status: 'Active', allottee_name: '', allottee_email: '', allottee_nid: '',
@@ -24,25 +28,43 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
   // blank) values since this UnitModal instance is reused for every row.
   useEffect(() => {
     if (open) {
-      reset(editItem
-        ? {
-            building_id: editItem.building_id ?? editItem.building?.id ?? '',
-            floor_no: editItem.floor_no ?? '',
-            unit_no: editItem.unit_no ?? '',
-            mobile_number: editItem.mobile_number ?? '',
-            package_id: editItem.package_id ?? '',
-            status: editItem.status ?? 'Active',
-            allottee_name: editItem.allottee?.name ?? '',
-            allottee_email: editItem.allottee?.email ?? '',
-            allottee_nid: editItem.allottee?.nid ?? '',
-          }
-        : {
-            building_id: '', floor_no: '', unit_no: '', mobile_number: '',
-            package_id: '', status: 'Active', allottee_name: '', allottee_email: '', allottee_nid: '',
-          }
-      )
+      if (editItem) {
+        const buildingIdVal = editItem.building_id ?? editItem.building?.id ?? ''
+        // Derive the project to pre-select from the matching building —
+        // the Building list (from buildingsAPI) already carries project_id.
+        const matchedBuilding = buildings?.find((b: any) => String(b.id) === String(buildingIdVal))
+        setProjectId(matchedBuilding?.project_id ? String(matchedBuilding.project_id) : '')
+        reset({
+          building_id: buildingIdVal,
+          floor_no: editItem.floor_no ?? '',
+          unit_no: editItem.unit_no ?? '',
+          mobile_number: editItem.mobile_number ?? '',
+          package_id: editItem.package_id ?? '',
+          status: editItem.status ?? 'Active',
+          allottee_name: editItem.allottee?.name ?? '',
+          allottee_email: editItem.allottee?.email ?? '',
+          allottee_nid: editItem.allottee?.nid ?? '',
+        })
+      } else {
+        setProjectId('')
+        reset({
+          building_id: '', floor_no: '', unit_no: '', mobile_number: '',
+          package_id: '', status: 'Active', allottee_name: '', allottee_email: '', allottee_nid: '',
+        })
+      }
     }
-  }, [open, editItem, reset])
+  }, [open, editItem, reset, buildings])
+
+  const filteredBuildings = useMemo(
+    () => (buildings ?? []).filter((b: any) => !projectId || String(b.project_id) === String(projectId)),
+    [buildings, projectId]
+  )
+
+  const handleProjectChange = (value: string) => {
+    setProjectId(value)
+    // Changing the project invalidates whatever building was picked before.
+    setValue('building_id', '')
+  }
 
   const save = useMutation({
     mutationFn: (data: any) =>
@@ -58,19 +80,36 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
     <Modal open={open} onClose={onClose} title={editItem ? 'Edit Unit' : 'New Unit'} size="lg">
       <form onSubmit={handleSubmit(d => save.mutate(d))} className="space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2">
+          <div>
+            <label className="label" htmlFor="unit-project">Project <span className="text-danger-500">*</span></label>
+            <select
+              id="unit-project"
+              value={projectId}
+              onChange={e => handleProjectChange(e.target.value)}
+              disabled={readOnly}
+              className="input"
+              aria-label="Project"
+              title="Project"
+            >
+              <option value="">— Select project —</option>
+              {projects?.map((p: any) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="label" htmlFor="unit-building">Building <span className="text-danger-500">*</span></label>
             <select
               id="unit-building"
               {...register('building_id', { required: true })}
-              disabled={readOnly}
+              disabled={readOnly || !projectId}
               className="input"
               aria-label="Building"
               title="Building"
             >
-              <option value="">— Select building —</option>
-              {buildings?.map((b: any) => (
-                <option key={b.id} value={b.id}>{b.project_name} › {b.name}</option>
+              <option value="">{projectId ? '— Select building —' : '— Select project first —'}</option>
+              {filteredBuildings.map((b: any) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
           </div>
@@ -96,18 +135,6 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
               placeholder="A1"
               aria-label="Unit number"
               title="Unit number"
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="unit-mobile">Mobile Number</label>
-            <input
-              id="unit-mobile"
-              {...register('mobile_number')}
-              disabled={readOnly}
-              className="input"
-              placeholder="01XXXXXXXXX"
-              aria-label="Mobile number"
-              title="Mobile number"
             />
           </div>
           <div>
@@ -150,7 +177,7 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
 
         <div className="border-t border-surface-100 pt-4">
           <div className="text-sm font-semibold text-surface-700 mb-3">Allottee Information</div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label" htmlFor="allottee-name">Name</label>
               <input
@@ -161,6 +188,21 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
                 placeholder="Full name"
                 aria-label="Allottee name"
                 title="Allottee name"
+              />
+            </div>
+            {/* Mobile number now lives here (previously a standalone Unit-level
+                field above) and is mandatory — every allottee record needs a
+                contact number, e.g. for payment/reading notifications. */}
+            <div>
+              <label className="label" htmlFor="allottee-mobile">Mobile Number <span className="text-danger-500">*</span></label>
+              <input
+                id="allottee-mobile"
+                {...register('mobile_number', { required: true, pattern: /^01[3-9]\d{8}$/ })}
+                disabled={readOnly}
+                className="input"
+                placeholder="01XXXXXXXXX"
+                aria-label="Allottee mobile number"
+                title="Allottee mobile number"
               />
             </div>
             <div>
@@ -212,6 +254,155 @@ function UnitModal({ open, onClose, editItem, buildings, packages, readOnly }: a
   )
 }
 
+function downloadBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  window.URL.revokeObjectURL(url)
+}
+
+function BulkImportModal({ open, onClose, buildings, projects }: any) {
+  const qc = useQueryClient()
+  const [projectId, setProjectId] = useState('')
+  const [buildingId, setBuildingId] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [importing, setImporting] = useState(false)
+
+  const filteredBuildings = useMemo(
+    () => (buildings ?? []).filter((b: any) => !projectId || String(b.project_id) === String(projectId)),
+    [buildings, projectId]
+  )
+
+  useEffect(() => {
+    if (open) {
+      setProjectId('')
+      setBuildingId('')
+      setFile(null)
+    }
+  }, [open])
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const res = await (unitsAPI as any).downloadBulkImportTemplate(buildingId)
+      downloadBlob(new Blob([res.data]), 'unit_import_template.xlsx')
+    } catch {
+      toast.error('Could not download the template')
+    }
+  }
+
+  const handleUpload = async () => {
+    if (!buildingId || !file) return
+    setImporting(true)
+    try {
+      const res = await (unitsAPI as any).bulkImport(buildingId, file)
+      const contentType = String(res.headers?.['content-type'] || '')
+
+      if (res.status === 201) {
+        const text = await (res.data as Blob).text()
+        const parsed = JSON.parse(text)
+        toast.success(`${parsed.created} unit(s) created`)
+        qc.invalidateQueries({ queryKey: ['units'] })
+        onClose()
+      } else if (res.status === 422 && contentType.includes('spreadsheet')) {
+        downloadBlob(res.data as Blob, 'unit_import_errors.xlsx')
+        toast.error('Some rows had errors — check the downloaded file for details')
+      } else {
+        let message = 'Import failed'
+        try {
+          const text = await (res.data as Blob).text()
+          message = JSON.parse(text).detail || message
+        } catch {
+          // Response wasn't JSON either — fall back to the generic message above.
+        }
+        toast.error(message)
+      }
+    } catch {
+      toast.error('Import failed — please try again')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Bulk Import Units" size="md">
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="label" htmlFor="bulk-project">Project <span className="text-danger-500">*</span></label>
+            <select
+              id="bulk-project"
+              className="input"
+              value={projectId}
+              onChange={e => { setProjectId(e.target.value); setBuildingId('') }}
+              aria-label="Project"
+            >
+              <option value="">— Select project —</option>
+              {projects?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label" htmlFor="bulk-building">Building <span className="text-danger-500">*</span></label>
+            <select
+              id="bulk-building"
+              className="input"
+              value={buildingId}
+              onChange={e => setBuildingId(e.target.value)}
+              disabled={!projectId}
+              aria-label="Building"
+            >
+              <option value="">{projectId ? '— Select building —' : '— Select project first —'}</option>
+              {filteredBuildings.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="border-t border-surface-100 pt-4 space-y-3">
+          <button
+            type="button"
+            className="btn-secondary w-full justify-center"
+            onClick={handleDownloadTemplate}
+            disabled={!buildingId}
+            aria-label="Download template"
+            title="Download template"
+          >
+            <Download className="w-4 h-4" /> Download Template
+          </button>
+          <p className="text-xs text-surface-400">
+            Fill in the rows below the greyed-out example row (row 3), then upload the same file here.
+            Meter No. and Mobile Number are required for every row.
+          </p>
+          <input
+            type="file"
+            accept=".xlsx"
+            className="input"
+            onChange={e => setFile(e.target.files?.[0] ?? null)}
+            disabled={!buildingId}
+            aria-label="Upload filled template"
+          />
+        </div>
+
+        <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end pt-2 border-t border-surface-100">
+          <button type="button" className="btn-secondary w-full sm:w-auto justify-center" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn-primary w-full sm:w-auto justify-center"
+            onClick={handleUpload}
+            disabled={!buildingId || !file || importing}
+          >
+            {importing ? 'Importing…' : 'Upload & Import'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export default function UnitsPage() {
   const { can } = usePermissions()
   const qc = useQueryClient()
@@ -221,6 +412,7 @@ export default function UnitsPage() {
   const [page, setPage] = useState(1)
   const [modal, setModal] = useState<{ open: boolean; item?: any }>({ open: false })
   const [meterModal, setMeterModal] = useState<{ open: boolean; unit?: any }>({ open: false })
+  const [bulkModalOpen, setBulkModalOpen] = useState(false)
   const { confirmState, confirm, handleClose } = useConfirm()
 
   const { data, isLoading } = useQuery({
@@ -235,6 +427,12 @@ export default function UnitsPage() {
   const { data: buildings } = useQuery({
     queryKey: ['buildings-all'],
     queryFn: () => buildingsAPI.list({ page_size: 200 }).then(r => r.data.results || r.data),
+  })
+  // Full project list, used to drive the Project selector in the New/Edit
+  // Unit modal and the Bulk Import modal (Project -> Building cascade).
+  const { data: projects } = useQuery({
+    queryKey: ['projects-all'],
+    queryFn: () => projectsAPI.list({ page_size: 500 }).then(r => r.data.results || r.data),
   })
   const { data: packages } = useQuery({
     queryKey: ['packages'],
@@ -267,14 +465,24 @@ export default function UnitsPage() {
           <p className="page-subtitle">Manage residential / commercial units, allottees, and meters</p>
         </div>
         {can.editBuildings && (
-          <button
-            className="btn-primary w-full sm:w-auto justify-center"
-            onClick={() => setModal({ open: true })}
-            aria-label="Create new unit"
-            title="Create new unit"
-          >
-            <Plus className="w-4 h-4" /> New Unit
-          </button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <button
+              className="btn-secondary flex-1 sm:flex-none justify-center"
+              onClick={() => setBulkModalOpen(true)}
+              aria-label="Bulk import units"
+              title="Bulk import units"
+            >
+              <Upload className="w-4 h-4" /> Bulk Import
+            </button>
+            <button
+              className="btn-primary flex-1 sm:flex-none justify-center"
+              onClick={() => setModal({ open: true })}
+              aria-label="Create new unit"
+              title="Create new unit"
+            >
+              <Plus className="w-4 h-4" /> New Unit
+            </button>
+          </div>
         )}
       </div>
 
@@ -411,8 +619,16 @@ export default function UnitsPage() {
         onClose={() => setModal({ open: false })}
         editItem={modal.item}
         buildings={buildings}
+        projects={projects}
         packages={packages}
         readOnly={!can.editBuildings}
+      />
+
+      <BulkImportModal
+        open={bulkModalOpen}
+        onClose={() => setBulkModalOpen(false)}
+        buildings={buildings}
+        projects={projects}
       />
 
       <MeterAssignModal

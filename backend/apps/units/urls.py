@@ -3,6 +3,8 @@ from . import views
 
 urlpatterns = [
     path('', views.UnitListCreateView.as_view()),
+    path('bulk-import/template/', views.UnitBulkImportTemplateView.as_view()),
+    path('bulk-import/', views.UnitBulkImportView.as_view()),
     path('<int:pk>/', views.UnitDetailView.as_view()),
     path('allottees/', views.AllotteeListCreateView.as_view()),
     path('allottees/<int:pk>/', views.AllotteeDetailView.as_view()),

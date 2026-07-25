@@ -39,6 +39,17 @@ class UnitSerializer(serializers.ModelSerializer):
         write_only=True, required=False, allow_null=True
     )
 
+    # NOTE: mobile_number lives on Unit (not Allottee) at the DB level —
+    # the frontend now visually groups it under "Allottee Information",
+    # but no model/migration change was needed for that move. What *did*
+    # change: this field is explicitly declared here (instead of being
+    # left to ModelSerializer's default mapping) so we can force it
+    # required=True at the API layer, since Unit.mobile_number is still
+    # null=True/blank=True at the model level for backward compatibility
+    # with rows created before this became a business rule. Editing an
+    # existing unit that has no mobile number will now require adding one.
+    mobile_number = serializers.CharField(required=True, allow_blank=False, max_length=15)
+
     # Allottee nested write fields
     allottee_name  = serializers.CharField(write_only=True, required=False, allow_blank=True)
     allottee_email = serializers.EmailField(write_only=True, required=False, allow_blank=True)

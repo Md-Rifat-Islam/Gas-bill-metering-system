@@ -99,6 +99,28 @@ export const unitsAPI = {
   create: (data: any) => api.post('/units/', data),
   update: (id: number, data: any) => api.patch(`/units/${id}/`, data),
   delete: (id: number) => api.delete(`/units/${id}/`),
+
+  // Bulk import — responseType 'blob' on both, since the template call is
+  // always a file, and the import call can come back as either JSON
+  // (all rows valid) or a file (an annotated error workbook). validateStatus
+  // is relaxed on the import call so a 422 error-file response doesn't
+  // trigger the global interceptor's generic error toast above — the
+  // Bulk Import modal handles both outcomes itself.
+  downloadBulkImportTemplate: (buildingId: string | number) =>
+    api.get('/units/bulk-import/template/', {
+      params: { building_id: buildingId },
+      responseType: 'blob',
+    }),
+  bulkImport: (buildingId: string | number, file: File) => {
+    const form = new FormData()
+    form.append('building_id', String(buildingId))
+    form.append('file', file)
+    return api.post('/units/bulk-import/', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      responseType: 'blob',
+      validateStatus: () => true,
+    })
+  },
 }
 
 export const metersAPI = {
