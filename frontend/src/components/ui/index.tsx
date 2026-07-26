@@ -83,7 +83,14 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
         aria-labelledby="modal-title"
         className={cn(
           'relative bg-white rounded-2xl shadow-2xl w-full animate-fadeIn my-auto',
-          'max-h-[90vh] flex flex-col',
+          // `vh` units are computed against the LARGEST possible mobile viewport
+          // (as if the browser's address bar were hidden), not the actually
+          // visible area. That made short forms (few fields) get squeezed into
+          // a box shorter than the real visible screen and forced to scroll
+          // even though the content itself was tiny. `dvh` tracks the real,
+          // dynamic viewport as browser chrome shows/hides. Keep the `vh`
+          // value first as a fallback for browsers that don't support `dvh`.
+          'max-h-[90vh] max-h-[90dvh] flex flex-col',
           sizes[size]
         )}
       >
@@ -93,7 +100,11 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-6 overflow-y-auto">{children}</div>
+        {/* flex-1 + min-h-0 so this is the ONLY element that ever scrolls,
+            and only once its content actually exceeds the available space —
+            short forms now just shrink-to-fit instead of inheriting a tall,
+            mostly-empty scrollable box. */}
+        <div className="p-6 overflow-y-auto flex-1 min-h-0">{children}</div>
       </div>
     </div>
   )
