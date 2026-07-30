@@ -142,9 +142,15 @@ SIMPLE_JWT = {
 # ── CORS ──────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = os.getenv(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:5173,http://localhost:3000'
+    'http://localhost:5173,https://billing.deco.com.bd'
 ).split(',')
 CORS_ALLOW_CREDENTIALS = True
+
+# ── CSRF ──────────────────────────────────────────────────────────────────────
+CSRF_TRUSTED_ORIGINS = os.getenv(
+    'CSRF_TRUSTED_ORIGINS',
+    'https://billing.deco.com.bd,https://billing-api.deco.com.bd'
+).split(',')
 
 # ── OTP ───────────────────────────────────────────────────────────────────────
 OTP_EXPIRY_MINUTES = 5
@@ -210,3 +216,14 @@ LOGGING = {
         },
     },
 }
+
+# ── Production Security ───────────────────────────────────────────────────────
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True

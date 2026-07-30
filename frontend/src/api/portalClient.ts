@@ -3,7 +3,8 @@ import toast from 'react-hot-toast'
 import { useCustomerAuthStore } from '@/store/customerAuthStore'
 
 const portalApi = axios.create({
-  baseURL: '/api/v1',
+//  baseURL: 'https://billing-api.deco.com.bd/api/v1',
+  baseURL: import.meta.env.VITE_API_URL,
   headers: { 'Content-Type': 'application/json' },
 })
 
