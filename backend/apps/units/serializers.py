@@ -31,12 +31,23 @@ class UnitSerializer(serializers.ModelSerializer):
     meter_type = serializers.SerializerMethodField()
     barcode    = serializers.SerializerMethodField()
 
+    # Fix: these were previously `write_only=True`, which meant GET
+    # requests (the ones the Units list and Edit-modal pre-fill rely on)
+    # never returned building_id/package_id at all — only the human-
+    # readable building_name/project_name/package_name strings. The
+    # frontend Edit form was looking for editItem.building_id to derive
+    # both the Building AND Project selects, and editItem.package_id for
+    # the Package select, so both silently rendered blank on every edit no
+    # matter how the frontend timed its effects. PrimaryKeyRelatedField
+    # already knows how to serialize the related object's PK on read, so
+    # dropping write_only is enough — no separate read field needed, and
+    # writes (POST/PUT still accepting a plain id) are unaffected.
     building_id = serializers.PrimaryKeyRelatedField(
-        queryset=Building.objects.all(), source='building', write_only=True
+        queryset=Building.objects.all(), source='building'
     )
     package_id = serializers.PrimaryKeyRelatedField(
         queryset=Package.objects.all(), source='package',
-        write_only=True, required=False, allow_null=True
+        required=False, allow_null=True
     )
 
     # NOTE: mobile_number lives on Unit (not Allottee) at the DB level —

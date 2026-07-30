@@ -55,6 +55,23 @@ function UnitModal({ open, onClose, editItem, buildings, projects, packages, rea
     }
   }, [open, editItem, reset, buildings])
 
+  // Fix: the Building <select> is uncontrolled (via `register`), and its
+  // <option> list (`filteredBuildings`) depends on the `projectId` state set
+  // above. `reset()` in the effect above writes straight to the select's DOM
+  // value in the SAME tick that `setProjectId` is queued — at that instant
+  // the matching <option> doesn't exist yet, so the browser silently drops
+  // the selection and the Building field renders blank on Edit, even though
+  // every other field (plain text inputs) populates correctly. This second
+  // effect re-applies building_id specifically once `projectId` has actually
+  // changed and `filteredBuildings` has re-rendered to include that option.
+  useEffect(() => {
+    if (!open || !editItem) return
+    const buildingIdVal = editItem.building_id ?? editItem.building?.id ?? ''
+    if (buildingIdVal) {
+      setValue('building_id', buildingIdVal)
+    }
+  }, [open, editItem, projectId, buildings, setValue])
+
   const filteredBuildings = useMemo(
     () => (buildings ?? []).filter((b: any) => !projectId || String(b.project_id) === String(projectId)),
     [buildings, projectId]

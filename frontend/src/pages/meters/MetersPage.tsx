@@ -5,7 +5,7 @@ import {
   Gauge, BookOpen, Eye, X,
   Calendar, CalendarDays, Filter, LayoutGrid,
 } from 'lucide-react'
-import { metersAPI } from '@/api/client'
+import { metersAPI, projectsAPI, buildingsAPI } from '@/api/client'
 import { PageLoader, EmptyState, Pagination } from '@/components/ui'
 import { ReadingModal } from '@/components/meters/ReadingModal'
 import { formatDate } from '@/utils/helpers'
@@ -200,6 +200,19 @@ export default function MetersPage() {
     queryFn: () => metersAPI.list({ page_size: 500 }).then(r => r.data),
   })
 
+  // Projects + Buildings, used to drive the Project -> Building -> Meter
+  // cascade in the Record Reading modal (same pattern as the Units page and
+  // Quick Reading Dashboard) — a single flat meter dropdown doesn't scale
+  // once there are hundreds/thousands of meters.
+  const { data: projects } = useQuery({
+    queryKey: ['projects-all'],
+    queryFn: () => projectsAPI.list({ page_size: 500 }).then(r => r.data.results || r.data),
+  })
+  const { data: buildings } = useQuery({
+    queryKey: ['buildings-all'],
+    queryFn: () => buildingsAPI.list({ page_size: 200 }).then(r => r.data.results || r.data),
+  })
+
   const meters   = metersData?.results   ?? []
   const readings = readingsData?.results ?? []
 
@@ -281,7 +294,13 @@ export default function MetersPage() {
         </>
       )}
 
-      <ReadingModal open={readingModal} onClose={() => setReadingModal(false)} meters={meters} />
+      <ReadingModal
+        open={readingModal}
+        onClose={() => setReadingModal(false)}
+        meters={meters}
+        projects={projects}
+        buildings={buildings}
+      />
     </div>
   )
 }

@@ -72,6 +72,13 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
 
   if (!open) return null
   const sizes = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }
+  // Only give the larger, form-heavy modals (Unit, Bulk Import, etc.) a
+  // minimum height so they use the available screen space instead of
+  // shrink-wrapping shorter than the viewport and looking "cut off" once
+  // content scrolls out of view. Small/medium modals (confirm dialogs, short
+  // forms) deliberately get NO minimum — forcing those tall would recreate
+  // the original "empty box" bug in reverse.
+  const minHeights = { sm: '', md: '', lg: 'min-h-[70vh]', xl: 'min-h-[70vh]' }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 py-8 overflow-y-auto">
@@ -83,14 +90,16 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
         aria-labelledby="modal-title"
         className={cn(
           'relative bg-white rounded-2xl shadow-2xl w-full animate-fadeIn my-auto',
-          // `vh` units are computed against the LARGEST possible mobile viewport
-          // (as if the browser's address bar were hidden), not the actually
-          // visible area. That made short forms (few fields) get squeezed into
-          // a box shorter than the real visible screen and forced to scroll
-          // even though the content itself was tiny. `dvh` tracks the real,
-          // dynamic viewport as browser chrome shows/hides. Keep the `vh`
-          // value first as a fallback for browsers that don't support `dvh`.
-          'max-h-[90vh] max-h-[90dvh] flex flex-col',
+          // Two separate `max-h-[...]` utility classes on one element is
+          // unreliable — Tailwind can't guarantee which rule wins, since that
+          // depends on generation order in the compiled stylesheet, not the
+          // order written here. `supports-[height:100dvh]:max-h-[...]` is a
+          // single conditional rule (wrapped in a real @supports block), so
+          // it deterministically overrides the vh fallback only in browsers
+          // that understand dvh. Cap raised to 95vh to leave more headroom
+          // for longer forms before scrolling ever kicks in.
+          'max-h-[95vh] supports-[height:100dvh]:max-h-[95dvh] flex flex-col',
+          minHeights[size],
           sizes[size]
         )}
       >
@@ -100,11 +109,18 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
             <X className="w-4 h-4" />
           </button>
         </div>
-        {/* flex-1 + min-h-0 so this is the ONLY element that ever scrolls,
-            and only once its content actually exceeds the available space —
-            short forms now just shrink-to-fit instead of inheriting a tall,
-            mostly-empty scrollable box. */}
-        <div className="p-6 overflow-y-auto flex-1 min-h-0">{children}</div>
+        {/* flex-1 + min-h-0 so this is the ONLY element that ever scrolls, and
+            only once content actually exceeds the available space. The
+            scrollbar is styled to always render at low opacity (instead of
+            relying on the OS's hover-only overlay scrollbar), so if a long
+            form (like Allottee Information below) does need scrolling, it's
+            visibly obvious rather than looking like the form got cut off. */}
+        <div
+          className="p-6 overflow-y-auto flex-1 min-h-0"
+          style={{ scrollbarGutter: 'stable', scrollbarWidth: 'thin' }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   )
