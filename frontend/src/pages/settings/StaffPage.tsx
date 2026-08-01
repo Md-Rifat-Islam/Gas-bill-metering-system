@@ -20,14 +20,17 @@ const ROLE_BADGE: Record<string, string> = {
 }
 
 const PERMISSION_MODULES: { value: string; label: string }[] = [
+  { value: 'dashboard', label: 'Dashboard' },
   { value: 'projects',  label: 'Projects' },
+  { value: 'packages',  label: 'Packages' },
   { value: 'buildings', label: 'Buildings' },
   { value: 'units',     label: 'Units' },
   { value: 'meters',    label: 'Meters' },
-  { value: 'quick_reading', label: 'Quick Reading' },   
+  { value: 'quick_reading', label: 'Quick Reading' },
   { value: 'billing',   label: 'Billing' },
   { value: 'payments',  label: 'Payments' },
   { value: 'reports',   label: 'Reports' },
+  { value: 'financial_reports', label: 'Financial Reports' },
   { value: 'staff',     label: 'Staff Management' },
   { value: 'audit',     label: 'Audit Logs' },
 ]

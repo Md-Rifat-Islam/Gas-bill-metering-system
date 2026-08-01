@@ -57,10 +57,21 @@ export default function PortalLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-surface-50 p-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
+          {/* 
           <div className="w-14 h-14 rounded-2xl bg-brand-500 flex items-center justify-center mb-3">
             <Flame className="w-7 h-7 text-white" />
+          </div> 
+          <h1 className="text-xl font-bold text-surface-900">DECO</h1> 
+          */}
+          {/* --------Logo------------- */}
+          <div className="inline-flex w-fit bg-white rounded-2xl px-2 py-2 shadow-2xl shadow-black/30">
+            <img
+              src="/branding/deco-logo.png"
+              alt="DECO Limited"
+              className="h-9 w-auto object-contain"
+            />
           </div>
-          <h1 className="text-xl font-bold text-surface-900">DECO</h1>
+          
           <p className="text-sm text-surface-400 mt-1">Resident Portal</p>
         </div>
 
