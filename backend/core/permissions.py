@@ -117,6 +117,20 @@ class IsAnyStaff(BasePermission):
 
 # ── Module-level RBAC, override-aware ─────────────────────────────────────────
 
+class DashboardPermission(ModuleOverridePermission):
+    """
+    Gates the main Dashboard view/summary endpoint. Every staff role sees
+    the dashboard by default (see rbac.py) — this exists so a specific
+    user's dashboard access can still be revoked individually if needed,
+    same override mechanism as every other module.
+
+    NOTE: nothing currently applies this to a view. Attach it to whatever
+    endpoint backs the dashboard landing page (e.g. reports/views.py's
+    dashboard summary endpoint) for it to have any effect.
+    """
+    module = 'dashboard'
+
+
 class ProjectPermission(ModuleOverridePermission):
     module = 'projects'
 
@@ -135,23 +149,23 @@ class UnitPermission(ModuleOverridePermission):
     module = 'units'
 
 
-class PackagePermission(BasePermission):
+class PackagePermission(ModuleOverridePermission):
     """
-    Super Admin : full CRUD + price history
-    Admin       : assign only (no price editing)
-    Others      : read-only
+    Gates the Packages app (pricing packages under Projects).
 
-    NOT override-able — Packages has no dedicated PermissionModule entry
-    (it's a sub-concern of Projects in the data model), so it stays
-    role-only, same as before.
+    MIGRATION NOTE: this used to be a hard-coded, non-override-able
+    BasePermission ("Packages has no dedicated PermissionModule entry ...
+    stays role-only"). It has now been promoted to a full module with the
+    same override mechanism as everything else, backed by a real
+    PermissionModule.PACKAGES entry.
+
+    The role defaults in rbac.py were set to reproduce the exact previous
+    behavior (Super Admin: full CRUD; Admin/Billing Officer/Accountant/
+    Viewer: read-only), so nothing changes for anyone until a Super Admin
+    (or an Admin, for users they created) explicitly sets a per-user
+    override on this module.
     """
-    def has_permission(self, request, view):
-        r = role(request)
-        if r == R:
-            return True
-        if r == A:
-            return request.method in SAFE_METHODS
-        return request.method in SAFE_METHODS and r in (BO, AC, V)
+    module = 'packages'
 
 
 class MeterPermission(ModuleOverridePermission):
@@ -229,15 +243,26 @@ class ReportPermission(ModuleOverridePermission):
     module = 'reports'
 
 
-class FinancialReportPermission(BasePermission):
+class FinancialReportPermission(ModuleOverridePermission):
     """
-    Revenue / financial reports: Super Admin + Accountant only. NOT
-    override-able — financial totals are treated as a stricter, separate
-    concern from general Reports access, by design.
+    Revenue / financial reports (monthly-revenue, payment-methods, and any
+    other endpoint exposing money totals).
+
+    MIGRATION NOTE: this used to be hard-locked, role-only, explicitly NOT
+    override-able ("financial totals are treated as a stricter, separate
+    concern from general Reports access, by design"). A Super Admin can now
+    grant financial-report access to any individual user via that user's
+    Role & Permission tab (Admin can do the same, but only for users they
+    personally created) — same override mechanism as every other module,
+    backed by a dedicated PermissionModule.FINANCIAL_REPORTS entry so it
+    stays distinct from the general 'reports' module.
+
+    Role defaults in rbac.py reproduce the exact previous behavior (Super
+    Admin + Accountant: view; everyone else: no access), so nothing changes
+    for anyone until a Super Admin explicitly sets a per-user override here.
     """
     message = 'Financial reports require Accountant or Super Admin access.'
-    def has_permission(self, request, view):
-        return role(request) in (R, AC)
+    module = 'financial_reports'
 
 
 # ── Hard-locked (no per-user override, ever) ──────────────────────────────────

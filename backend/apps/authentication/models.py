@@ -108,14 +108,17 @@ class StaffUser(AbstractBaseUser, PermissionsMixin):
 
 
 class PermissionModule(models.TextChoices):
+    DASHBOARD = 'dashboard', 'Dashboard'
     PROJECTS = 'projects', 'Projects'
+    PACKAGES = 'packages', 'Packages'
     BUILDINGS = 'buildings', 'Buildings'
     UNITS = 'units', 'Units'
     METERS = 'meters', 'Meters'
-    QUICK_READING = 'quick_reading', 'Quick Reading'  
+    QUICK_READING = 'quick_reading', 'Quick Reading'
     BILLING = 'billing', 'Billing'
     PAYMENTS = 'payments', 'Payments'
     REPORTS = 'reports', 'Reports'
+    FINANCIAL_REPORTS = 'financial_reports', 'Financial Reports'
     STAFF = 'staff', 'Staff Management'
     AUDIT = 'audit', 'Audit Logs'
 
@@ -130,6 +133,12 @@ class UserPermission(models.Model):
 
     This is what a Super Admin (for anyone) or an Admin (only for users they
     created) edits on the Role & Permission tab of the staff edit form.
+
+    NOTE: 'packages' and 'financial_reports' were previously excluded from
+    this system on purpose (PackagePermission and FinancialReportPermission
+    were hard-coded, role-only / hard-locked). Both are now override-able
+    like every other module — see core/permissions.py for the migration
+    notes on each.
     """
     user = models.ForeignKey(
         StaffUser, on_delete=models.CASCADE, related_name='permission_overrides'
