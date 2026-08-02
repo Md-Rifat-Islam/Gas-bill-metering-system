@@ -39,12 +39,6 @@ class StaffUserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'created_by', 'created_by_name', 'permission_overrides', 'can_manage']
 
     def get_can_manage(self, obj):
-        """
-        Tells the frontend whether the *requesting* user may edit/delete/
-        manage-permissions for *this row*. This is presentation-only — the
-        backend re-checks the same StaffUser.can_manage() rule on every
-        write request regardless of what this flag says.
-        """
         request = self.context.get('request')
         if not request or not getattr(request, 'user', None) or not request.user.is_authenticated:
             return False
@@ -99,3 +93,77 @@ class CustomerUserSerializer(serializers.ModelSerializer):
         model = CustomerUser
         fields = ['id', 'name', 'mobile', 'email', 'is_active', 'created_at']
         read_only_fields = ['id', 'mobile', 'is_active', 'created_at']
+        # NOTE: 'password' is deliberately not in `fields` — it is never
+        # readable or writable through this serializer, by design. All
+        # password paths (login, self-service change, admin reset) go
+        # through the dedicated serializers below instead.
+
+
+class CustomerPasswordLoginSerializer(serializers.Serializer):
+    """
+    Resident Portal — mobile + password login.
+
+    Deliberately returns the SAME generic error for "no account with this
+    mobile" and "wrong password" — distinguishing the two would let someone
+    probe which mobile numbers have a portal account registered.
+    """
+    mobile = serializers.CharField(max_length=15)
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        generic_error = 'Invalid mobile number or password.'
+        try:
+            customer = CustomerUser.objects.get(mobile=data['mobile'])
+        except CustomerUser.DoesNotExist:
+            raise serializers.ValidationError(generic_error)
+
+        if not customer.is_active:
+            raise serializers.ValidationError('This account has been deactivated.')
+
+        if not customer.check_password(data['password']):
+            raise serializers.ValidationError(generic_error)
+
+        data['customer'] = customer
+        return data
+
+
+class CustomerChangePasswordSerializer(serializers.Serializer):
+    """
+    Resident Portal, profile page — authenticated customer sets a new
+    password after proving control of their registered mobile via OTP.
+    The OTP is always checked against `self.context['customer'].mobile`
+    (the logged-in customer's OWN number), never a mobile from the request
+    body, so this can't be used to reset someone else's password.
+    """
+    otp_code = serializers.CharField(max_length=6)
+    new_password = serializers.CharField(min_length=6, write_only=True)
+
+    def validate(self, data):
+        customer = self.context['customer']
+        otp_obj = OTPVerification.objects.filter(
+            mobile=customer.mobile, otp_code=data['otp_code'], is_used=False
+        ).order_by('-created_at').first()
+
+        if not otp_obj or not otp_obj.is_valid():
+            raise serializers.ValidationError({'otp_code': 'Invalid or expired OTP.'})
+
+        data['otp_obj'] = otp_obj
+        return data
+
+
+class AdminResetCustomerPasswordSerializer(serializers.Serializer):
+    """
+    Staff-side (no OTP) reset — used from the Unit edit form. `new_password`
+    is optional; if omitted, the password resets to the mobile number
+    itself (mirrors the original auto-provisioned default, a quick
+    "reset to default" action for support calls).
+    """
+    mobile = serializers.CharField(max_length=15)
+    new_password = serializers.CharField(min_length=6, required=False, allow_blank=True)
+
+    def validate_mobile(self, value):
+        if not CustomerUser.objects.filter(mobile=value).exists():
+            raise serializers.ValidationError(
+                'No portal account exists yet for this mobile number.'
+            )
+        return value

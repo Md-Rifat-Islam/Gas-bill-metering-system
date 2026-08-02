@@ -121,6 +121,15 @@ export const unitsAPI = {
       validateStatus: () => true,
     })
   },
+
+  // Admin-side (no OTP) reset of a resident's Resident Portal password —
+  // called from the Unit edit modal. Omit newPassword to reset to the
+  // mobile number itself.
+  resetCustomerPassword: (mobile: string, newPassword?: string) =>
+    api.post('/auth/customers/reset-password/', {
+      mobile,
+      new_password: newPassword,
+    }),
 }
 
 export const metersAPI = {

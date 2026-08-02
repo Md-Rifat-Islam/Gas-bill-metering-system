@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.hashers import make_password, check_password as check_password_hash
 from django.db import models
 import random
 import string
@@ -56,16 +57,12 @@ class StaffUser(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
 
-    # Hierarchy: who created this account. Used to enforce that an Admin may
-    # only manage (edit/delete/change-permissions-for) users they created,
-    # never a Super Admin or another Admin.
     created_by = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='created_users',
         help_text='The staff user who created this account. Null for the first Super Admin.',
     )
 
-    # Free-text field backing the "Additional Details" tab of the staff edit form.
     notes = models.TextField(blank=True, default='')
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -87,17 +84,6 @@ class StaffUser(AbstractBaseUser, PermissionsMixin):
         return self.role.role_name if self.role else None
 
     def can_manage(self, target: 'StaffUser') -> bool:
-        """
-        Hierarchy rule used everywhere a StaffUser tries to view/edit/delete
-        or change permissions for another StaffUser (`target`).
-
-        - Super Admin can manage everyone (including other Super Admins, but
-          not themselves for the "delete" case — enforced separately).
-        - Admin can manage only users they personally created, and only if
-          that user is not an Admin or Super Admin (Admin cannot promote
-          a peer or touch a superior).
-        - Everyone else: no management rights.
-        """
         if self.role_name == Role.SUPER_ADMIN:
             return True
         if self.role_name == Role.ADMIN:
@@ -124,22 +110,6 @@ class PermissionModule(models.TextChoices):
 
 
 class UserPermission(models.Model):
-    """
-    Per-user, per-module permission override on top of the base role.
-
-    A row here means: "for this module, this user's access is exactly
-    {can_view, can_edit, can_delete}" — overriding whatever the role default
-    would otherwise grant. Absence of a row means "use role default."
-
-    This is what a Super Admin (for anyone) or an Admin (only for users they
-    created) edits on the Role & Permission tab of the staff edit form.
-
-    NOTE: 'packages' and 'financial_reports' were previously excluded from
-    this system on purpose (PackagePermission and FinancialReportPermission
-    were hard-coded, role-only / hard-locked). Both are now override-able
-    like every other module — see core/permissions.py for the migration
-    notes on each.
-    """
     user = models.ForeignKey(
         StaffUser, on_delete=models.CASCADE, related_name='permission_overrides'
     )
@@ -163,10 +133,35 @@ class UserPermission(models.Model):
 
 
 class CustomerUser(models.Model):
-    """End-user / customer who logs in via mobile OTP"""
+    """
+    End-user / customer who logs in via the Resident Portal.
+
+    Auth methods, both live simultaneously:
+      - Mobile + password (primary). Password is auto-provisioned to equal
+        the mobile number itself the first time a Unit is saved with this
+        mobile_number (see apps/authentication/signals.py). The resident
+        can change it from their Profile page via OTP verification
+        (CustomerChangePasswordView); staff can reset it directly with no
+        OTP from the Unit edit form (AdminResetCustomerPasswordView).
+      - Mobile + OTP (fallback / alternate login — unchanged, still the
+        original flow via OTPRequestView / OTPVerifyView).
+
+    `password` stores a Django-hashed value (via set_password), same
+    hashing machinery as StaffUser, even though this model doesn't inherit
+    AbstractBaseUser — kept as a plain field + helper methods since
+    CustomerUser predates this and DRF's IsAuthenticated only needs
+    is_authenticated/is_anonymous, not the full auth-user contract.
+
+    NOTE: rows created before this field existed will have password=''.
+    Run a one-off backfill (see migration notes) to set password=mobile
+    for any existing account with a blank password, or those residents
+    won't be able to use password login until they go through the OTP
+    change-password flow once.
+    """
     mobile = models.CharField(max_length=15, unique=True)
     name = models.CharField(max_length=100, blank=True)
     email = models.EmailField(blank=True)
+    password = models.CharField(max_length=128, blank=True, default='')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -177,7 +172,14 @@ class CustomerUser(models.Model):
     def __str__(self):
         return f"{self.name} ({self.mobile})"
 
-    # DRF permission checks (IsAuthenticated etc.) expect these attributes
+    def set_password(self, raw_password):
+        self.password = make_password(raw_password)
+
+    def check_password(self, raw_password):
+        if not self.password:
+            return False
+        return check_password_hash(raw_password, self.password)
+
     @property
     def is_authenticated(self):
         return True
@@ -202,7 +204,6 @@ class OTPVerification(models.Model):
 
     @classmethod
     def generate_otp(cls, mobile):
-        # Invalidate previous OTPs for this mobile
         cls.objects.filter(mobile=mobile, is_used=False).update(is_used=True)
         otp = ''.join(random.choices(string.digits, k=6))
         expires_at = timezone.now() + timedelta(minutes=5)

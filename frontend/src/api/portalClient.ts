@@ -50,6 +50,17 @@ export const portalAuthAPI = {
   requestOTP: (mobile: string) => axios.post('/api/v1/auth/otp/request/', { mobile }),
   verifyOTP:  (mobile: string, otp_code: string) =>
     axios.post('/api/v1/auth/otp/verify/', { mobile, otp_code }),
+
+  // Primary login — mobile + password. No token exists yet, so plain axios
+  // is fine here too, same as the OTP calls above.
+  loginWithPassword: (mobile: string, password: string) =>
+    axios.post('/api/v1/auth/portal/login/', { mobile, password }),
+
+  // These two are authenticated (customer JWT) — must go through `portalApi`,
+  // not plain axios, so the interceptor attaches the Authorization header.
+  requestPasswordChangeOTP: () => portalApi.post('/auth/portal/password/otp/'),
+  changePassword: (otp_code: string, new_password: string) =>
+    portalApi.post('/auth/portal/password/change/', { otp_code, new_password }),
 }
 
 export const portalAPI = {

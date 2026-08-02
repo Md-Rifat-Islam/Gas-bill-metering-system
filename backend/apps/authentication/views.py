@@ -5,14 +5,16 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db import transaction
 from .models import StaffUser, Role, CustomerUser, OTPVerification, UserPermission, PermissionModule
+from .customer_auth import CustomerJWTAuthentication
 from .serializers import (
     StaffUserSerializer, LoginSerializer, RoleSerializer,
     OTPRequestSerializer, OTPVerifySerializer, CustomerUserSerializer,
-    UserPermissionSerializer,
+    UserPermissionSerializer, CustomerPasswordLoginSerializer,
+    CustomerChangePasswordSerializer, AdminResetCustomerPasswordSerializer,
 )
 from apps.audit.utils import log_action
 from core.permissions import (
-    UserModulePermission, RBACPermission, IsAnyStaff,
+    UserModulePermission, RBACPermission, IsAnyStaff, IsCustomer,
     UserPermissionManagePermission, role as get_role, R, A, BO, AC, V,
 )
 from core.permissions import (
@@ -53,11 +55,18 @@ class LogoutView(APIView):
 
 class OTPRequestView(APIView):
     '''
-    Customer Portal — request an OTP for mobile login.
+    Customer Portal — request an OTP for mobile login (fallback login
+    method, kept alongside CustomerPasswordLoginView below — password is
+    now the primary login method).
 
     If no CustomerUser exists yet for this mobile but an active Unit has this
     mobile_number on file (set by staff when allotting the unit), a CustomerUser
     is auto-created so the resident can self-onboard without staff action.
+
+    NOTE: this manual fallback path is now redundant with the automatic
+    provisioning in signals.py (which fires at Unit save time), but is left
+    in place as a safety net in case a Unit predates that signal or was
+    bulk-imported some other way.
     '''
     permission_classes = [permissions.AllowAny]
 
@@ -84,6 +93,8 @@ class OTPRequestView(APIView):
                 mobile=mobile,
                 name=getattr(unit.allottee, 'name', '') if hasattr(unit, 'allottee') else '',
             )
+            customer.set_password(mobile)
+            customer.save()
 
         if not customer.is_active:
             return Response({'error': 'This account has been deactivated.'}, status=status.HTTP_403_FORBIDDEN)
@@ -98,7 +109,7 @@ class OTPRequestView(APIView):
 
 
 class OTPVerifyView(APIView):
-    '''Customer Portal — verify OTP and issue customer-scoped JWT tokens.'''
+    '''Customer Portal — verify OTP and issue customer-scoped JWT tokens (fallback login).'''
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -129,6 +140,120 @@ class OTPVerifyView(APIView):
             'refresh':  str(refresh),
             'customer': CustomerUserSerializer(customer).data,
         })
+
+
+class CustomerPasswordLoginView(APIView):
+    """
+    Customer Portal — mobile + password login. This is now the PRIMARY
+    login method; OTPRequestView/OTPVerifyView above remain as a fallback,
+    per design decision (not removed).
+
+    Issues the exact same token shape/claims as OTPVerifyView, so both
+    login methods produce interchangeable tokens for CustomerJWTAuthentication.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = CustomerPasswordLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        customer = serializer.validated_data['customer']
+
+        refresh = RefreshToken()
+        refresh['user_type']   = 'customer'
+        refresh['customer_id'] = customer.id
+        refresh['mobile']      = customer.mobile
+        access = refresh.access_token
+
+        return Response({
+            'access':   str(access),
+            'refresh':  str(refresh),
+            'customer': CustomerUserSerializer(customer).data,
+        })
+
+
+class CustomerRequestPasswordChangeOTPView(APIView):
+    """
+    Resident Portal, profile page — an ALREADY-LOGGED-IN customer requests
+    an OTP to authorize changing their own password.
+
+    Deliberately never accepts a mobile number from the request body —
+    always uses request.user.mobile (the authenticated customer's own
+    number) — so this endpoint can't be used to spam OTPs to an arbitrary
+    number the way the login-time OTPRequestView could be (that one is
+    AllowAny and mobile-from-body by necessity, since the caller isn't
+    logged in yet).
+    """
+    authentication_classes = [CustomerJWTAuthentication]
+    permission_classes = [IsCustomer]
+
+    def post(self, request):
+        from django.conf import settings as dj_settings
+        otp_obj = OTPVerification.generate_otp(request.user.mobile)
+        # TODO: send_sms(request.user.mobile, f"Your DECO OTP is {otp_obj.otp_code}")
+
+        payload = {'message': 'OTP sent to your registered mobile number'}
+        if dj_settings.DEBUG:
+            payload['debug_otp'] = otp_obj.otp_code  # remove in production
+        return Response(payload)
+
+
+class CustomerChangePasswordView(APIView):
+    """
+    Resident Portal, profile page — authenticated customer sets a new
+    password after verifying the OTP from CustomerRequestPasswordChangeOTPView.
+    """
+    authentication_classes = [CustomerJWTAuthentication]
+    permission_classes = [IsCustomer]
+
+    def post(self, request):
+        serializer = CustomerChangePasswordSerializer(
+            data=request.data, context={'customer': request.user}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        otp_obj = serializer.validated_data['otp_obj']
+        otp_obj.is_used = True
+        otp_obj.save()
+
+        request.user.set_password(serializer.validated_data['new_password'])
+        request.user.save()
+
+        return Response({'message': 'Password updated successfully'})
+
+
+class AdminResetCustomerPasswordView(APIView):
+    """
+    Staff-side password reset — NO OTP required. Reached from the Unit
+    edit form (a staff member who can edit a unit's allottee info can also
+    reset that resident's portal password). Gated on UnitPermission's
+    edit check (module='units', can_edit) — same permission that already
+    gates the rest of the Unit edit form, so nothing new to configure per
+    role; Super Admin/Admin get it by default like everywhere else, and it
+    inherits the same per-user override mechanism as Units generally.
+
+    `new_password` is optional in the request body — if omitted, resets
+    to the mobile number itself (matches the original auto-provisioned
+    default; a quick "reset to default" action for support calls).
+    """
+    permission_classes = [permissions.IsAuthenticated, UnitPermission]
+
+    def post(self, request):
+        serializer = AdminResetCustomerPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        mobile = serializer.validated_data['mobile']
+        new_password = serializer.validated_data.get('new_password') or mobile
+
+        customer = CustomerUser.objects.get(mobile=mobile)
+        customer.set_password(new_password)
+        customer.save()
+
+        log_action(
+            request.user, 'customer_users', customer.id, 'UPDATE',
+            {'action': 'password_reset'},
+            {'action': 'password_reset', 'reset_by': request.user.email},
+        )
+        return Response({'message': 'Password reset successfully'})
 
 
 # ── Staff (Super Admin / Admin only — UserModulePermission enforces this) ─────
@@ -189,7 +314,6 @@ class StaffUserDetailView(generics.RetrieveUpdateDestroyAPIView):
         target = self.get_object()
         self._check_hierarchy(self.request, target)
 
-        # Admin additionally cannot promote a user they manage to Admin/Super Admin
         if self.request.user.role_name == Role.ADMIN:
             new_role = serializer.validated_data.get('role')
             if new_role and new_role.role_name in (Role.SUPER_ADMIN, Role.ADMIN):
@@ -446,6 +570,7 @@ _CAPABILITY_DEFINITION = {
     'deleteBuildings':     (BuildingPermission, 'DELETE'),
 
     'viewUnits':           (UnitPermission, 'GET'),
+    'editUnits':           (UnitPermission, 'POST'),
 
     'viewPackages':        (PackagePermission, 'GET'),
     'editPackages':        (PackagePermission, 'POST'),
@@ -477,14 +602,16 @@ _CAPABILITY_DEFINITION = {
 # simulated flags. Staff and Audit are deliberately absent — they're
 # hard-locked and never take an override, by design.
 _MODULE_FLAG_MAP = {
-    'projects':      ('viewProjects',  'editProject',  'deleteProject'),
-    'buildings':     ('viewBuildings', 'editBuildings', 'deleteBuildings'),
-    'units':         ('viewUnits',     None,            None),
-    'meters':        ('viewMeters',    'editMeters',    None),
-    'quick_reading': ('recordReading', 'recordReading', None),
-    'billing':       ('viewBills',     'editBill',      'deleteBill'),
-    'payments':      ('viewPayments',  'recordPayment', None),
-    'reports':       ('viewReports',   None,            None),
+    'projects':          ('viewProjects',  'editProject',  'deleteProject'),
+    'packages':          ('viewPackages',  'editPackages',  None),
+    'buildings':         ('viewBuildings', 'editBuildings', 'deleteBuildings'),
+    'units':             ('viewUnits',     'editUnits',     None),
+    'meters':            ('viewMeters',    'editMeters',    None),
+    'quick_reading':     ('recordReading', 'recordReading', None),
+    'billing':           ('viewBills',     'editBill',      'deleteBill'),
+    'payments':          ('viewPayments',  'recordPayment', None),
+    'reports':           ('viewReports',   None,            None),
+    'financial_reports': ('viewFinancialReports', None,     None),
 }
 
 
@@ -504,7 +631,7 @@ class MyPermissionsView(APIView):
         # Capabilities without a dedicated permission class — direct role
         # checks (unaffected by the module override system).
         r = request.user.role_name
-        flags['viewDashboard']      = r in (R, A, AC)  # (R, A, BO, AC) -> # everyone except Viewer, matching dashboardModules()
+        flags['viewDashboard']      = r in (R, A, AC)
         flags['adjustBill']         = r in (R, A, BO)
         flags['assignPackages']     = r in (R, A)
         flags['viewProjectReports'] = r in (R, A, AC)

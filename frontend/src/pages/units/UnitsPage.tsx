@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { Plus, Pencil, Trash2, Home, Search, Gauge, PlusCircle, Upload, Download } from 'lucide-react'
+import { Plus, Pencil, Trash2, Home, Search, Gauge, PlusCircle, Upload, Download, KeyRound, Loader2 } from 'lucide-react'
 import { unitsAPI, buildingsAPI, projectsAPI } from '@/api/client'
 import { Modal, PageLoader, EmptyState, Pagination, ConfirmDialog } from '@/components/ui'
 import { MeterAssignModal } from '@/components/meters/MeterAssignModal'
@@ -9,18 +9,110 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { useConfirm } from '@/hooks'
 import toast from 'react-hot-toast'
 
+/* ── Portal Password reset — admin/staff side, no OTP ────────────────────── */
+function CustomerPasswordResetSection({ mobile, readOnly }: { mobile: string; readOnly: boolean }) {
+  const [customPassword, setCustomPassword] = useState('')
+  const [showCustom, setShowCustom] = useState(false)
+
+  const reset = useMutation({
+    mutationFn: (newPassword?: string) => unitsAPI.resetCustomerPassword(mobile, newPassword),
+    onSuccess: () => {
+      toast.success('Portal password reset')
+      setCustomPassword('')
+      setShowCustom(false)
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.mobile?.[0] || err.response?.data?.detail || 'Could not reset password')
+    },
+  })
+
+  if (readOnly || !mobile) return null
+
+  return (
+    <div className="border-t border-surface-100 pt-4">
+      <div className="flex items-center gap-2 mb-3">
+        <KeyRound className="w-4 h-4 text-brand-500" />
+        <div className="text-sm font-semibold text-surface-700">Resident Portal Password</div>
+      </div>
+      <p className="text-xs text-surface-400 mb-3">
+        No OTP required — this resets the login password for the Resident Portal account tied to{' '}
+        <span className="font-mono">{mobile}</span>.
+      </p>
+      {!showCustom ? (
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            type="button"
+            className="btn-secondary flex-1 justify-center"
+            onClick={() => reset.mutate(undefined)}
+            disabled={reset.isPending}
+            title="Reset password back to the mobile number"
+          >
+            {reset.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+            Reset to Default (Mobile No.)
+          </button>
+          <button
+            type="button"
+            className="btn-secondary flex-1 justify-center"
+            onClick={() => setShowCustom(true)}
+            disabled={reset.isPending}
+          >
+            Set Custom Password
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            className="input flex-1"
+            placeholder="New password (min 6 characters)"
+            value={customPassword}
+            onChange={e => setCustomPassword(e.target.value)}
+            aria-label="New portal password"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="btn-primary flex-1 sm:flex-none justify-center"
+              onClick={() => {
+                if (customPassword.length < 6) {
+                  toast.error('Password must be at least 6 characters')
+                  return
+                }
+                reset.mutate(customPassword)
+              }}
+              disabled={reset.isPending}
+            >
+              {reset.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Set'}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary flex-1 sm:flex-none justify-center"
+              onClick={() => { setShowCustom(false); setCustomPassword('') }}
+              disabled={reset.isPending}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function UnitModal({ open, onClose, editItem, buildings, projects, packages, readOnly }: any) {
   const qc = useQueryClient()
   // Project is a UI-only selector used to narrow the Building dropdown —
   // it is never submitted to the backend, only building_id is.
   const [projectId, setProjectId] = useState('')
 
-  const { register, handleSubmit, reset, setValue } = useForm({
+  const { register, handleSubmit, reset, setValue, watch } = useForm({
     defaultValues: {
       building_id: '', floor_no: '', unit_no: '', mobile_number: '',
       package_id: '', status: 'Active', allottee_name: '', allottee_email: '', allottee_nid: '',
     },
   })
+
+  const currentMobile = watch('mobile_number')
 
   // Fix: re-populate the form whenever the modal opens / target item changes.
   // Previously `defaultValues` was only evaluated on first mount, so editing
@@ -209,7 +301,10 @@ function UnitModal({ open, onClose, editItem, buildings, projects, packages, rea
             </div>
             {/* Mobile number now lives here (previously a standalone Unit-level
                 field above) and is mandatory — every allottee record needs a
-                contact number, e.g. for payment/reading notifications. */}
+                contact number, e.g. for payment/reading notifications. It also
+                doubles as the Resident Portal login identifier — saving a
+                mobile_number here auto-provisions (or reuses) that resident's
+                portal account, with an initial password equal to this number. */}
             <div>
               <label className="label" htmlFor="allottee-mobile">Mobile Number <span className="text-danger-500">*</span></label>
               <input
@@ -249,6 +344,15 @@ function UnitModal({ open, onClose, editItem, buildings, projects, packages, rea
             </div>
           </div>
         </div>
+
+        {/* Portal password reset — only meaningful for an existing unit that
+            already has a mobile number (and therefore, in principle, a
+            provisioned portal account). Hidden on the New Unit form since
+            nothing exists to reset yet — the account gets created on first
+            save instead. */}
+        {editItem && (
+          <CustomerPasswordResetSection mobile={currentMobile} readOnly={readOnly} />
+        )}
 
         {!readOnly && (
           <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end pt-2">
