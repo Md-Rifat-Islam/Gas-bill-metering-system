@@ -118,7 +118,10 @@ class BulkCreateBillsView(APIView):
       - does not already have a Bill for that month,
     creates a Bill automatically using:
       - previous_reading / current_reading from that MeterReading
-        (never re-typed — the reading already recorded is the source of truth)
+        (never re-typed — the reading already recorded is the source of truth;
+        this already inherits the initial_reading fix below, since that
+        MeterReading's previous_reading was resolved correctly when the
+        reading itself was recorded)
       - unit_price / conversion_factor from the unit's own package if set,
         else the building's default package, else the project's default
         package (same resolution order as the single-bill auto-fill)
@@ -233,7 +236,8 @@ class BulkCreateBillsView(APIView):
             'skipped_already_billed': skipped_billed,
             'skipped_no_reading': skipped_no_reading,
         })
-        
+
+
 class LatestUnitReadingView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -260,8 +264,13 @@ class LatestUnitReadingView(APIView):
         )
 
         if not reading:
+            # THE FIX: previously hardcoded 0 here — this is exactly the
+            # code path that inflated a unit's first bill whenever the
+            # meter wasn't literally brand new. Now falls back to
+            # meter.initial_reading, the dial value staff recorded at
+            # assignment time (see Meter model / MeterAssignModal).
             return Response({
-                'previous_reading': 0,
+                'previous_reading': meter.initial_reading,
                 'current_reading': 0,
                 'meter_no': meter.meter_no,
             })

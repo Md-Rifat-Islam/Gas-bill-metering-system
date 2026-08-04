@@ -19,7 +19,7 @@ class MeterSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'unit_id', 'unit_no', 'floor_no', 'building_name',
             'project_name', 'allottee_name', 'meter_no', 'meter_type',
-            'barcode', 'created_at',
+            'barcode', 'initial_reading', 'created_at',
         ]
 
     def create(self, validated_data):
@@ -108,7 +108,7 @@ class MeterCardSerializer(serializers.ModelSerializer):
     class Meta:
         model = Meter
         fields = [
-            'id', 'meter_no', 'barcode', 'meter_type',
+            'id', 'meter_no', 'barcode', 'meter_type', 'initial_reading',
             'unit_id', 'unit_no', 'floor_no',
             'building_id', 'building_name', 'project_id', 'project_name',
             'allottee_name', 'allottee_mobile', 'unit_status',
@@ -123,8 +123,14 @@ class MeterCardSerializer(serializers.ModelSerializer):
         return self.context.get('latest_by_meter', {}).get(obj.id)
 
     def get_previous_reading(self, obj):
+        # THE FIX: previously fell back to the hardcoded string '0.00' when
+        # no MeterReading exists yet for this meter. Now falls back to
+        # obj.initial_reading — the dial value staff recorded when the
+        # meter was assigned — so a meter that wasn't literally brand new
+        # doesn't get its entire prior accumulated usage billed as if it
+        # all happened in the first billing month.
         r = self._latest_reading(obj)
-        return str(r.current_reading) if r else '0.00'
+        return str(r.current_reading) if r else str(obj.initial_reading)
 
     def get_previous_reading_date(self, obj):
         r = self._latest_reading(obj)

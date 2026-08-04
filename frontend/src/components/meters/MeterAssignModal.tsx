@@ -15,6 +15,9 @@ interface UnitForMeter {
   meter_no: string | null
   meter_type: string | null
   barcode: string | null
+  // Only present if the Units list endpoint exposes it — see the note in
+  // the component below if this is coming through as undefined.
+  initial_reading?: number | string | null
 }
 
 interface MeterAssignModalProps {
@@ -28,7 +31,7 @@ export function MeterAssignModal({ open, onClose, unit }: MeterAssignModalProps)
   const isEdit = Boolean(unit?.meter_id)
 
   const { register, handleSubmit, reset } = useForm({
-    defaultValues: { meter_no: '', meter_type: 'Standard', barcode: '' },
+    defaultValues: { meter_no: '', meter_type: 'Standard', barcode: '', initial_reading: '0' },
   })
 
   // Reset whenever the modal (re)opens for a (possibly different) unit —
@@ -40,6 +43,10 @@ export function MeterAssignModal({ open, onClose, unit }: MeterAssignModalProps)
         meter_no: unit.meter_no || '',
         meter_type: unit.meter_type || 'Standard',
         barcode: unit.barcode || '',
+        initial_reading:
+          unit.initial_reading !== null && unit.initial_reading !== undefined
+            ? String(unit.initial_reading)
+            : '0',
       })
     }
   }, [open, unit, reset])
@@ -74,7 +81,6 @@ export function MeterAssignModal({ open, onClose, unit }: MeterAssignModalProps)
           </div>
           <Lock className="w-3.5 h-3.5 text-surface-300" />
         </div>
-
         <div>
           <label className="label" htmlFor="meter-no">Meter No. <span className="text-danger-500">*</span></label>
           <input
@@ -96,6 +102,27 @@ export function MeterAssignModal({ open, onClose, unit }: MeterAssignModalProps)
           />
         </div>
         <div>
+          <label className="label" htmlFor="meter-initial-reading">
+            Initial Reading <span className="text-surface-400 font-normal text-xs">(dial value right now)</span>
+          </label>
+          <input
+            id="meter-initial-reading"
+            {...register('initial_reading', { required: true, min: 0 })}
+            type="number"
+            step="0.01"
+            min="0"
+            className="input"
+            placeholder="0.00"
+            aria-label="Initial meter reading"
+          />
+          <p className="text-xs text-surface-400 mt-1">
+            Only leave this at 0 if the meter is brand new/unused. Otherwise enter what the
+            dial actually shows right now — this becomes the starting point for this meter's
+            first bill, so the resident isn't charged for usage from before it was assigned here.
+            Has no effect once a reading has already been recorded for this meter.
+          </p>
+        </div>
+        <div>
           <label className="label" htmlFor="meter-barcode">
             Barcode / QR <span className="text-surface-400 font-normal text-xs">(optional)</span>
           </label>
@@ -107,11 +134,10 @@ export function MeterAssignModal({ open, onClose, unit }: MeterAssignModalProps)
             aria-label="Barcode"
           />
         </div>
-
         <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end pt-2 border-t border-surface-100">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
           <button type="submit" className="btn-primary" disabled={save.isPending}>
-            {save.isPending ? 'Saving…' : isEdit ? 'Update Meter' : 'Assign Meter'}
+            {save.isPending ? 'Saving...' : isEdit ? 'Update Meter' : 'Assign Meter'}
           </button>
         </div>
       </form>

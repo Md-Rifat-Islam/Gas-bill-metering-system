@@ -39,18 +39,28 @@ from .models import Unit, Allottee
 
 MOBILE_PATTERN = re.compile(r'^01[3-9]\d{8}$')
 
+# THE FIX (meter-reading baseline bug, bulk-import path): this import
+# workflow creates Meter rows directly (see create_units_from_rows below),
+# completely bypassing MeterAssignModal — so it needed its own Initial
+# Reading column, or every unit onboarded via bulk import would silently
+# get Meter.initial_reading=0 regardless of what the physical meter
+# actually showed, reintroducing the exact same first-bill-overcharge bug
+# for anyone imported this way instead of assigned one-by-one.
+#
+# Optional column, same as the modal: blank/omitted -> defaults to 0
+# (meter treated as genuinely brand new).
 HEADERS = [
     'Floor No.*', 'Unit No.*', 'Mobile Number*',
     'Allottee Name', 'Allottee Email', 'Allottee NID',
-    'Meter No.*', 'Meter Type', 'Barcode',
+    'Meter No.*', 'Initial Reading', 'Meter Type', 'Barcode',
     'Package Name', 'Status',
 ]
-COL_WIDTHS = [10, 12, 16, 20, 24, 16, 16, 14, 20, 20, 12]
+COL_WIDTHS = [10, 12, 16, 20, 24, 16, 16, 16, 14, 20, 20, 12]
 
 EXAMPLE_ROW = [
     1, 'A1', '01712345678',
     'Jane Doe', 'jane@example.com', '1234567890123',
-    'MTR-00001', 'Standard', '',
+    'MTR-00001', 0, 'Standard', '',
     '', 'Active',
 ]
 
@@ -62,7 +72,8 @@ EXAMPLE_FONT     = Font(name=FONT_NAME, size=10, italic=True, color='64748B')
 
 # 0-indexed column positions, used repeatedly below.
 (COL_FLOOR, COL_UNIT, COL_MOBILE, COL_ANAME, COL_AEMAIL, COL_ANID,
- COL_METER_NO, COL_METER_TYPE, COL_BARCODE, COL_PACKAGE, COL_STATUS) = range(11)
+ COL_METER_NO, COL_INITIAL_READING, COL_METER_TYPE, COL_BARCODE,
+ COL_PACKAGE, COL_STATUS) = range(12)
 
 EXAMPLE_ROW_INDEX = 3
 DATA_START_ROW = 4
@@ -98,7 +109,7 @@ def _row_errors(values, seen_unit_keys, seen_meter_nos, seen_barcodes,
     errors = {}  # 0-based column index -> message
 
     (floor_raw, unit_no, mobile, aname, aemail, anid,
-     meter_no, meter_type, barcode, package_name, status) = values
+     meter_no, initial_reading_raw, meter_type, barcode, package_name, status) = values
 
     # Floor No.
     try:
@@ -142,6 +153,22 @@ def _row_errors(values, seen_unit_keys, seen_meter_nos, seen_barcodes,
     else:
         seen_meter_nos.add(meter_no)
 
+    # Initial Reading — optional, defaults to 0 (meter treated as brand
+    # new/unused). If the physical meter already has usage on its dial
+    # (reused/reassigned meter, or onboarding an existing installation),
+    # this should be filled in — otherwise the unit's first bill will be
+    # calculated from a 0 baseline and overcharge for the meter's entire
+    # prior accumulated usage. See Meter.initial_reading.
+    initial_reading = 0
+    if initial_reading_raw not in (None, ''):
+        try:
+            initial_reading = float(initial_reading_raw)
+            if initial_reading < 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            errors[COL_INITIAL_READING] = 'Initial Reading must be a non-negative number'
+            initial_reading = 0
+
     # Barcode — optional, but Meter.barcode is unique when present
     barcode = str(barcode).strip() if barcode is not None else ''
     if barcode:
@@ -173,7 +200,8 @@ def _row_errors(values, seen_unit_keys, seen_meter_nos, seen_barcodes,
     cleaned = {
         'floor_no': floor_no, 'unit_no': unit_no, 'mobile_number': mobile,
         'allottee_name': aname, 'allottee_email': aemail, 'allottee_nid': anid,
-        'meter_no': meter_no, 'meter_type': meter_type, 'barcode': barcode or None,
+        'meter_no': meter_no, 'initial_reading': initial_reading,
+        'meter_type': meter_type, 'barcode': barcode or None,
         'package': package, 'status': status,
     }
     return errors, cleaned
@@ -280,6 +308,7 @@ def create_units_from_rows(building, cleaned_rows):
             meter_no=row['meter_no'],
             meter_type=row['meter_type'],
             barcode=row['barcode'],
+            initial_reading=row['initial_reading'],
         )
         # Keep the legacy Unit.meter_no mirror in sync — same reasoning as
         # MeterSerializer.create/update for the single-unit Assign Meter flow.

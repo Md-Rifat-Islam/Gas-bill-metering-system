@@ -31,6 +31,14 @@ class UnitSerializer(serializers.ModelSerializer):
     meter_type = serializers.SerializerMethodField()
     barcode    = serializers.SerializerMethodField()
 
+    # THE FIX (meter-reading baseline bug): exposes the linked Meter's
+    # initial_reading so the frontend's MeterAssignModal can actually
+    # pre-fill it on Edit. Without this, the Edit form always showed 0 in
+    # that field regardless of what was saved, since the Units list/detail
+    # endpoint never returned the value at all. Same read-only,
+    # sourced-from-Meter pattern as meter_no/meter_type/barcode above.
+    initial_reading = serializers.SerializerMethodField()
+
     # Fix: these were previously `write_only=True`, which meant GET
     # requests (the ones the Units list and Edit-modal pre-fill rely on)
     # never returned building_id/package_id at all — only the human-
@@ -71,6 +79,7 @@ class UnitSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'building_id', 'building_name', 'project_name',
             'floor_no', 'unit_no', 'meter_id', 'meter_no', 'meter_type', 'barcode',
+            'initial_reading',
             'mobile_number', 'package_id', 'package_name', 'status',
             'allottee', 'allottee_name', 'allottee_email', 'allottee_nid',
             'created_at', 'updated_at',
@@ -91,6 +100,10 @@ class UnitSerializer(serializers.ModelSerializer):
     def get_barcode(self, obj):
         meter = getattr(obj, 'meter', None)
         return meter.barcode if meter else None
+
+    def get_initial_reading(self, obj):
+        meter = getattr(obj, 'meter', None)
+        return str(meter.initial_reading) if meter else None
 
     def _save_allottee(self, unit, name, email, nid):
         if name:

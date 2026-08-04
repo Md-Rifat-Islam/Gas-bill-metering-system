@@ -10,6 +10,25 @@ class Meter(models.Model):
         max_length=100, unique=True, null=True, blank=True,
         help_text='Barcode/QR payload printed on the physical meter, used for scan-to-select.'
     )
+    # THE FIX: the meter's actual dial reading at the moment it was assigned
+    # to this unit. Used as the baseline (previous_reading) for this
+    # meter's FIRST-EVER MeterReading, instead of assuming the meter
+    # started at 0 — a meter that's been in service before being onboarded
+    # into DECO (or reassigned from a previous unit) almost never actually
+    # starts at 0, and treating it as if it did inflates the first bill by
+    # the meter's entire prior accumulated usage.
+    #
+    # Default 0 preserves the old behavior for meters that genuinely ARE
+    # brand new/unused — staff simply leaves this at 0 in that case.
+    #
+    # NOTE: this only prevents the bug going forward. It does NOT
+    # retroactively correct any first bill that was already generated
+    # using an assumed-0 baseline before this field existed — those need
+    # a manual bill adjustment if any are found.
+    initial_reading = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Meter's dial reading at assignment time — baseline for this meter's first bill."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
