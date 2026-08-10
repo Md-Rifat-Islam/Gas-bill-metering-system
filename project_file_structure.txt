@@ -33,9 +33,12 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   │   ├── 0004_merge_20260617_1624.py
 │   │   │   │   ├── 0005_remove_staffuser_unique_staff_mobile_when_exists_and_more.py
 │   │   │   │   ├── 0006_alter_userpermission_module.py
+│   │   │   │   ├── 0007_alter_userpermission_module.py
+│   │   │   │   ├── 0008_customeruser_password.py
 │   │   │   │   └── __init__.py
 │   │   │   ├── models.py
 │   │   │   ├── serializers.py
+│   │   │   ├── signals.py
 │   │   │   ├── urls.py
 │   │   │   └── views.py
 │   │   ├── billing
@@ -71,6 +74,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   │   ├── 0003_alter_meterreading_options.py
 │   │   │   │   ├── 0004_meter_barcode_and_indexes.py
 │   │   │   │   ├── 0005_rename_meters_barcode_idx_meters_barcode_f3970e_idx_and_more.py
+│   │   │   │   ├── 0006_meter_initial_reading.py
 │   │   │   │   └── __init__.py
 │   │   │   ├── models.py
 │   │   │   ├── serializers.py

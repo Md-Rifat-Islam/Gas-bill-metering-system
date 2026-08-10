@@ -47,17 +47,18 @@ portalApi.interceptors.response.use(
 export default portalApi
 
 export const portalAuthAPI = {
-  requestOTP: (mobile: string) => axios.post('/api/v1/auth/otp/request/', { mobile }),
+  // Fixed: these were plain axios.post('/api/v1/...') — no baseURL, so
+  // relative paths resolved against the page's own origin instead of
+  // VITE_API_URL. Worked in local dev only because Vite's dev server
+  // proxies /api requests; broke in production where there's no such
+  // proxy. Now routed through portalApi like everything else in this file.
+  requestOTP: (mobile: string) => portalApi.post('/auth/otp/request/', { mobile }),
   verifyOTP:  (mobile: string, otp_code: string) =>
-    axios.post('/api/v1/auth/otp/verify/', { mobile, otp_code }),
+    portalApi.post('/auth/otp/verify/', { mobile, otp_code }),
 
-  // Primary login — mobile + password. No token exists yet, so plain axios
-  // is fine here too, same as the OTP calls above.
   loginWithPassword: (mobile: string, password: string) =>
-    axios.post('/api/v1/auth/portal/login/', { mobile, password }),
+    portalApi.post('/auth/portal/login/', { mobile, password }),
 
-  // These two are authenticated (customer JWT) — must go through `portalApi`,
-  // not plain axios, so the interceptor attaches the Authorization header.
   requestPasswordChangeOTP: () => portalApi.post('/auth/portal/password/otp/'),
   changePassword: (otp_code: string, new_password: string) =>
     portalApi.post('/auth/portal/password/change/', { otp_code, new_password }),
