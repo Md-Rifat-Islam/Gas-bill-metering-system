@@ -91,10 +91,9 @@ export function BillingFilters({ filters, onChange }: BillingFiltersProps) {
           className="input w-full sm:w-auto sm:max-w-[160px]"
           value={filters.projectId}
           aria-label="Filter bills by project"
-          onChange={(e) => {
-            set("projectId", e.target.value);
-            set("buildingId", "");
-          }}
+          onChange={(e) =>
+            onChange({ ...filters, projectId: e.target.value, buildingId: "" })
+          }
         >
           <option value="">All Projects</option>
           {projects?.map((p: any) => (
