@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db import transaction
 from .models import Bill
+from .filters import BillFilter
 from .serializers import BillSerializer
 from apps.audit.utils import log_action
 from apps.units.models import Unit
@@ -22,7 +23,7 @@ class BillListCreateView(generics.ListCreateAPIView):
     serializer_class   = BillSerializer
     permission_classes = [IsAuthenticated, BillPermission]
     filter_backends    = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields   = ['status', 'unit', 'building', 'project', 'billing_month']
+    filterset_class    = BillFilter          # was: filterset_fields = [...] 
     search_fields      = ['bill_number', 'unit__unit_no', 'unit__allottee__name', 'unit__mobile_number']
     ordering_fields    = ['billing_month', 'total_amount', 'created_at']
 
