@@ -31,6 +31,7 @@ import PortalBillDetailPage from "@/pages/portal/PortalBillDetailPage";
 import PortalPaymentPage from "@/pages/portal/PortalPaymentPage";
 import PortalPaymentsPage from "@/pages/portal/PortalPaymentsPage";
 import PortalProfilePage from "@/pages/portal/PortalProfilePage";
+import PortalUnitSelectPage from "@/pages/portal/PortalUnitSelectPage";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -100,6 +101,7 @@ export default function App() {
           </PortalPrivateRoute>
         }
       >
+        <Route path="/portal/select-unit" element={<PortalUnitSelectPage />} />
         <Route index element={<Navigate to="/portal/dashboard" replace />} />
         <Route path="dashboard" element={<PortalDashboardPage />} />
         <Route path="bills" element={<PortalBillsPage />} />

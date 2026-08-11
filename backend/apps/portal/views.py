@@ -17,7 +17,7 @@ from core.permissions import IsCustomer
 from .models import Notification
 from .serializers import (
     PortalProfileSerializer, PortalBillSerializer, PortalPaymentSerializer,
-    PortalPaymentSubmitSerializer, NotificationSerializer,
+    PortalPaymentSubmitSerializer, NotificationSerializer, PortalUnitSerializer,
 )
 
 
@@ -26,9 +26,55 @@ class CustomerScopedMixin:
     authentication_classes = [CustomerJWTAuthentication]
     permission_classes     = [IsAuthenticated, IsCustomer]
 
+    def get_selected_unit_id(self):
+        """
+        A customer can have more than one flat registered under the same
+        mobile number. The frontend sends the currently-selected unit as
+        ?unit=<id> on GET requests, or a `unit` field in the body for
+        POST/PATCH. Filtering below always combines this with mobile_number
+        — so a stray or forged unit id just yields an empty queryset
+        instead of leaking another customer's data. No separate ownership
+        check needed.
+        """
+        unit_id = self.request.query_params.get('unit')
+        if unit_id:
+            return unit_id
+        # request.data is only meaningful for POST/PATCH/PUT; safe no-op on GET
+        if hasattr(self.request, 'data'):
+            return self.request.data.get('unit')
+        return None
+
     def get_bill_queryset(self):
-        # A customer's bills = bills for units whose registered mobile matches theirs
-        return Bill.objects.filter(unit__mobile_number=self.request.user.mobile)
+        # A customer's bills = bills for units whose registered mobile matches theirs,
+        # narrowed further to one unit once they've picked which flat they mean.
+        qs = Bill.objects.filter(unit__mobile_number=self.request.user.mobile)
+        unit_id = self.get_selected_unit_id()
+        if unit_id:
+            qs = qs.filter(unit_id=unit_id)
+        return qs
+
+
+# ── Units ─────────────────────────────────────────────────────────────────────
+
+class PortalUnitListView(CustomerScopedMixin, APIView):
+    """
+    GET /api/v1/portal/units/
+
+    Every unit registered under the logged-in customer's mobile number.
+    Powers the unit picker shown right after login when a customer has
+    more than one flat, and the unit switcher in the portal header. For a
+    customer with exactly one unit, the frontend skips the picker and
+    auto-selects it — this endpoint's shape doesn't change either way.
+    """
+    def get(self, request):
+        from apps.units.models import Unit
+        units = (
+            Unit.objects
+            .filter(mobile_number=request.user.mobile)
+            .select_related('building', 'building__project')
+            .order_by('building__name', 'floor_no', 'unit_no')
+        )
+        return Response(PortalUnitSerializer(units, many=True).data)
 
 
 # ── Profile ────────────────────────────────────────────────────────────────────
@@ -98,12 +144,11 @@ class PortalPaymentListView(CustomerScopedMixin, generics.ListAPIView):
     serializer_class = PortalPaymentSerializer
 
     def get_queryset(self):
-        return (
-            Payment.objects
-            .filter(bill__unit__mobile_number=self.request.user.mobile)
-            .select_related('bill')
-            .order_by('-created_at')
-        )
+        qs = Payment.objects.filter(bill__unit__mobile_number=self.request.user.mobile)
+        unit_id = self.get_selected_unit_id()
+        if unit_id:
+            qs = qs.filter(bill__unit_id=unit_id)
+        return qs.select_related('bill').order_by('-created_at')
 
 
 class PortalPaymentSubmitView(CustomerScopedMixin, generics.CreateAPIView):
@@ -181,6 +226,12 @@ class NotificationListView(CustomerScopedMixin, generics.ListAPIView):
     day-5/day-10 payment reminders (see signals.py / tasks.py), newest
     first. Not paginated: a customer's notification volume is small enough
     (one per bill created, up to two reminders per bill) that this is safe.
+
+    NOTE: deliberately NOT filtered by get_selected_unit_id() — a
+    notification isn't attached to "the currently viewed unit", it's
+    attached to the customer as a whole (their Notification.customer FK),
+    so a customer with two flats should see notifications for both
+    regardless of which unit they currently have selected.
     """
     serializer_class = NotificationSerializer
 

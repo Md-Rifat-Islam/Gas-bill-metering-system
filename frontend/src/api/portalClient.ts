@@ -10,6 +10,24 @@ const portalApi = axios.create({
 portalApi.interceptors.request.use((config) => {
   const token = localStorage.getItem('customer_access_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
+
+  // Auto-attach the customer's currently-selected flat to every request,
+  // so individual API calls below don't each need to remember to pass it.
+  // Endpoints that don't care about it (login, notifications, unit list
+  // itself) just ignore the extra param/field — see CustomerScopedMixin
+  // on the backend.
+  const unit = useCustomerAuthStore.getState().selectedUnit
+  if (unit) {
+    const method = (config.method || 'get').toLowerCase()
+    if (method === 'get' || method === 'delete') {
+      config.params = { ...(config.params || {}), unit: unit.id }
+    } else if (config.data instanceof FormData) {
+      config.data.append('unit', String(unit.id))
+    } else if (config.data && typeof config.data === 'object') {
+      config.data = { ...config.data, unit: unit.id }
+    }
+  }
+
   return config
 })
 
@@ -72,6 +90,10 @@ export const portalAPI = {
   bill:         (id: number) => portalApi.get(`/portal/bills/${id}/`),
   payments:     (params?: any) => portalApi.get('/portal/payments/', { params }),
   payInitiate:  (bill_id: number) => portalApi.post('/portal/payments/initiate/', { bill_id }),
+
+  // Every flat registered under the logged-in customer's mobile number.
+  // Powers the post-login unit picker and the header unit switcher.
+  myUnits: () => portalApi.get('/portal/units/'),
 
   // Notifications — must use portalApi (customer JWT), not the staff `api`
   // instance, or every call here would send the wrong auth token entirely.

@@ -2,6 +2,7 @@ from rest_framework import serializers
 from apps.billing.models import Bill
 from apps.payments.models import Payment
 from apps.authentication.models import CustomerUser
+from apps.units.models import Unit
 from .models import Notification
 
 # Re-exported here so portal views can import everything portal-related from
@@ -16,6 +17,20 @@ class PortalProfileSerializer(serializers.ModelSerializer):
         model = CustomerUser
         fields = ['id', 'name', 'mobile', 'email']
         read_only_fields = ['id', 'mobile']
+
+
+class PortalUnitSerializer(serializers.ModelSerializer):
+    """
+    One flat belonging to the logged-in customer. Used by the post-login
+    unit picker (when a mobile number has more than one unit registered
+    against it) and the unit switcher in the portal header.
+    """
+    building_name = serializers.CharField(source='building.name', read_only=True)
+    project_name  = serializers.CharField(source='building.project.name', read_only=True)
+
+    class Meta:
+        model  = Unit
+        fields = ['id', 'unit_no', 'floor_no', 'building_name', 'project_name']
 
 
 class PortalBillSerializer(serializers.ModelSerializer):
