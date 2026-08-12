@@ -118,7 +118,7 @@ export default function PortalLoginPage() {
                 </div>
                 <h2 className="font-semibold text-surface-900">Sign in</h2>
                 <p className="text-xs text-surface-400 mt-1">
-                  New here? Your password is your mobile number, until you change it.
+                  New here? Get your credentials from DECO admins.
                 </p>
               </div>
               <div>

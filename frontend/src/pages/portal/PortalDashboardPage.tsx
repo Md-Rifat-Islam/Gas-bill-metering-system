@@ -39,7 +39,8 @@ export default function PortalDashboardPage() {
       {/* Greeting */}
       <div>
         <h1 className="text-xl font-bold text-surface-900">
-          Hi{customer?.name ? `, ${customer.name.split(' ')[0]}` : ''} 👋
+          Hi{customer?.name ? `, ${customer.name}` : ''} 👋  
+          {/* ${customer.name.split(' ')[0]} */}
         </h1>
         <p className="text-sm text-surface-400">Here's your gas billing overview</p>
       </div>

@@ -93,6 +93,21 @@ export default function App() {
 
       {/* ── Customer portal ───────────────────────────────────────────────── */}
       <Route path="/portal/login" element={<PortalLoginPage />} />
+      {/*
+        Sibling route, NOT nested inside PortalLayout below — this page runs
+        before a unit is chosen, so it must not render through PortalLayout's
+        <Outlet/> (which would show bill/payment nav for a unit that hasn't
+        been selected yet). Still wrapped in PortalPrivateRoute so a logged-out
+        visitor can't hit it directly.
+      */}
+      <Route
+        path="/portal/select-unit"
+        element={
+          <PortalPrivateRoute>
+            <PortalUnitSelectPage />
+          </PortalPrivateRoute>
+        }
+      />
       <Route
         path="/portal"
         element={
@@ -101,7 +116,6 @@ export default function App() {
           </PortalPrivateRoute>
         }
       >
-        <Route path="/portal/select-unit" element={<PortalUnitSelectPage />} />
         <Route index element={<Navigate to="/portal/dashboard" replace />} />
         <Route path="dashboard" element={<PortalDashboardPage />} />
         <Route path="bills" element={<PortalBillsPage />} />
