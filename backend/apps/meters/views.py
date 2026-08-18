@@ -12,6 +12,7 @@ from .models import Meter, MeterReading
 from .serializers import MeterSerializer, MeterReadingSerializer, MeterCardSerializer
 from core.permissions import MeterPermission, QuickReadingPermission
 from apps.billing.models import Bill
+from apps.audit.utils import log_action
 
 
 class MeterListCreateView(generics.ListCreateAPIView):
@@ -57,14 +58,53 @@ class MeterReadingListCreateView(generics.ListCreateAPIView):
     ordering_fields    = ['reading_date', 'created_at']
     ordering           = ['-reading_date']
 
+    def perform_create(self, serializer):
+        reading = serializer.save()
+        log_action(
+            self.request.user, 'meter_readings', reading.id, 'CREATE',
+            None,
+            MeterReadingSerializer(reading, context=self.get_serializer_context()).data,
+        )
+
 
 class MeterReadingDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Reading edit/delete. Permission (edit -> can_edit, delete -> can_delete)
+    is already enforced by MeterPermission, including any per-user override
+    set on the Staff -> Role & Permission tab — nothing extra needed there.
+
+    THE FIX: this view previously did no audit logging at all, unlike every
+    other module (Bill, Staff, etc.), so an edited/deleted reading left no
+    trace of who changed it or what the prior values were. perform_update /
+    perform_destroy below bring it in line with the rest of the system.
+
+    NOTE: a MeterReading has no direct FK from Bill (Bill stores its own
+    previous/current reading snapshot at creation time), so editing or
+    deleting a reading here does NOT retroactively touch any bill already
+    generated from it. If a reading tied to an already-billed month needs
+    correction, the corresponding bill may need a manual adjustment too —
+    this is a known limitation, not something this endpoint resolves.
+    """
     queryset           = MeterReading.objects.all().select_related(
         'meter__unit__building__project', 'recorded_by'
     )
     serializer_class   = MeterReadingSerializer
     permission_classes = [IsAuthenticated, MeterPermission]
     parser_classes     = [MultiPartParser, FormParser, JSONParser]
+
+    def perform_update(self, serializer):
+        # Snapshot BEFORE .save() — serializer.instance is the same object
+        # that update() mutates in place, so it must be serialized first.
+        old_data = MeterReadingSerializer(serializer.instance, context=self.get_serializer_context()).data
+        reading = serializer.save()
+        new_data = MeterReadingSerializer(reading, context=self.get_serializer_context()).data
+        log_action(self.request.user, 'meter_readings', reading.id, 'UPDATE', old_data, new_data)
+
+    def perform_destroy(self, instance):
+        old_data = MeterReadingSerializer(instance, context=self.get_serializer_context()).data
+        record_id = instance.id
+        instance.delete()
+        log_action(self.request.user, 'meter_readings', record_id, 'DELETE', old_data, None)
 
 
 # ── Quick Reading Dashboard ────────────────────────────────────────────────────
