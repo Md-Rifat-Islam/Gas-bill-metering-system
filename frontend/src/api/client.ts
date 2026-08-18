@@ -144,6 +144,16 @@ export const metersAPI = {
       headers: isForm ? { 'Content-Type': 'multipart/form-data' } : {},
     })
   },
+  // Edit an existing reading. Accepts FormData (when a new photo is being
+  // attached) or a plain object (photo unchanged) — same dual-mode pattern
+  // as createReading above.
+  updateReading: (id: number, data: FormData | any) => {
+    const isForm = data instanceof FormData
+    return api.patch(`/meters/readings/${id}/`, data, {
+      headers: isForm ? { 'Content-Type': 'multipart/form-data' } : {},
+    })
+  },
+  deleteReading: (id: number) => api.delete(`/meters/readings/${id}/`),
 
   // Quick Reading Dashboard — pre-joined meter cards for a project/building
   quickDashboard: (params?: { project_id?: string | number; building_id?: string | number; status?: string }) =>
