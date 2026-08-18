@@ -7,20 +7,34 @@ import { Modal } from '@/components/ui'
 import toast from 'react-hot-toast'
 
 // ── Photo capture component ───────────────────────────────────────────────────
-export function PhotoCapture({ value, onChange, error }: {
+export function PhotoCapture({ value, onChange, error, existingUrl, required = true }: {
   value: File | null
   onChange: (file: File | null) => void
   /** Show the required-field error state (red border + message) — true when
    *  the form was submitted with no photo attached. */
   error?: boolean
+  /** URL of a photo already stored on the reading being edited — shown as
+   *  the initial preview so the user can see what's on file before
+   *  optionally replacing it. */
+  existingUrl?: string | null
+  /** When false (edit mode), a missing photo doesn't block saving — the
+   *  existing stored photo is simply left as-is. */
+  required?: boolean
 }) {
   const fileRef     = useRef<HTMLInputElement>(null)
   const cameraRef   = useRef<HTMLInputElement>(null)
-  const [preview, setPreview] = useState<string | null>(null)
+  const [preview, setPreview] = useState<string | null>(existingUrl ?? null)
   const [lightbox, setLightbox] = useState(false)
 
+  // Keep the preview in sync if the modal is reused for a different
+  // reading (existingUrl changes) without a full remount.
+  useEffect(() => {
+    if (!value) setPreview(existingUrl ?? null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingUrl])
+
   const handleFile = (file: File | null) => {
-    if (!file) { setPreview(null); onChange(null); return }
+    if (!file) { setPreview(existingUrl ?? null); onChange(null); return }
     const url = URL.createObjectURL(file)
     setPreview(url)
     onChange(file)
@@ -29,7 +43,7 @@ export function PhotoCapture({ value, onChange, error }: {
   return (
     <div>
       <label className="label">
-        Meter Photo <span className="text-danger-500">*</span>
+        Meter Photo {required && <span className="text-danger-500">*</span>}
       </label>
 
       {preview ? (
@@ -51,16 +65,22 @@ export function PhotoCapture({ value, onChange, error }: {
             </button>
             <button
               type="button"
-              title="Remove Photo"
+              title={value ? 'Remove new photo' : 'Remove photo'}
               onClick={() => handleFile(null)}
               className="w-8 h-8 rounded-lg bg-black/50 text-white flex items-center justify-center hover:bg-red-500/80 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
-          <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded-lg">
-            {value?.name}
-          </div>
+          {value ? (
+            <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded-lg">
+              {value.name}
+            </div>
+          ) : existingUrl ? (
+            <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded-lg">
+              Current photo on file
+            </div>
+          ) : null}
         </div>
       ) : (
         <div
@@ -70,7 +90,7 @@ export function PhotoCapture({ value, onChange, error }: {
         >
           <Camera className={`w-8 h-8 mx-auto mb-2 ${error ? 'text-danger-400' : 'text-surface-300'}`} />
           <p className={`text-sm mb-4 ${error ? 'text-danger-500' : 'text-surface-400'}`}>
-            Take a photo or upload from gallery
+            {required ? 'Take a photo or upload from gallery' : 'Optionally replace the meter photo'}
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             {/* Camera capture (mobile) */}
@@ -107,7 +127,7 @@ export function PhotoCapture({ value, onChange, error }: {
             aria-label="Upload meter photo"
             onChange={e => handleFile(e.target.files?.[0] ?? null)}
           />
-          {error && (
+          {error && required && (
             <p className="text-xs text-danger-500 mt-3">A meter photo is required before saving.</p>
           )}
         </div>
@@ -129,7 +149,7 @@ export function PhotoCapture({ value, onChange, error }: {
   )
 }
 
-// ── Record Reading Modal ──────────────────────────────────────────────────────
+// ── Record / Edit Reading Modal ───────────────────────────────────────────────
 interface ReadingModalProps {
   open: boolean
   onClose: () => void
@@ -151,14 +171,35 @@ interface ReadingModalProps {
   projects?: any[]
   /** Buildings list (each expected to carry `project_id`) for the same cascade. */
   buildings?: any[]
+  /**
+   * When set, the modal opens in EDIT mode for this existing reading
+   * instead of creating a new one: fields are pre-filled from it, the
+   * meter is always locked (a reading isn't reassignable to a different
+   * meter), the photo is optional (existing photo kept unless replaced),
+   * and saving calls PATCH instead of POST.
+   */
+  editReading?: {
+    id: number
+    meter: number
+    meter_no?: string
+    unit_no?: string
+    allottee_name?: string
+    previous_reading: string | number
+    current_reading: string | number
+    reading_date: string
+    notes?: string
+    reading_photo_url?: string | null
+  } | null
 }
 
 export function ReadingModal({
   open, onClose, meters,
   initialMeterId, initialPreviousReading, lockMeterSelect, onSaved,
-  projects, buildings,
+  projects, buildings, editReading,
 }: ReadingModalProps) {
   const qc = useQueryClient()
+  const isEdit = !!editReading
+
   const { register, handleSubmit, reset, watch, setValue } = useForm({
     defaultValues: {
       meter: initialMeterId ?? '',
@@ -173,7 +214,9 @@ export function ReadingModal({
   // True once a selected meter/unit resolves to an actual recorded previous
   // reading — locks the Previous field so it can't be hand-edited. Stays
   // false for a meter/unit with no reading history yet, so the first-ever
-  // reading can still be entered manually.
+  // reading can still be entered manually. Also false in edit mode, where
+  // both Previous and Current are intentionally editable (that's the whole
+  // point of correcting a reading).
   const [previousReadingLocked, setPreviousReadingLocked] = useState(false)
   const prev  = watch('previous_reading') || 0
   const curr  = watch('current_reading')  || 0
@@ -195,6 +238,11 @@ export function ReadingModal({
     (b: any) => !projectId || String(b.project_id) === String(projectId)
   )
 
+  // Registered once per render and spread onto the Unit/Meter select below,
+  // with its onChange called explicitly (see the select) rather than passed
+  // as a register() option — see the THE FIX comment at the select itself.
+  const meterField = register('meter', { required: true })
+
   // Meters for the combined Unit/Meter dropdown, scoped to the selected
   // building. Previously this filtered the flat `meters` prop (sourced from
   // metersAPI.list()) client-side by `building_id` — but that endpoint
@@ -207,7 +255,7 @@ export function ReadingModal({
   const { data: buildingMetersData, isFetching: loadingBuildingMeters } = useQuery({
     queryKey: ['meters-quick-dashboard-for-reading', buildingId],
     queryFn: () => metersAPI.quickDashboard({ building_id: buildingId }).then(r => r.data),
-    enabled: !lockMeterSelect && !!buildingId,
+    enabled: !lockMeterSelect && !isEdit && !!buildingId,
   })
   // NOTE: adjust `.results` below to match the actual response shape —
   // some endpoints in this app paginate (`{ results: [...] }`), others
@@ -217,26 +265,37 @@ export function ReadingModal({
 
   // Reset the form whenever the modal (re)opens — matters because this
   // component stays mounted between opens (Modal only hides its own output),
-  // so stale values from the previous meter would otherwise linger.
+  // so stale values from the previous meter/reading would otherwise linger.
   useEffect(() => {
     if (open) {
-      reset({
-        meter: initialMeterId ?? '',
-        previous_reading: initialPreviousReading ?? 0,
-        current_reading: 0,
-        reading_date: new Date().toISOString().slice(0, 10),
-        notes: '',
-      })
+      if (editReading) {
+        reset({
+          meter: editReading.meter,
+          previous_reading: Number(editReading.previous_reading),
+          current_reading: Number(editReading.current_reading),
+          reading_date: editReading.reading_date,
+          notes: editReading.notes ?? '',
+        })
+        setPreviousReadingLocked(false)
+      } else {
+        reset({
+          meter: initialMeterId ?? '',
+          previous_reading: initialPreviousReading ?? 0,
+          current_reading: 0,
+          reading_date: new Date().toISOString().slice(0, 10),
+          notes: '',
+        })
+        setPreviousReadingLocked(!!lockMeterSelect)
+        if (!lockMeterSelect) {
+          setProjectId('')
+          setBuildingId('')
+        }
+      }
       setPhoto(null)
       setPhotoError(false)
-      setPreviousReadingLocked(!!lockMeterSelect)
-      if (!lockMeterSelect) {
-        setProjectId('')
-        setBuildingId('')
-      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialMeterId, initialPreviousReading])
+  }, [open, initialMeterId, initialPreviousReading, editReading])
 
   const handleProjectChange = (value: string) => {
     setProjectId(value)
@@ -274,18 +333,20 @@ export function ReadingModal({
       const fd = new FormData()
       Object.entries(data).forEach(([k, v]) => { if (v !== undefined && v !== null) fd.append(k, String(v)) })
       if (photo) fd.append('reading_photo', photo)
-      return metersAPI.createReading(fd)
+      return isEdit
+        ? metersAPI.updateReading(editReading!.id, fd)
+        : metersAPI.createReading(fd)
     },
     onSuccess: (_res, variables: any) => {
       qc.invalidateQueries({ queryKey: ['meter-readings'] })
-      toast.success('Meter reading recorded')
+      toast.success(isEdit ? 'Meter reading updated' : 'Meter reading recorded')
       onSaved?.(Number(variables.meter))
       onClose(); reset(); setPhoto(null); setPhotoError(false)
     },
   })
 
   const onSubmit = (d: any) => {
-    if (!photo) {
+    if (!isEdit && !photo) {
       setPhotoError(true)
       toast.error('Please capture or upload a meter photo before saving')
       return
@@ -294,26 +355,48 @@ export function ReadingModal({
   }
 
   const selectedMeter = meters?.find((m: any) => String(m.id) === String(initialMeterId))
+  // Locked meter display: prefer whatever the reading itself already
+  // knows about (meter_no/unit_no/allottee_name come straight from
+  // MeterReadingSerializer), falling back to the `meters` list lookup
+  // used by the Quick Reading / barcode flows.
+  const lockedMeterLabel = editReading
+    ? `${editReading.meter_no ?? '—'}${editReading.unit_no ? ` — Unit ${editReading.unit_no}` : ''}${editReading.allottee_name ? ` (${editReading.allottee_name})` : ''}`
+    : `${selectedMeter?.meter_no || '—'}${selectedMeter?.allottee_name ? ` — ${selectedMeter.allottee_name}` : ''}`
+
+  const showLockedMeter = lockMeterSelect || isEdit
 
   return (
-    <Modal open={open} onClose={onClose} title="Record Meter Reading" size="lg">
+    <Modal open={open} onClose={onClose} title={isEdit ? 'Edit Meter Reading' : 'Record Meter Reading'} size="lg">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left */}
           <div className="space-y-4">
-            {lockMeterSelect ? (
+            {showLockedMeter ? (
               <div>
                 <label className="label">Meter *</label>
                 <div className="input flex items-center justify-between gap-2 bg-surface-50 text-surface-600">
-                  <span className="truncate">
-                    {selectedMeter?.meter_no || '—'}
-                    {selectedMeter?.allottee_name ? ` — ${selectedMeter.allottee_name}` : ''}
-                  </span>
+                  <span className="truncate">{lockedMeterLabel}</span>
                   <Lock className="w-3.5 h-3.5 text-surface-300 shrink-0" />
                 </div>
-                {/* Kept registered so the locked value is still submitted */}
-                <select {...register('meter', { required: true })} className="hidden" defaultValue={initialMeterId}>
-                  <option value={initialMeterId}>{initialMeterId}</option>
+                {isEdit && (
+                  <p className="text-xs text-surface-400 mt-1">
+                    A reading can't be reassigned to a different meter — delete and re-record it under
+                    the correct meter if it was recorded against the wrong one.
+                  </p>
+                )}
+                {/* Kept registered so the locked value is still submitted.
+                    Reuses the same `meterField` registration as the
+                    cascading select below — only one of the two is ever
+                    actually mounted per render, so there's no duplicate
+                    registration of the 'meter' field. */}
+                <select
+                  {...meterField}
+                  className="hidden"
+                  defaultValue={isEdit ? editReading!.meter : initialMeterId}
+                >
+                  <option value={isEdit ? editReading!.meter : initialMeterId}>
+                    {isEdit ? editReading!.meter : initialMeterId}
+                  </option>
                 </select>
               </div>
             ) : (
@@ -354,14 +437,30 @@ export function ReadingModal({
                     separate dropdowns that then have to be kept in sync. */}
                 <div>
                   <label className="label" htmlFor="reading-meter">Unit / Meter *</label>
+                  {/*
+                    THE FIX: previously wired the auto-fill via
+                    `register('meter', { onChange: ... })`, relying on
+                    react-hook-form to call the custom onChange as part of
+                    its own internal change handler. That chaining is not
+                    reliable enough to depend on here — the field's value
+                    was tracked correctly, but the side effect (looking up
+                    the meter and calling setValue on Previous Reading)
+                    wasn't firing consistently, so Previous Reading stayed
+                    at whatever it was before (usually 0) after picking a
+                    meter. Destructuring register()'s own onChange and
+                    calling it explicitly alongside handleMeterChange
+                    removes that ambiguity — both are now guaranteed to run
+                    on every change, in a fixed order.
+                  */}
                   <select
                     id="reading-meter"
                     className="input"
                     disabled={!buildingId || loadingBuildingMeters}
-                    {...register('meter', {
-                      required: true,
-                      onChange: e => handleMeterChange(e.target.value),
-                    })}
+                    {...meterField}
+                    onChange={(e) => {
+                      meterField.onChange(e)
+                      handleMeterChange(e.target.value)
+                    }}
                   >
                     <option value="">
                       {!buildingId
@@ -389,9 +488,11 @@ export function ReadingModal({
                 <input
                   {...register('previous_reading', { min: 0 })}
                   type="number" step="0.01" className="input"
-                  readOnly={lockMeterSelect || previousReadingLocked}
+                  readOnly={!isEdit && (lockMeterSelect || previousReadingLocked)}
                   title={
-                    lockMeterSelect || previousReadingLocked
+                    isEdit
+                      ? 'Editable — correct this reading if it was recorded incorrectly'
+                      : lockMeterSelect || previousReadingLocked
                       ? 'Auto-filled from the last recorded reading — cannot be edited'
                       : 'No previous reading on file for this unit/meter yet — enter the starting value'
                   }
@@ -401,7 +502,7 @@ export function ReadingModal({
                 <label className="label">Current Reading (m³) *</label>
                 <input
                   {...register('current_reading', { required: true, min: 0 })}
-                  type="number" step="0.01" className="input" autoFocus
+                  type="number" step="0.01" className="input" autoFocus={!isEdit}
                 />
               </div>
             </div>
@@ -425,13 +526,29 @@ export function ReadingModal({
               <label className="label">Notes</label>
               <textarea {...register('notes')} className="input" rows={2} placeholder="Any observations…" />
             </div>
+
+            {isEdit && (
+              <p className="text-xs text-warning-600 bg-warning-50 border border-warning-200 rounded-xl px-3 py-2">
+                If a bill has already been generated for this billing month, editing this reading
+                will not automatically update that bill — check the Billing page and adjust it
+                separately if needed.
+              </p>
+            )}
           </div>
 
           {/* Right — photo */}
           <div>
-            <PhotoCapture value={photo} onChange={setPhoto} error={photoError && !photo} />
+            <PhotoCapture
+              value={photo}
+              onChange={setPhoto}
+              error={photoError && !photo}
+              required={!isEdit}
+              existingUrl={editReading?.reading_photo_url ?? null}
+            />
             <p className="text-xs text-surface-400 mt-2">
-              Point camera at the meter display and tap capture. Photo is stored with the reading for audit.
+              {isEdit
+                ? 'Leave as-is to keep the current photo, or replace it above.'
+                : 'Point camera at the meter display and tap capture. Photo is stored with the reading for audit.'}
             </p>
           </div>
         </div>
@@ -441,7 +558,7 @@ export function ReadingModal({
             Cancel
           </button>
           <button type="submit" className="btn-primary" disabled={save.isPending}>
-            {save.isPending ? 'Saving…' : 'Record Reading'}
+            {save.isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Record Reading'}
           </button>
         </div>
       </form>
