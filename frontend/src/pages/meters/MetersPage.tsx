@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Gauge, BookOpen, Eye, X,
+  Gauge, BookOpen, Eye, X, Pencil, Trash2,
   Calendar, CalendarDays, Filter, LayoutGrid,
 } from 'lucide-react'
 import { metersAPI, projectsAPI, buildingsAPI } from '@/api/client'
-import { PageLoader, EmptyState, Pagination } from '@/components/ui'
+import { PageLoader, EmptyState, Pagination, ConfirmDialog } from '@/components/ui'
 import { ReadingModal } from '@/components/meters/ReadingModal'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useConfirm } from '@/hooks'
 import { formatDate } from '@/utils/helpers'
+import toast from 'react-hot-toast'
 
 // ── Date range filter bar ─────────────────────────────────────────────────────
 type DateMode = 'all' | 'month' | 'week' | 'custom'
@@ -149,12 +152,19 @@ function PhotoThumb({ url }: { url: string | null }) {
 // unique-constraint error when a meter was assigned to a unit that already
 // had one from the other tab. Meter assignment now lives solely on the
 // Units page (one meter icon per row, handles both assign and edit). This
-// page is meter READING history + recording only.
+// page is meter READING history + recording, and now also editing/deleting
+// an existing reading (Edit/Delete gated on can.editMeters / can.deleteMeters,
+// which mirror the Meters module's per-role default + per-user override on
+// the Staff -> Role & Permission tab / Roles & RBAC page).
 export default function MetersPage() {
   const navigate = useNavigate()
-  const [page, setPage] = useState(1)
+  const qc = useQueryClient()
+  const { can } = usePermissions()
+  const { confirmState, confirm, handleClose } = useConfirm()
 
+  const [page, setPage] = useState(1)
   const [readingModal, setReadingModal] = useState(false)
+  const [editingReading, setEditingReading] = useState<any | null>(null)
 
   const now = new Date()
   const [dateFilter, setDateFilter] = useState<DateFilter>({
@@ -213,8 +223,31 @@ export default function MetersPage() {
     queryFn: () => buildingsAPI.list({ page_size: 200 }).then(r => r.data.results || r.data),
   })
 
+  const deleteReading = useMutation({
+    mutationFn: (id: number) => metersAPI.deleteReading(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['meter-readings'] })
+      toast.success('Meter reading deleted')
+    },
+  })
+
+  const handleDelete = async (r: any) => {
+    const ok = await confirm(
+      'Delete meter reading',
+      `Delete the reading of ${r.current_reading} m³ recorded on ${formatDate(r.reading_date)} for meter ${r.meter_no}? ` +
+      `This cannot be undone, and won't automatically adjust any bill already generated using this reading.`
+    )
+    if (ok) deleteReading.mutate(r.id)
+  }
+
+  const openCreate = () => { setEditingReading(null); setReadingModal(true) }
+  const openEdit   = (r: any) => { setEditingReading(r); setReadingModal(true) }
+  const closeModal = () => { setReadingModal(false); setEditingReading(null) }
+
   const meters   = metersData?.results   ?? []
   const readings = readingsData?.results ?? []
+
+  const showActionsColumn = can.editMeters || can.deleteMeters
 
   return (
     <div>
@@ -232,7 +265,7 @@ export default function MetersPage() {
           <button className="btn-primary w-full sm:w-auto justify-center" onClick={() => navigate('/meters/quick-reading')}>
             <LayoutGrid className="w-4 h-4" /> Quick Reading Dashboard
           </button>
-          <button className="btn-secondary w-full sm:w-auto justify-center" onClick={() => setReadingModal(true)}>
+          <button className="btn-secondary w-full sm:w-auto justify-center" onClick={openCreate}>
             <BookOpen className="w-4 h-4" /> Record Reading
           </button>
         </div>
@@ -257,11 +290,12 @@ export default function MetersPage() {
                   <th className="text-right">Usage (m³)</th>
                   <th>Recorded By</th>
                   <th>Notes</th>
+                  {showActionsColumn && <th></th>}
                 </tr>
               </thead>
               <tbody>
                 {readings.length === 0 ? (
-                  <tr><td colSpan={10}>
+                  <tr><td colSpan={showActionsColumn ? 11 : 10}>
                     <EmptyState
                       icon={BookOpen}
                       title="No readings found"
@@ -285,6 +319,32 @@ export default function MetersPage() {
                     </td>
                     <td className="text-surface-500 text-sm">{r.recorded_by_name || '—'}</td>
                     <td className="text-surface-400 text-sm max-w-xs truncate">{r.notes || '—'}</td>
+                    {showActionsColumn && (
+                      <td>
+                        <div className="flex gap-1 justify-end">
+                          {can.editMeters && (
+                            <button
+                              className="btn-ghost btn-sm"
+                              title="Edit reading"
+                              aria-label={`Edit reading for meter ${r.meter_no}`}
+                              onClick={() => openEdit(r)}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {can.deleteMeters && (
+                            <button
+                              className="btn-ghost btn-sm text-danger-500 hover:bg-danger-50"
+                              title="Delete reading"
+                              aria-label={`Delete reading for meter ${r.meter_no}`}
+                              onClick={() => handleDelete(r)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -296,10 +356,20 @@ export default function MetersPage() {
 
       <ReadingModal
         open={readingModal}
-        onClose={() => setReadingModal(false)}
+        onClose={closeModal}
         meters={meters}
         projects={projects}
         buildings={buildings}
+        editReading={editingReading}
+      />
+
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        danger
+        onClose={() => handleClose(false)}
+        onConfirm={() => handleClose(true)}
       />
     </div>
   )
