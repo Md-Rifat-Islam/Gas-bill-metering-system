@@ -390,6 +390,12 @@ _MATRIX_DEFINITION = [
     ('units',      'Units',               UnitPermission,            'GET'),
     ('packages',   'Packages',            PackagePermission,         'GET'),
     ('meters',     'Meters & Readings',   MeterPermission,           'GET'),
+    # THE FIX: previously the matrix only ever simulated GET for meters, so
+    # the live Roles & RBAC page had no way to show which roles can delete
+    # a meter reading by default — every role rendered as if delete access
+    # were invisible/unknown rather than showing the real False for
+    # everyone but Super Admin. Mirrors the existing 'billDelete' pattern.
+    ('metersDelete', 'Meters (Delete)',   MeterPermission,           'DELETE'),
     ('quickread',  'Quick Reading',       QuickReadingPermission,    'GET'),
     ('bills',      'Bills',               BillPermission,            'GET'),
     ('billDelete', 'Bills (Delete)',      BillDeletePermission,      'DELETE'),
@@ -577,6 +583,11 @@ _CAPABILITY_DEFINITION = {
 
     'viewMeters':          (MeterPermission, 'GET'),
     'editMeters':          (MeterPermission, 'POST'),
+    # THE FIX: there was no capability flag for deleting a meter reading at
+    # all, so the frontend had no `can.deleteMeters` to gate a Delete button
+    # on — even though the backend's MeterPermission already resolves
+    # DELETE -> can_delete correctly (role default or per-user override).
+    'deleteMeters':        (MeterPermission, 'DELETE'),
     'recordReading':       (QuickReadingPermission, 'POST'),
 
     'viewBills':           (BillPermission, 'GET'),
@@ -606,7 +617,15 @@ _MODULE_FLAG_MAP = {
     'packages':          ('viewPackages',  'editPackages',  None),
     'buildings':         ('viewBuildings', 'editBuildings', 'deleteBuildings'),
     'units':             ('viewUnits',     'editUnits',     None),
-    'meters':            ('viewMeters',    'editMeters',    None),
+    # THE FIX: delete_key was None here, so even when a Super Admin granted
+    # a specific user a per-user "Meters -> Delete" override on the Staff
+    # page, that override was saved to the DB (and already enforced by
+    # MeterPermission on the actual DELETE request) but never surfaced to
+    # this user's own `can.deleteMeters` flag — the Delete button (once
+    # added on the frontend) would stay hidden even though the API call
+    # would have succeeded. Now it overlays correctly, same as every other
+    # override-able module.
+    'meters':            ('viewMeters',    'editMeters',    'deleteMeters'),
     'quick_reading':     ('recordReading', 'recordReading', None),
     'billing':           ('viewBills',     'editBill',      'deleteBill'),
     'payments':          ('viewPayments',  'recordPayment', None),
