@@ -21,6 +21,7 @@ import StaffPage from "@/pages/settings/StaffPage";
 import RolesPage from "@/pages/settings/RolesPage";
 import QuickReadingPage from "@/pages/meters/QuickReadingPage";
 import PaymentChannelSettingsPage from '@/pages/settings/PaymentChannelSettingsPage'
+import AuditLogsPage from '@/pages/audit/AuditLogsPage'
 
 // Customer portal
 import PortalLayout from "@/components/layout/PortalLayout";
@@ -89,6 +90,12 @@ export default function App() {
         <Route path="/meters/quick-reading" element={<QuickReadingPage />} />
         <Route path="/payments/pending" element={<PendingPaymentsPage />} />
         <Route path="/settings/payment-channels" element={<PaymentChannelSettingsPage />} />
+        {/* Audit Logs — Super Admin only, enforced both here (AccessDenied
+            inside the page via can.viewAuditLogs) and on the backend
+            (AuditLogPermission, hard-locked, not override-able). Grouped
+            under /settings/ to match Roles & RBAC, which is the same
+            Super-Admin-only tier. */}
+        <Route path="/settings/audit" element={<AuditLogsPage />} />
       </Route>
 
       {/* ── Customer portal ───────────────────────────────────────────────── */}
