@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Clock,
   Wallet,
+  History,
 } from "lucide-react";
 import { cn } from "@/utils/helpers";
 import { useAuthStore } from "@/store/authStore";
@@ -96,6 +97,9 @@ export default function AppLayout() {
     { icon: Users, label: "Staff Users", path: "/settings/staff", show: can.manageUsers },
     { icon: ShieldCheck, label: "Roles & RBAC", path: "/settings/roles", show: can.manageRBAC },
     { icon: Wallet, label: "Payment Channels", path: "/settings/payment-channels", show: can.viewSystemSettings },
+    // Same tier as Roles & RBAC — hard-locked Super Admin only on the
+    // backend (AuditLogPermission), can.viewAuditLogs mirrors that exactly.
+    { icon: History, label: "Audit Logs", path: "/settings/audit", show: can.viewAuditLogs },
   ].filter((i) => i.show);
 
   const roleName = user?.role?.role_name ?? "";
