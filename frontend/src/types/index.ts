@@ -244,6 +244,11 @@ export interface AuditLog {
   table_name: string
   record_id: number
   changed_by_name: string
+  // 'staff' | 'customer' | 'system' — added alongside the backend fix that
+  // made changed_by_name correctly attribute customer-initiated actions
+  // (previously always 'System' for those, since it read only from the
+  // staff-only changed_by FK).
+  actor_type: 'staff' | 'customer' | 'system'
   action: 'CREATE' | 'UPDATE' | 'DELETE'
   old_data: Record<string, unknown> | null
   new_data: Record<string, unknown> | null
