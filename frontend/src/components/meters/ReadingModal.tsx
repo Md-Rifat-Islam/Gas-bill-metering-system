@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { Camera, X, Upload, ZoomIn, Lock } from 'lucide-react'
+import { Camera, X, Upload, ZoomIn, Lock, Loader2 } from 'lucide-react'
 import { metersAPI } from '@/api/client'
 import { Modal } from '@/components/ui'
+import { compressImage } from '@/utils/imageCompression'
 import toast from 'react-hot-toast'
 
 // ── Photo capture component ───────────────────────────────────────────────────
@@ -25,6 +26,11 @@ export function PhotoCapture({ value, onChange, error, existingUrl, required = t
   const cameraRef   = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(existingUrl ?? null)
   const [lightbox, setLightbox] = useState(false)
+  // True while a just-selected photo is being compressed client-side
+  // before it's handed off via onChange. Phone camera photos are
+  // typically 2-3MB — compressing here (rather than server-side) means
+  // the upload itself starts smaller and faster.
+  const [compressing, setCompressing] = useState(false)
 
   // Keep the preview in sync if the modal is reused for a different
   // reading (existingUrl changes) without a full remount.
@@ -33,11 +39,29 @@ export function PhotoCapture({ value, onChange, error, existingUrl, required = t
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingUrl])
 
-  const handleFile = (file: File | null) => {
+  const handleFile = async (file: File | null) => {
     if (!file) { setPreview(existingUrl ?? null); onChange(null); return }
-    const url = URL.createObjectURL(file)
-    setPreview(url)
-    onChange(file)
+
+    setCompressing(true)
+    try {
+      const compressed = await compressImage(file, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.7,
+        maxSizeMB: 1,
+      })
+      const url = URL.createObjectURL(compressed)
+      setPreview(url)
+      onChange(compressed)
+    } catch {
+      // Compression failed for some reason — fall back to the original
+      // file rather than blocking the reading from being saved.
+      const url = URL.createObjectURL(file)
+      setPreview(url)
+      onChange(file)
+    } finally {
+      setCompressing(false)
+    }
   }
 
   return (
@@ -54,6 +78,13 @@ export function PhotoCapture({ value, onChange, error, existingUrl, required = t
             className="w-full h-52 md:h-44 object-cover cursor-zoom-in"
             onClick={() => setLightbox(true)}
           />
+          {compressing && (
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+              <div className="flex items-center gap-2 text-white text-xs font-medium bg-black/50 px-3 py-1.5 rounded-lg">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Compressing…
+              </div>
+            </div>
+          )}
           <div className="absolute top-2 right-2 flex gap-1">
             <button
               type="button"
@@ -74,7 +105,7 @@ export function PhotoCapture({ value, onChange, error, existingUrl, required = t
           </div>
           {value ? (
             <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded-lg">
-              {value.name}
+              {value.name} · {(value.size / 1024 / 1024).toFixed(2)} MB
             </div>
           ) : existingUrl ? (
             <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded-lg">
@@ -98,6 +129,7 @@ export function PhotoCapture({ value, onChange, error, existingUrl, required = t
               type="button"
               onClick={() => cameraRef.current?.click()}
               className="w-full btn-secondary btn-sm"
+              disabled={compressing}
             >
               <Camera className="w-3.5 h-3.5" /> Camera
             </button>
@@ -106,6 +138,7 @@ export function PhotoCapture({ value, onChange, error, existingUrl, required = t
               type="button"
               onClick={() => fileRef.current?.click()}
               className="btn-secondary btn-sm"
+              disabled={compressing}
             >
               <Upload className="w-3.5 h-3.5" /> Upload
             </button>

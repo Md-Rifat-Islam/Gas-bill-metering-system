@@ -8,6 +8,7 @@ import {
 import { paymentsAPI, billingAPI, reportsAPI } from '@/api/client'
 import { Modal, PageLoader, EmptyState, Pagination } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/utils/helpers'
+import { compressImage } from '@/utils/imageCompression'
 import toast from 'react-hot-toast'
 
 const METHOD_COLORS: Record<string, string> = {
@@ -28,13 +29,39 @@ const STATUS_COLORS: Record<string, string> = {
 function ProofInput({ value, onChange }: { value: File | null; onChange: (f: File | null) => void }) {
   const [preview, setPreview] = useState<string | null>(null)
   const [lightbox, setLightbox] = useState(false)
+  // True while a just-selected image is being compressed client-side.
+  // PDFs skip this entirely (nothing to compress) and pass straight through.
+  const [compressing, setCompressing] = useState(false)
   const isImage = value?.type.startsWith('image/')
 
-  const handleFile = (file: File | null) => {
+  const handleFile = async (file: File | null) => {
     if (!file) { setPreview(null); onChange(null); return }
-    if (file.type.startsWith('image/')) setPreview(URL.createObjectURL(file))
-    else setPreview(null)
-    onChange(file)
+
+    if (!file.type.startsWith('image/')) {
+      // PDF or other non-image proof — nothing to compress.
+      setPreview(null)
+      onChange(file)
+      return
+    }
+
+    setCompressing(true)
+    try {
+      const compressed = await compressImage(file, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.7,
+        maxSizeMB: 1,
+      })
+      setPreview(URL.createObjectURL(compressed))
+      onChange(compressed)
+    } catch {
+      // Compression failed — fall back to the original file rather than
+      // blocking the payment from being recorded.
+      setPreview(URL.createObjectURL(file))
+      onChange(file)
+    } finally {
+      setCompressing(false)
+    }
   }
 
   return (
@@ -47,13 +74,22 @@ function ProofInput({ value, onChange }: { value: File | null; onChange: (f: Fil
         <div className="flex items-center justify-between gap-3 border border-surface-200 rounded-xl p-3 bg-surface-50">
           <div className="flex items-center gap-2 min-w-0">
             {preview ? (
-              <img src={preview} alt="proof" className="w-10 h-10 rounded-lg object-cover cursor-zoom-in shrink-0" onClick={() => setLightbox(true)} />
+              <div className="relative w-10 h-10 shrink-0">
+                <img src={preview} alt="proof" className="w-10 h-10 rounded-lg object-cover cursor-zoom-in" onClick={() => setLightbox(true)} />
+                {compressing && (
+                  <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
+                    <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="w-10 h-10 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
-                <Upload className="w-4 h-4 text-brand-500" />
+                {compressing ? <Loader2 className="w-4 h-4 text-brand-500 animate-spin" /> : <Upload className="w-4 h-4 text-brand-500" />}
               </div>
             )}
-            <span className="text-sm text-surface-600 truncate">{value.name}</span>
+            <span className="text-sm text-surface-600 truncate">
+              {value.name} <span className="text-surface-400">· {(value.size / 1024 / 1024).toFixed(2)} MB</span>
+            </span>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             {isImage && (

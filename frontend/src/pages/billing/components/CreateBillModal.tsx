@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { Info } from "lucide-react";
+import { Info, Gauge } from "lucide-react";
 import { billingAPI, buildingsAPI, projectsAPI, unitsAPI } from "@/api/client";
 import { Modal } from "@/components/ui";
-import { formatCurrency } from "@/utils/helpers";
+import { formatCurrency, formatDate } from "@/utils/helpers";
 import { computeUsage, computeBillTotal } from "@/utils/billingCalculations";
 import toast from "react-hot-toast";
 
@@ -91,7 +91,13 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
   );
   const unitId = watch("unit_id");
 
-  const { data: latestReading } = useQuery({
+  // The most recent MeterReading recorded for this unit's meter (via the
+  // Quick Reading Dashboard / Record Reading flow) — carries its own
+  // previous_reading / current_reading / reading_date, distinct from this
+  // bill's own Previous/Current Reading fields below. Shown so staff can
+  // see exactly which recorded reading the bill is being seeded from,
+  // rather than a number just silently appearing in the field.
+  const { data: latestReading, isFetching: loadingLatestReading } = useQuery({
     queryKey: ["latest-reading", unitId],
     queryFn: () => billingAPI.latestReading(unitId).then((r) => r.data),
     enabled: !!unitId,
@@ -99,7 +105,14 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
 
   useEffect(() => {
     if (!latestReading) return;
-    setValue("previous_reading", Number(latestReading.current_reading || 0));
+    // THE FIX: this used to read `latestReading.current_reading` into
+    // previous_reading — copying the wrong field of the response. The
+    // backend's LatestUnitReadingView (and BulkCreateBillsView, which does
+    // this same mapping server-side) returns the latest MeterReading's own
+    // previous_reading and current_reading as two distinct values; both
+    // belong on this bill directly, not cross-mapped.
+    setValue("previous_reading", Number(latestReading.previous_reading ?? 0));
+    setValue("current_reading", Number(latestReading.current_reading ?? 0));
   }, [latestReading, setValue]);
 
   const selectedProject = projects?.find(
@@ -271,6 +284,47 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
               </div>
             )}
 
+            {/* Last recorded meter reading — makes visible exactly what
+                the Previous Reading field below is being auto-filled
+                from, instead of a number just silently appearing there. */}
+            {unitId && (
+              <div className="flex items-start gap-3 bg-brand-50 border border-brand-100 rounded-xl p-3 text-sm">
+                <Gauge className="w-4 h-4 mt-0.5 shrink-0 text-brand-500" />
+                {loadingLatestReading ? (
+                  <span className="text-surface-500 text-xs">
+                    Loading last recorded meter reading…
+                  </span>
+                ) : latestReading ? (
+                  <div className="flex-1">
+                    <div className="text-xs text-surface-500 mb-1">
+                      Last Recorded Meter Reading
+                      {latestReading.reading_date && (
+                        <> · {formatDate(latestReading.reading_date)}</>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-surface-500 text-xs">Previous</span>
+                      <span className="font-mono font-semibold">
+                        {Number(latestReading.previous_reading ?? 0).toFixed(2)} m³
+                      </span>
+                      <span className="text-surface-300">→</span>
+                      <span className="text-surface-500 text-xs">Taken</span>
+                      <span className="font-mono font-bold text-brand-700">
+                        {Number(latestReading.current_reading ?? 0).toFixed(2)} m³
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-surface-400 mt-1">
+                      This bill's Previous and Current Reading below are auto-filled from the reading taken above — edit Current Reading if you've taken a newer one that isn't recorded yet.
+                    </p>
+                  </div>
+                ) : (
+                  <span className="text-surface-500 text-xs">
+                    No meter reading has been recorded for this unit yet — enter Previous and Current Reading manually below.
+                  </span>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="label">Billing Month</label>
               <input
@@ -287,10 +341,18 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
                   {...register("previous_reading", { required: true, min: 0 })}
                   type="number"
                   step="0.01"
-                  className="input bg-surface-50 readOnly"
+                  className="input bg-surface-50"
+                  readOnly={!!latestReading}
+                  title={
+                    latestReading
+                      ? "Auto-filled from the last recorded meter reading — cannot be edited"
+                      : "No reading on file for this unit yet — enter the starting value"
+                  }
                 />
                 <p className="text-xs text-surface-500 mt-1">
-                  Auto-filled from latest meter reading
+                  {latestReading
+                    ? "Auto-filled from latest meter reading"
+                    : "No prior reading found — enter manually"}
                 </p>
               </div>
               <div>
@@ -301,6 +363,11 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
                   step="0.01"
                   className="input"
                 />
+                {latestReading && Number(latestReading.current_reading) > 0 && (
+                  <p className="text-xs text-surface-500 mt-1">
+                    Auto-filled from latest meter reading — edit if a newer reading has been taken
+                  </p>
+                )}
               </div>
             </div>
 

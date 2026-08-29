@@ -9,6 +9,7 @@ import { portalAPI, paymentsAPI, portalPaymentChannelsAPI } from '@/api/portalCl
 import { PaymentChannelsCard } from '@/components/payments/PaymentChannelsCard'
 import { BkashComingSoon } from '@/components/payments/BkashComingSoon'
 import { formatCurrency } from '@/utils/helpers'
+import { compressImage } from '@/utils/imageCompression'
 
 interface PortalPaymentPageProps {}
 
@@ -18,6 +19,11 @@ export default function PortalPaymentPage(_: PortalPaymentPageProps) {
   const billId   = params.get('bill')
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  // Separate from `submitting` so the button can say "Compressing…" during
+  // the (usually sub-second) client-side image shrink step, before the
+  // actual network submit starts — the two stages can otherwise look like
+  // one long, unexplained "Submitting…" hang on a slow phone connection.
+  const [compressing, setCompressing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const { data: bill, isLoading } = useQuery({
@@ -52,6 +58,31 @@ export default function PortalPaymentPage(_: PortalPaymentPageProps) {
       setError('Transaction ID is required.')
       setSubmitting(false)
       return
+    }
+
+    // Compress whichever proof file(s) are images before they go over the
+    // wire — these are typically 2-3MB straight off a phone camera/gallery.
+    // proof_invoice may legitimately be a PDF, which compressImage leaves
+    // untouched. Uses fd.set (not append) to replace the original entry.
+    setCompressing(true)
+    try {
+      if (proofImage?.size) {
+        const compressed = await compressImage(proofImage, {
+          maxWidth: 1600, maxHeight: 1600, quality: 0.7, maxSizeMB: 1,
+        })
+        fd.set('proof_image', compressed, compressed.name)
+      }
+      if (proofInvoice?.size) {
+        const compressed = await compressImage(proofInvoice, {
+          maxWidth: 1600, maxHeight: 1600, quality: 0.7, maxSizeMB: 1,
+        })
+        fd.set('proof_invoice', compressed, compressed.name)
+      }
+    } catch {
+      // If compression throws for any reason, fall through and submit the
+      // originals rather than blocking the payment submission.
+    } finally {
+      setCompressing(false)
     }
 
     try {
@@ -185,6 +216,7 @@ export default function PortalPaymentPage(_: PortalPaymentPageProps) {
           </div>
           <p className="text-xs text-surface-400 mb-3">
             Upload a screenshot of your payment and/or invoice. At least one is required.
+            Photos are automatically compressed before upload.
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -221,7 +253,11 @@ export default function PortalPaymentPage(_: PortalPaymentPageProps) {
 
         <button type="submit" className="btn-primary w-full" disabled={submitting}
           aria-label="Submit payment" title="Submit payment">
-          {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</> : 'Submit Payment'}
+          {compressing
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Compressing photo…</>
+            : submitting
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</>
+            : 'Submit Payment'}
         </button>
       </form>
     </div>

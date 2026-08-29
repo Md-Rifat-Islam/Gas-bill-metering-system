@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { useCustomerAuthStore } from "@/store/customerAuthStore";
 import { authAPI } from "@/api/client";
@@ -36,7 +36,7 @@ import PortalUnitSelectPage from "@/pages/portal/PortalUnitSelectPage";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/staff/login" replace />;
 }
 
 function PortalPrivateRoute({ children }: { children: React.ReactNode }) {
@@ -45,6 +45,17 @@ function PortalPrivateRoute({ children }: { children: React.ReactNode }) {
     <>{children}</>
   ) : (
     <Navigate to="/portal/login" replace />
+  );
+}
+
+// Root ("/") is the site's public default now — sends a visitor straight
+// into the customer portal, skipping an extra hop through /portal/login
+// when they're not yet signed in. Staff have their own explicit entry at
+// /staff/login (see below) instead of sharing the root.
+function RootEntry() {
+  const { isAuthenticated } = useCustomerAuthStore();
+  return (
+    <Navigate to={isAuthenticated ? "/portal/dashboard" : "/portal/login"} replace />
   );
 }
 
@@ -65,17 +76,20 @@ export default function App() {
     }, []);
   return (
     <Routes>
-      {/* ── Staff app ─────────────────────────────────────────────────────── */}
-      <Route path="/login" element={<LoginPage />} />
+      {/* ── Site root — customer-facing by default ───────────────────────── */}
+      <Route path="/" element={<RootEntry />} />
+
+      {/* ── Staff app — now lives under /staff ───────────────────────────── */}
+      <Route path="/staff/login" element={<LoginPage />} />
       <Route
-        path="/"
+        path="/staff"
         element={
           <PrivateRoute>
             <AppLayout />
           </PrivateRoute>
         }
       >
-        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route index element={<Navigate to="/staff/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="buildings" element={<BuildingsPage />} />
@@ -87,16 +101,38 @@ export default function App() {
         <Route path="reports" element={<ReportsPage />} />
         <Route path="settings/staff" element={<StaffPage />} />
         <Route path="settings/roles" element={<RolesPage />} />
-        <Route path="/meters/quick-reading" element={<QuickReadingPage />} />
-        <Route path="/payments/pending" element={<PendingPaymentsPage />} />
-        <Route path="/settings/payment-channels" element={<PaymentChannelSettingsPage />} />
+        <Route path="meters/quick-reading" element={<QuickReadingPage />} />
+        <Route path="payments/pending" element={<PendingPaymentsPage />} />
+        <Route path="settings/payment-channels" element={<PaymentChannelSettingsPage />} />
         {/* Audit Logs — Super Admin only, enforced both here (AccessDenied
             inside the page via can.viewAuditLogs) and on the backend
             (AuditLogPermission, hard-locked, not override-able). Grouped
             under /settings/ to match Roles & RBAC, which is the same
             Super-Admin-only tier. */}
-        <Route path="/settings/audit" element={<AuditLogsPage />} />
+        <Route path="settings/audit" element={<AuditLogsPage />} />
       </Route>
+
+      {/* ── Legacy staff bookmarks ────────────────────────────────────────
+          The staff app used to live at these exact paths (root-level, no
+          /staff prefix). Production staff almost certainly have these
+          bookmarked or saved as browser autofill, so redirect each old
+          path to its new /staff/... home instead of just 404-ing them. */}
+      <Route path="/login" element={<Navigate to="/staff/login" replace />} />
+      <Route path="/dashboard" element={<Navigate to="/staff/dashboard" replace />} />
+      <Route path="/projects" element={<Navigate to="/staff/projects" replace />} />
+      <Route path="/buildings" element={<Navigate to="/staff/buildings" replace />} />
+      <Route path="/units" element={<Navigate to="/staff/units" replace />} />
+      <Route path="/meters" element={<Navigate to="/staff/meters" replace />} />
+      <Route path="/meters/quick-reading" element={<Navigate to="/staff/meters/quick-reading" replace />} />
+      <Route path="/billing" element={<Navigate to="/staff/billing" replace />} />
+      <Route path="/billing/:id" element={<LegacyBillingRedirect />} />
+      <Route path="/payments" element={<Navigate to="/staff/payments" replace />} />
+      <Route path="/payments/pending" element={<Navigate to="/staff/payments/pending" replace />} />
+      <Route path="/reports" element={<Navigate to="/staff/reports" replace />} />
+      <Route path="/settings/staff" element={<Navigate to="/staff/settings/staff" replace />} />
+      <Route path="/settings/roles" element={<Navigate to="/staff/settings/roles" replace />} />
+      <Route path="/settings/payment-channels" element={<Navigate to="/staff/settings/payment-channels" replace />} />
+      <Route path="/settings/audit" element={<Navigate to="/staff/settings/audit" replace />} />
 
       {/* ── Customer portal ───────────────────────────────────────────────── */}
       <Route path="/portal/login" element={<PortalLoginPage />} />
@@ -132,8 +168,18 @@ export default function App() {
         <Route path="profile" element={<PortalProfilePage />} />
       </Route>
 
-      {/* ── Fallback ──────────────────────────────────────────────────────── */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* ── Fallback ──────────────────────────────────────────────────────── 
+          Unknown paths land on the public customer entry, not the old staff
+          dashboard — the site's default audience is now customers. */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
+}
+
+// A bare "/billing/:id" redirect can't reference the dynamic :id via a
+// plain `to="..."` string, so it needs its own tiny component to read the
+// param and forward it into the new /staff/billing/:id location.
+function LegacyBillingRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/staff/billing/${id}`} replace />;
 }

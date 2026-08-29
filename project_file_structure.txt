@@ -45,6 +45,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   ├── __init__.py
 │   │   │   ├── admin.py
 │   │   │   ├── apps.py
+│   │   │   ├── filters.py
 │   │   │   ├── migrations
 │   │   │   │   ├── 0001_initial.py
 │   │   │   │   ├── 0002_alter_bill_last_updated_by.py
@@ -147,6 +148,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │       ├── serializers.py
 │   │       ├── urls.py
 │   │       └── views.py
+│   ├── backfill_customer_names.py
 │   ├── core
 │   │   ├── __init__.py
 │   │   ├── exceptions.py
@@ -169,11 +171,15 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │           └── 4.png
 │   │   └── payment_proofs
 │   │       └── 2026
-│   │           └── 07
-│   │               ├── Course_Curriculum.png
-│   │               ├── Syllabus_Islamic.png
-│   │               └── photo_2026-07-04_10-21-49.jpg
+│   │           ├── 07
+│   │           │   ├── Course_Curriculum.png
+│   │           │   ├── Syllabus_Islamic.png
+│   │           │   └── photo_2026-07-04_10-21-49.jpg
+│   │           └── 08
+│   │               └── rifat1.png
 │   ├── requirements.txt
+│   ├── scripts
+│   │   └── backfill_customer_passwords.py
 │   └── templates
 ├── docker-compose.yml
 ├── docs
@@ -230,7 +236,13 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   │   └── LoginPage.tsx
 │   │   │   ├── billing
 │   │   │   │   ├── BillDetailPage.tsx
-│   │   │   │   └── BillingPage.tsx
+│   │   │   │   ├── BillingPage.tsx
+│   │   │   │   └── components
+│   │   │   │       ├── BillingFilters.tsx
+│   │   │   │       ├── BillsTable.tsx
+│   │   │   │       ├── BulkCreateBillModal.tsx
+│   │   │   │       ├── CreateBillModal.tsx
+│   │   │   │       └── SpreadsheetBillingTable.tsx
 │   │   │   ├── buildings
 │   │   │   │   └── BuildingsPage.tsx
 │   │   │   ├── dashboard
@@ -248,7 +260,8 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   │   ├── PortalLoginPage.tsx
 │   │   │   │   ├── PortalPaymentPage.tsx
 │   │   │   │   ├── PortalPaymentsPage.tsx
-│   │   │   │   └── PortalProfilePage.tsx
+│   │   │   │   ├── PortalProfilePage.tsx
+│   │   │   │   └── PortalUnitSelectPage.tsx
 │   │   │   ├── projects
 │   │   │   │   └── ProjectsPage.tsx
 │   │   │   ├── reports
@@ -265,6 +278,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   ├── types
 │   │   │   └── index.ts
 │   │   ├── utils
+│   │   │   ├── billingCalculations.ts
 │   │   │   └── helpers.ts
 │   │   └── vite-env.d.ts
 │   ├── tailwind.config.js

@@ -62,7 +62,7 @@ export default function LoginPage() {
       const res = await authAPI.login(data.email, data.password);
       setAuth(res.data.user, res.data.access, res.data.refresh);
       toast.success(`Welcome back, ${res.data.user.name}!`);
-      navigate("/dashboard");
+      navigate("/staff/dashboard");
     } catch {
       // handled by interceptor
     } finally {
@@ -290,10 +290,12 @@ export default function LoginPage() {
             <div className="flex-1 h-px bg-surface-200" />
           </div>
 
-          {/* Customer Portal entry */}
+          {/* Customer Portal entry — root ("/") now IS the customer portal
+              entry point, so this just sends staff back to the site's
+              public default instead of a portal-specific sub-path. */}
           <button
             type="button"
-            onClick={() => navigate("/portal/login")}
+            onClick={() => navigate("/")}
             className="w-full flex items-center gap-3 p-4 rounded-2xl bg-white border border-surface-200 hover:border-brand-300 hover:shadow-card transition-all group"
           >
             <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 shrink-0 group-hover:bg-brand-100 transition-colors">
