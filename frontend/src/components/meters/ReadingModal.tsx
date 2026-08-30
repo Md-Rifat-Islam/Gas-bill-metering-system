@@ -389,12 +389,13 @@ export function ReadingModal({
 
   const selectedMeter = meters?.find((m: any) => String(m.id) === String(initialMeterId))
   // Locked meter display: prefer whatever the reading itself already
-  // knows about (meter_no/unit_no/allottee_name come straight from
-  // MeterReadingSerializer), falling back to the `meters` list lookup
-  // used by the Quick Reading / barcode flows.
+  // knows about (meter_no/unit_no come straight from MeterReadingSerializer),
+  // falling back to the `meters` list lookup used by the Quick Reading /
+  // barcode flows. Allottee name intentionally omitted — meter number and
+  // unit number are enough to identify which meter this is.
   const lockedMeterLabel = editReading
-    ? `${editReading.meter_no ?? '—'}${editReading.unit_no ? ` — Unit ${editReading.unit_no}` : ''}${editReading.allottee_name ? ` (${editReading.allottee_name})` : ''}`
-    : `${selectedMeter?.meter_no || '—'}${selectedMeter?.allottee_name ? ` — ${selectedMeter.allottee_name}` : ''}`
+    ? `${editReading.meter_no ?? '—'}${editReading.unit_no ? ` — Unit ${editReading.unit_no}` : ''}`
+    : `${selectedMeter?.meter_no || '—'}${selectedMeter?.unit_no ? ` — Unit ${selectedMeter.unit_no}` : ''}`
 
   const showLockedMeter = lockMeterSelect || isEdit
 

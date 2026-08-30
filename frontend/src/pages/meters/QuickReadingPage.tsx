@@ -269,6 +269,7 @@ export default function QuickReadingPage() {
         meters={activeCard ? [{
           id: activeCard.id,
           meter_no: activeCard.meter_no,
+          unit_no: activeCard.unit_no,
           building_name: activeCard.building_name,
           allottee_name: activeCard.allottee_name,
         }] : []}

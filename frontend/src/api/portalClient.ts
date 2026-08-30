@@ -56,7 +56,12 @@ portalApi.interceptors.response.use(
         error.response?.data?.detail ||
         Object.values(error.response?.data || {})[0] ||
         'Something went wrong'
-      toast.error(Array.isArray(msg) ? msg[0] : String(msg))
+      // Fixed id: if several requests fail at once, this replaces the same
+      // toast instead of stacking several full-width toasts on top of each
+      // other — the main cause of toasts covering the whole screen on
+      // mobile. Uses a different id from the staff app's client.ts so the
+      // two never cross-cancel each other on pages that somehow use both.
+      toast.error(Array.isArray(msg) ? msg[0] : String(msg), { id: 'portal-api-error' })
     }
     return Promise.reject(error)
   }

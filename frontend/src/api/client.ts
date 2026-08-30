@@ -30,7 +30,7 @@ api.interceptors.response.use(
         return api(original)
       } catch {
         useAuthStore.getState().clearAuth()
-        window.location.href = '/login'
+        window.location.href = '/staff/login'
         return Promise.reject(error)
       }
     }
@@ -40,7 +40,12 @@ api.interceptors.response.use(
         error.response?.data?.message ||
         Object.values(error.response?.data || {})[0] ||
         'An error occurred'
-      toast.error(Array.isArray(msg) ? msg[0] : String(msg))
+      // Fixed id: if several requests fail at once (common when a page
+      // fires multiple queries and they all 401/500 together), this
+      // replaces the same toast instead of stacking several full-width
+      // toasts on top of each other — the main cause of toasts covering
+      // the whole screen on mobile.
+      toast.error(Array.isArray(msg) ? msg[0] : String(msg), { id: 'api-error' })
     }
     return Promise.reject(error)
   }
