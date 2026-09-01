@@ -521,7 +521,7 @@ export function ReadingModal({
                 <label className="label">Previous Reading (m³)</label>
                 <input
                   {...register('previous_reading', { min: 0 })}
-                  type="number" step="0.01" className="input"
+                  type="number" step="0.001" className="input"
                   readOnly={!isEdit && (lockMeterSelect || previousReadingLocked)}
                   title={
                     isEdit
@@ -536,7 +536,7 @@ export function ReadingModal({
                 <label className="label">Current Reading (m³) *</label>
                 <input
                   {...register('current_reading', { required: true, min: 0 })}
-                  type="number" step="0.01" className="input" autoFocus={!isEdit}
+                  type="number" step="0.001" className="input" autoFocus={!isEdit}
                 />
               </div>
             </div>
@@ -547,7 +547,7 @@ export function ReadingModal({
             }`}>
               <span className="text-surface-500">Usage</span>
               <span className={`text-xl font-bold font-mono ${usage > 0 ? 'text-brand-700' : 'text-surface-400'}`}>
-                {usage.toFixed(2)} <span className="text-sm font-normal">m³</span>
+                {usage.toFixed(3)} <span className="text-sm font-normal">m³</span>
               </span>
             </div>
 

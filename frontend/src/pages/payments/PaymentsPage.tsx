@@ -3,12 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import {
-  CreditCard, Search, ExternalLink, Plus, Clock, Upload, X, ZoomIn, Download, Loader2,
+  CreditCard, ExternalLink, Plus, Clock, Upload, X, ZoomIn, Download, Loader2, Pencil, Trash2,
 } from 'lucide-react'
-import { paymentsAPI, billingAPI, reportsAPI } from '@/api/client'
-import { Modal, PageLoader, EmptyState, Pagination } from '@/components/ui'
+import { paymentsAPI, billingAPI, reportsAPI, projectsAPI } from '@/api/client'
+import { Modal, PageLoader, EmptyState, Pagination, ConfirmDialog } from '@/components/ui'
+import { SearchInput } from '@/components/forms'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import { compressImage } from '@/utils/imageCompression'
+import { PaymentModal } from '@/components/payments/PaymentModal'
+import { usePermissions } from '@/hooks/usePermissions'
 import toast from 'react-hot-toast'
 
 const METHOD_COLORS: Record<string, string> = {
@@ -29,8 +32,6 @@ const STATUS_COLORS: Record<string, string> = {
 function ProofInput({ value, onChange }: { value: File | null; onChange: (f: File | null) => void }) {
   const [preview, setPreview] = useState<string | null>(null)
   const [lightbox, setLightbox] = useState(false)
-  // True while a just-selected image is being compressed client-side.
-  // PDFs skip this entirely (nothing to compress) and pass straight through.
   const [compressing, setCompressing] = useState(false)
   const isImage = value?.type.startsWith('image/')
 
@@ -38,7 +39,6 @@ function ProofInput({ value, onChange }: { value: File | null; onChange: (f: Fil
     if (!file) { setPreview(null); onChange(null); return }
 
     if (!file.type.startsWith('image/')) {
-      // PDF or other non-image proof — nothing to compress.
       setPreview(null)
       onChange(file)
       return
@@ -55,8 +55,6 @@ function ProofInput({ value, onChange }: { value: File | null; onChange: (f: Fil
       setPreview(URL.createObjectURL(compressed))
       onChange(compressed)
     } catch {
-      // Compression failed — fall back to the original file rather than
-      // blocking the payment from being recorded.
       setPreview(URL.createObjectURL(file))
       onChange(file)
     } finally {
@@ -147,10 +145,6 @@ function ManualPaymentModal({ open, onClose }: { open: boolean; onClose: () => v
   const selectedBillId = watch('bill_id')
   const enteredAmount = Number(watch('paid_amount')) || 0
 
-  // Fetch a working set of bills to search/select from — mirrors the
-  // page_size:500 + client-side filter pattern already used elsewhere
-  // (e.g. units-all on MetersPage) rather than assuming server-side search
-  // support that isn't confirmed on this endpoint.
   const { data: billsData } = useQuery({
     queryKey: ['bills-for-payment'],
     queryFn: () => billingAPI.list({ page_size: 500 }).then(r => {
@@ -174,10 +168,9 @@ function ManualPaymentModal({ open, onClose }: { open: boolean; onClose: () => v
 
   const save = useMutation({
     mutationFn: (data: any) => {
-      if (!proof) throw new Error('Payment proof is required.')
       const fd = new FormData()
       Object.entries(data).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') fd.append(k, String(v)) })
-      fd.append('proof_image', proof)
+      if (proof) fd.append('proof_image', proof)
       return paymentsAPI.create(fd)
     },
     onSuccess: () => {
@@ -209,7 +202,6 @@ function ManualPaymentModal({ open, onClose }: { open: boolean; onClose: () => v
           </select>
         </div>
 
-        {/* Previous paid/due for the selected bill */}
         {selectedBill && (
           <div className="bg-surface-50 rounded-xl p-3 text-sm space-y-1">
             <div className="flex justify-between">
@@ -248,7 +240,6 @@ function ManualPaymentModal({ open, onClose }: { open: boolean; onClose: () => v
           </div>
         </div>
 
-        {/* Live remaining-due preview — recalculates as the amount is typed */}
         {selectedBill && (
           <div className={`rounded-xl p-3 flex justify-between items-center text-sm ${
             overpaying ? 'bg-danger-50' : remainingDue === 0 ? 'bg-success-50' : 'bg-brand-50'
@@ -285,18 +276,33 @@ function ManualPaymentModal({ open, onClose }: { open: boolean; onClose: () => v
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function PaymentsPage() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
+  const { can } = usePermissions()
+  const [projectFilter, setProjectFilter] = useState('')
   const [methodFilter, setMethodFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [entryModal, setEntryModal] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [editTarget, setEditTarget] = useState<any | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+
+  const { data: projects } = useQuery({
+    queryKey: ['projects-all'],
+    queryFn: () => projectsAPI.list({ page_size: 500 }).then(r => {
+      const raw = r.data; return Array.isArray(raw) ? raw : (raw.results ?? [])
+    }),
+  })
 
   const { data, isLoading } = useQuery({
-    queryKey: ['all-payments', page, methodFilter, statusFilter],
+    queryKey: ['all-payments', page, projectFilter, methodFilter, statusFilter, search],
     queryFn: () => paymentsAPI.list({
       page,
+      project: projectFilter || undefined,
       payment_method: methodFilter || undefined,
       status: statusFilter || undefined,
+      search: search || undefined,
     }).then(r => r.data),
   })
 
@@ -309,14 +315,29 @@ export default function PaymentsPage() {
 
   const payments = data?.results || []
 
+  const handleFilterChange = (setter: (v: string) => void) => (value: string) => {
+    setter(value)
+    setPage(1)
+  }
+
+  const deletePayment = useMutation({
+    mutationFn: (id: number) => paymentsAPI.remove(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['all-payments'] })
+      qc.invalidateQueries({ queryKey: ['bills'] })
+      toast.success('Payment deleted')
+      setDeleteTarget(null)
+    },
+  })
+
   const handleExport = async () => {
     setExporting(true)
     try {
-      // Exports exactly what's currently filtered — same method/status
-      // params the list query itself is using.
       await reportsAPI.exportPaymentsExcel({
+        project: projectFilter || undefined,
         payment_method: methodFilter || undefined,
         status: statusFilter || undefined,
+        search: search || undefined,
       })
     } catch {
       toast.error('Could not export payments')
@@ -333,7 +354,7 @@ export default function PaymentsPage() {
           <p className="page-subtitle">All payment transactions across the system</p>
         </div>
         <div className="flex gap-3">
-          <button className="btn-secondary" onClick={() => navigate('/payments/pending')}>
+          <button className="btn-secondary" onClick={() => navigate('/staff/payments/pending')}>
             <Clock className="w-4 h-4" />
             Pending Approvals
             {pendingCount > 0 && (
@@ -352,9 +373,18 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      <div className="flex gap-3 mb-6">
+      <div className="flex flex-wrap gap-3 mb-6">
+        <select className="input max-w-[200px]" value={projectFilter}
+          onChange={e => handleFilterChange(setProjectFilter)(e.target.value)}
+          title="Filter by project"
+        >
+          <option value="">All Projects</option>
+          {(projects ?? []).map((p: any) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
         <select className="input max-w-[160px]" value={methodFilter}
-          onChange={e => { setMethodFilter(e.target.value); setPage(1) }}
+          onChange={e => handleFilterChange(setMethodFilter)(e.target.value)}
           title="Filter by payment method"
         >
           <option value="">All Methods</option>
@@ -365,7 +395,7 @@ export default function PaymentsPage() {
           <option>SSLCommerz</option>
         </select>
         <select className="input max-w-[160px]" value={statusFilter}
-          onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
+          onChange={e => handleFilterChange(setStatusFilter)(e.target.value)}
           title="Filter by status"
         >
           <option value="">All Statuses</option>
@@ -373,6 +403,13 @@ export default function PaymentsPage() {
           <option value="Approved">Approved</option>
           <option value="Rejected">Rejected</option>
         </select>
+        <div className="w-full sm:w-64">
+          <SearchInput
+            value={search}
+            onChange={handleFilterChange(setSearch)}
+            placeholder="Bill no., unit, customer, transaction ID…"
+          />
+        </div>
       </div>
 
       {isLoading ? <PageLoader /> : (
@@ -412,12 +449,30 @@ export default function PaymentsPage() {
                       {p.reviewed_by_name || p.received_by_name || '—'}
                     </td>
                     <td>
-                      <button className="btn-ghost btn-sm"
-                        onClick={() => navigate(`/billing/${p.bill}`)}
-                        title="View Bill"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex gap-1 justify-end">
+                        {can.editPayments && (
+                          <button className="btn-ghost btn-sm"
+                            onClick={() => setEditTarget(p)}
+                            title="Edit Payment"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {can.editPayments && (
+                          <button className="btn-ghost btn-sm text-danger-600 hover:bg-danger-50"
+                            onClick={() => setDeleteTarget(p)}
+                            title="Delete Payment"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button className="btn-ghost btn-sm"
+                          onClick={() => navigate(`/staff/billing/${p.bill}`)}
+                          title="View Bill"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -429,6 +484,26 @@ export default function PaymentsPage() {
       )}
 
       <ManualPaymentModal open={entryModal} onClose={() => setEntryModal(false)} />
+
+      <PaymentModal
+        open={Boolean(editTarget)}
+        onClose={() => setEditTarget(null)}
+        editPayment={editTarget}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deletePayment.mutate(deleteTarget.id)}
+        title="Delete this payment?"
+        message={
+          deleteTarget?.status === 'Approved'
+            ? `This will remove the payment and add ${formatCurrency(deleteTarget?.paid_amount || 0)} back to the bill's due amount. This cannot be undone.`
+            : "This payment record will be permanently removed. This cannot be undone."
+        }
+        confirmLabel={deletePayment.isPending ? 'Deleting…' : 'Delete Payment'}
+        danger
+      />
     </div>
   )
 }

@@ -25,8 +25,12 @@ class Meter(models.Model):
     # retroactively correct any first bill that was already generated
     # using an assumed-0 baseline before this field existed — those need
     # a manual bill adjustment if any are found.
+    #
+    # decimal_places=3: physical gas meters display 3 digits after the
+    # decimal point — 2 places was silently truncating the dial's actual
+    # precision.
     initial_reading = models.DecimalField(
-        max_digits=10, decimal_places=2, default=0,
+        max_digits=10, decimal_places=3, default=0,
         help_text="Meter's dial reading at assignment time — baseline for this meter's first bill."
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -43,8 +47,10 @@ class Meter(models.Model):
 
 class MeterReading(models.Model):
     meter            = models.ForeignKey(Meter, on_delete=models.CASCADE, related_name='readings')
-    previous_reading = models.DecimalField(max_digits=10, decimal_places=2)
-    current_reading  = models.DecimalField(max_digits=10, decimal_places=2)
+    # decimal_places=3 — matches the meter's actual dial precision (see
+    # Meter.initial_reading above for why 2 places was insufficient).
+    previous_reading = models.DecimalField(max_digits=10, decimal_places=3)
+    current_reading  = models.DecimalField(max_digits=10, decimal_places=3)
     reading_date     = models.DateField()
     reading_photo    = models.ImageField(
         upload_to='meter_readings/%Y/%m/', null=True, blank=True,

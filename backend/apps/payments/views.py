@@ -1,7 +1,7 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework import generics
+from rest_framework import generics, filters, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -9,32 +9,93 @@ from rest_framework.views import APIView
 from apps.audit.utils import log_action
 from core.permissions import PaymentPermission, PaymentWritePermission, SystemSettingsPermission
 from .models import Payment, PaymentChannelSettings
+from .permissions import PaymentEditPermission
 from .serializers import PaymentSerializer, PaymentReviewSerializer, PaymentChannelSettingsSerializer
 
 
 class PaymentListCreateView(generics.ListCreateAPIView):
     queryset           = Payment.objects.all().select_related(
-        'bill', 'bill__unit', 'bill__building', 'bill__unit__allottee',
+        'bill', 'bill__unit', 'bill__building', 'bill__project', 'bill__unit__allottee',
         'received_by', 'reviewed_by', 'submitted_by_customer',
     )
     serializer_class   = PaymentSerializer
     permission_classes = [IsAuthenticated, PaymentWritePermission]
+    filter_backends    = [filters.SearchFilter]
+    # THE FIX: no search_fields existed here at all, so the global
+    # SearchFilter backend (already active project-wide via
+    # DEFAULT_FILTER_BACKENDS) had nothing to search against — a `?search=`
+    # param was silently ignored. Same pattern as BillListCreateView's
+    # search_fields.
+    search_fields = [
+        'bill__bill_number', 'bill__unit__unit_no',
+        'bill__unit__allottee__name', 'transaction_id',
+    ]
 
     def get_queryset(self):
-        qs     = super().get_queryset()
-        bill   = self.request.query_params.get('bill')
+        qs           = super().get_queryset()
+        bill         = self.request.query_params.get('bill')
         status_param = self.request.query_params.get('status')
+        project      = self.request.query_params.get('project')
         if bill:
             qs = qs.filter(bill_id=bill)
         if status_param:
             qs = qs.filter(status=status_param)
+        if project:
+            qs = qs.filter(bill__project_id=project)
         return qs
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['request'] = self.request
+        return ctx
 
-class PaymentDetailView(generics.RetrieveAPIView):
-    queryset           = Payment.objects.all()
-    serializer_class   = PaymentSerializer
-    permission_classes = [IsAuthenticated, PaymentPermission]
+
+class PaymentDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    GET    — any role with PaymentPermission (existing, unchanged).
+    PATCH  — Super Admin only (PaymentEditPermission), for correcting a
+             payment's recorded details after the fact. PUT is intentionally
+             disabled: this is meant for targeted corrections (fix a typo'd
+             transaction id, adjust an amount), not full re-submission.
+    DELETE — Super Admin only (PaymentEditPermission). If the payment was
+             Approved, its amount is first reversed off the bill's
+             paid/due totals — otherwise deleting an applied payment would
+             leave the bill looking like it collected money it no longer
+             has a payment record for.
+    """
+    queryset            = Payment.objects.all().select_related(
+        'bill', 'bill__unit', 'bill__building', 'bill__unit__allottee',
+    )
+    serializer_class    = PaymentSerializer
+    permission_classes  = [IsAuthenticated]
+    http_method_names   = ['get', 'patch', 'delete']
+
+    def get_permissions(self):
+        if self.request.method in ('PATCH', 'DELETE'):
+            return [IsAuthenticated(), PaymentEditPermission()]
+        return [IsAuthenticated(), PaymentPermission()]
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['request'] = self.request
+        return ctx
+
+    def destroy(self, request, *args, **kwargs):
+        payment = self.get_object()
+        old_data = PaymentSerializer(payment, context={'request': request}).data
+
+        with transaction.atomic():
+            if payment.status == Payment.STATUS_APPROVED:
+                bill = payment.bill
+                bill.paid_amount = bill.paid_amount - payment.paid_amount
+                bill.due_amount  = bill.total_amount - bill.paid_amount
+                bill._update_status()
+                bill.save(update_fields=['paid_amount', 'due_amount', 'status', 'updated_at'])
+
+            log_action(request.user, 'payments', payment.id, 'DELETE', old_data, None)
+            payment.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ── Accountant Approval Queue ──────────────────────────────────────────────────

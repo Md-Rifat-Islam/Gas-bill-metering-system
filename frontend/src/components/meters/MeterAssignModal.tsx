@@ -109,10 +109,10 @@ export function MeterAssignModal({ open, onClose, unit }: MeterAssignModalProps)
             id="meter-initial-reading"
             {...register('initial_reading', { required: true, min: 0 })}
             type="number"
-            step="0.01"
+            step="0.001"
             min="0"
             className="input"
-            placeholder="0.00"
+            placeholder="0.000"
             aria-label="Initial meter reading"
           />
           <p className="text-xs text-surface-400 mt-1">

@@ -5,9 +5,11 @@ from apps.billing.models import Bill
 
 class PaymentSerializer(serializers.ModelSerializer):
     """
-    Used for staff-facing list/detail/manual-entry-create.
-    Manual entry (create) always requires proof and a transaction id, and is
-    auto-approved immediately (the accountant creating it IS the approval).
+    Used for staff-facing list/detail/manual-entry-create, and now also
+    Super-Admin-only edits (see PaymentEditPermission / PaymentDetailView).
+    Manual entry (create) requires a transaction id and is auto-approved
+    immediately (the accountant creating it IS the approval). Proof is
+    optional on both create and edit.
     """
     bill_number      = serializers.CharField(source='bill.bill_number', read_only=True)
     unit_no          = serializers.CharField(source='bill.unit.unit_no', read_only=True)
@@ -30,7 +32,7 @@ class PaymentSerializer(serializers.ModelSerializer):
     # Write-only — used when CREATING/UPDATING a payment (request body sends
     # bill_id). Unrelated to reads; left exactly as before.
     bill_id = serializers.PrimaryKeyRelatedField(
-        queryset=Bill.objects.all(), source='bill', write_only=True
+        queryset=Bill.objects.all(), source='bill', write_only=True, required=False,
     )
 
     class Meta:
@@ -61,21 +63,31 @@ class PaymentSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(file_field.url) if request else file_field.url
 
     def validate(self, data):
-        bill   = data.get('bill')
-        amount = data.get('paid_amount')
+        bill   = data.get('bill', getattr(self.instance, 'bill', None))
+        amount = data.get('paid_amount', getattr(self.instance, 'paid_amount', None))
 
         if amount is not None and amount <= 0:
             raise serializers.ValidationError({'paid_amount': 'Payment amount must be positive.'})
-        if bill and amount and amount > bill.due_amount:
-            raise serializers.ValidationError(
-                {'paid_amount': f'Amount {amount} exceeds due amount {bill.due_amount}.'}
-            )
-        # Manual entry: proof and transaction id are mandatory per spec.
-        if self.instance is None:
-            if not data.get('proof_image') and not data.get('proof_invoice'):
+
+        if bill and amount is not None:
+            effective_due = bill.due_amount
+            # THE FIX (editing support): when editing an already-Approved
+            # payment, bill.due_amount already has THIS payment's existing
+            # amount subtracted out. Comparing the NEW amount against that
+            # as-is would make even a same-amount edit look like it exceeds
+            # the due amount. Add the old amount back before comparing.
+            if self.instance is not None and self.instance.status == Payment.STATUS_APPROVED:
+                effective_due = effective_due + self.instance.paid_amount
+            if amount > effective_due:
                 raise serializers.ValidationError(
-                    {'proof_image': 'Payment proof (image or invoice/PDF) is required.'}
+                    {'paid_amount': f'Amount {amount} exceeds due amount {effective_due}.'}
                 )
+
+        # Manual entry (create only): transaction id is still required.
+        # THE FIX: proof used to be mandatory here too — now optional, per
+        # design change. The model fields themselves already allow
+        # null/blank; this was the only place actually enforcing it.
+        if self.instance is None:
             if not data.get('transaction_id'):
                 raise serializers.ValidationError(
                     {'transaction_id': 'Transaction ID is required.'}
@@ -104,6 +116,42 @@ class PaymentSerializer(serializers.ModelSerializer):
                 'status': payment.status,
             })
         return payment
+
+    def update(self, instance, validated_data):
+        """
+        Super-Admin-only correction of an existing payment's details (see
+        PaymentEditPermission). If the payment is/was Approved, the bill's
+        paid_amount is adjusted by the DIFFERENCE between the old and new
+        amount rather than re-running apply_payment (which is written for
+        adding a brand-new payment, not correcting an existing one) — this
+        keeps a same-amount edit (e.g. just fixing a typo'd transaction id)
+        a true no-op on the bill's totals.
+        """
+        from django.db import transaction as db_transaction
+        from apps.audit.utils import log_action
+
+        user = self.context['request'].user
+        old_data = PaymentSerializer(instance, context=self.context).data
+        old_amount = instance.paid_amount
+        was_approved = instance.status == Payment.STATUS_APPROVED
+        bill = validated_data.get('bill', instance.bill)
+
+        with db_transaction.atomic():
+            for attr, val in validated_data.items():
+                setattr(instance, attr, val)
+            instance.save()
+
+            if was_approved:
+                bill.paid_amount = bill.paid_amount - old_amount + instance.paid_amount
+                bill.due_amount = bill.total_amount - bill.paid_amount
+                bill._update_status()
+                bill.save(update_fields=['paid_amount', 'due_amount', 'status', 'updated_at'])
+
+            log_action(
+                user, 'payments', instance.id, 'UPDATE',
+                old_data, PaymentSerializer(instance, context=self.context).data,
+            )
+        return instance
 
 
 class PortalPaymentSubmitSerializer(serializers.ModelSerializer):

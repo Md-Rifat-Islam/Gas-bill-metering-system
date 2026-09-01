@@ -190,9 +190,18 @@ export const billingAPI = {
 export const paymentsAPI = {
   list: (params?: any) => api.get('/payments/', { params }),
   get: (id: number) => api.get(`/payments/${id}/`),
-  // Manual entry always requires proof, so this always sends multipart/form-data.
+  // Manual entry — proof is optional, transaction id is still required
+  // (enforced server-side in PaymentSerializer.validate). Always sends
+  // multipart/form-data since a proof file may or may not be attached.
   create: (data: FormData) =>
     api.post('/payments/', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  // Super Admin only (enforced server-side by PaymentEditPermission) —
+  // corrects an existing payment's recorded details.
+  update: (id: number, data: FormData) =>
+    api.patch(`/payments/${id}/`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  // Super Admin only — reverses the payment's effect on the bill (if it
+  // was Approved) and removes the record.
+  remove: (id: number) => api.delete(`/payments/${id}/`),
 
   pending: (params?: any) => api.get('/payments/pending/', { params }),
   approve: (id: number, remarks?: string) => api.post(`/payments/${id}/approve/`, { remarks }),
@@ -256,4 +265,24 @@ export const reportsAPI = {
 
 export const auditAPI = {
   list: (params?: any) => api.get('/audit/', { params }),
+}
+
+export const backupsAPI = {
+  list: () => api.get('/settings/backups/'),
+  run: () => api.post('/settings/backups/run/'),
+  // Triggers a file download (binary response) rather than returning JSON.
+  download: async (id: number) => {
+    const res = await api.get(`/settings/backups/${id}/download/`, { responseType: 'blob' })
+    const disposition = res.headers['content-disposition'] as string | undefined
+    const filenameMatch = disposition?.match(/filename="?([^"]+)"?/)
+    const filename = filenameMatch?.[1] || `backup_${id}.zip`
+    const url = window.URL.createObjectURL(new Blob([res.data]))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  },
 }

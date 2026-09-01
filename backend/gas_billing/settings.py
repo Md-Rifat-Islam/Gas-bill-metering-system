@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'apps.reports',
     'apps.audit',
     'apps.portal',
+    'apps.backups',
 ]
 
 MIDDLEWARE = [
@@ -191,6 +192,10 @@ CELERY_BEAT_SCHEDULE = {
     'daily-bill-reminders': {
         'task': 'apps.portal.tasks.send_daily_bill_reminders',
         'schedule': crontab(hour=9, minute=0),  # once daily; task itself checks day==5/10
+    },
+    'nightly-backup': {
+        'task': 'apps.backups.tasks.run_scheduled_backup',
+        'schedule': crontab(hour=2, minute=0),  # once daily, low-traffic hour
     },
 }
 

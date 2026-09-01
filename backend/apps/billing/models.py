@@ -22,10 +22,14 @@ class Bill(models.Model):
     project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name='bills')
     billing_month = models.DateField()  # First day of billing month
 
-    # Meter readings
-    previous_reading = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    current_reading = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    total_usage_m3 = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # Meter readings — decimal_places=3 to match the meter's actual dial
+    # precision (see apps/meters/models.py's Meter.initial_reading for the
+    # same fix). total_usage_kg stays at 2 places: it's a converted/
+    # derived billing quantity, not a raw dial reading, and money-adjacent
+    # values conventionally round to 2 places.
+    previous_reading = models.DecimalField(max_digits=10, decimal_places=3, default=0)
+    current_reading = models.DecimalField(max_digits=10, decimal_places=3, default=0)
+    total_usage_m3 = models.DecimalField(max_digits=10, decimal_places=3, default=0)
     total_usage_kg = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     conversion_factor = models.DecimalField(max_digits=6, decimal_places=4, null=True, blank=True)
 

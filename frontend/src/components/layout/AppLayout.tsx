@@ -20,6 +20,7 @@ import {
   Clock,
   Wallet,
   History,
+  Database,
 } from "lucide-react";
 import { cn } from "@/utils/helpers";
 import { useAuthStore } from "@/store/authStore";
@@ -66,40 +67,50 @@ export default function AppLayout() {
       if (refresh_token) await authAPI.logout(refresh_token);
     } catch {}
     clearAuth();
-    navigate("/login");
+    // THE FIX: this pointed at the old root-level /login, which now only
+    // works via the legacy redirect added when the staff app moved under
+    // /staff. Point directly at the real path.
+    navigate("/staff/login");
     toast.success("Logged out");
   };
 
   // Close the mobile drawer whenever a nav link is tapped
   const handleNavClick = () => setMobileOpen(false);
 
-  // Build nav items filtered by permission
+  // THE FIX: every path below was still the old root-level path from
+  // before the staff app moved under /staff/ — e.g. "/dashboard" instead
+  // of "/staff/dashboard". They still "worked" only because of the legacy
+  // redirect routes added for old bookmarks, but every click was silently
+  // taking an extra redirect hop. Now pointing directly at the real paths.
   const navItems = [
-    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard", show: can.viewDashboard },
-    { icon: Layers, label: "Projects", path: "/projects", show: can.viewProjects },
-    { icon: Building, label: "Buildings", path: "/buildings", show: can.viewBuildings },
-    { icon: Home, label: "Units", path: "/units", show: can.viewBuildings },
-    { icon: Gauge, label: "Meters", path: "/meters", show: can.viewMeters },
-    { icon: Flame, label: "Quick Reading", path: "/meters/quick-reading", show: can.recordReading },
-    { icon: FileText, label: "Billing", path: "/billing", show: can.viewBills },
-    { icon: CreditCard, label: "Payments", path: "/payments", show: can.viewPayments },
+    { icon: LayoutDashboard, label: "Dashboard", path: "/staff/dashboard", show: can.viewDashboard },
+    { icon: Layers, label: "Projects", path: "/staff/projects", show: can.viewProjects },
+    { icon: Building, label: "Buildings", path: "/staff/buildings", show: can.viewBuildings },
+    { icon: Home, label: "Units", path: "/staff/units", show: can.viewBuildings },
+    { icon: Gauge, label: "Meters", path: "/staff/meters", show: can.viewMeters },
+    { icon: Flame, label: "Quick Reading", path: "/staff/meters/quick-reading", show: can.recordReading },
+    { icon: FileText, label: "Billing", path: "/staff/billing", show: can.viewBills },
+    { icon: CreditCard, label: "Payments", path: "/staff/payments", show: can.viewPayments },
     {
       icon: Clock,
       label: "Pending Approvals",
-      path: "/payments/pending",
+      path: "/staff/payments/pending",
       show: canApprovePayments,
       badge: pendingCount > 0 ? pendingCount : undefined,
     },
-    { icon: BarChart3, label: "Reports", path: "/reports", show: can.viewReports },
+    { icon: BarChart3, label: "Reports", path: "/staff/reports", show: can.viewReports },
   ].filter((i) => i.show);
 
   const settingsItems = [
-    { icon: Users, label: "Staff Users", path: "/settings/staff", show: can.manageUsers },
-    { icon: ShieldCheck, label: "Roles & RBAC", path: "/settings/roles", show: can.manageRBAC },
-    { icon: Wallet, label: "Payment Channels", path: "/settings/payment-channels", show: can.viewSystemSettings },
+    { icon: Users, label: "Staff Users", path: "/staff/settings/staff", show: can.manageUsers },
+    { icon: ShieldCheck, label: "Roles & RBAC", path: "/staff/settings/roles", show: can.manageRBAC },
+    { icon: Wallet, label: "Payment Channels", path: "/staff/settings/payment-channels", show: can.viewSystemSettings },
     // Same tier as Roles & RBAC — hard-locked Super Admin only on the
     // backend (AuditLogPermission), can.viewAuditLogs mirrors that exactly.
-    { icon: History, label: "Audit Logs", path: "/settings/audit", show: can.viewAuditLogs },
+    { icon: History, label: "Audit Logs", path: "/staff/settings/audit", show: can.viewAuditLogs },
+    // Backups — also Super Admin only on the backend, same hard-locked
+    // tier as Audit Logs (see BackupPermission in apps/backups/permissions.py).
+    { icon: Database, label: "Backups", path: "/staff/settings/backups", show: can.manageBackups },
   ].filter((i) => i.show);
 
   const roleName = user?.role?.role_name ?? "";

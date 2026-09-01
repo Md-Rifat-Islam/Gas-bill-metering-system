@@ -13,6 +13,7 @@ from .serializers import (
     CustomerChangePasswordSerializer, AdminResetCustomerPasswordSerializer,
 )
 from apps.audit.utils import log_action
+from apps.backups.permissions import BackupPermission
 from core.permissions import (
     UserModulePermission, RBACPermission, IsAnyStaff, IsCustomer,
     UserPermissionManagePermission, role as get_role, R, A, BO, AC, V,
@@ -452,7 +453,10 @@ class UserPermissionListView(APIView):
     Every module row here is now genuinely enforced EXCEPT 'staff' and
     'audit', which stay hard-locked to role alone (see UserModulePermission
     / AuditLogPermission docstrings in core/permissions.py) — saving a
-    'staff' or 'audit' override row here has no effect, by design.
+    'staff' or 'audit' override row here has no effect, by design. Backups
+    follows the exact same hard-locked pattern (see BackupPermission in
+    apps/backups/permissions.py) and was never added as a PermissionModule,
+    so there's no override row for it here at all.
     """
     permission_classes = [permissions.IsAuthenticated, UserPermissionManagePermission]
 
@@ -604,14 +608,18 @@ _CAPABILITY_DEFINITION = {
     'viewFinancialReports': (FinancialReportPermission, 'GET'),
 
     'viewAuditLogs':       (AuditLogPermission, 'GET'),
+    # Same hard-locked tier as viewAuditLogs — see BackupPermission's
+    # docstring in apps/backups/permissions.py for why this is deliberately
+    # NOT given a _MODULE_FLAG_MAP row below (no per-user override).
+    'manageBackups':       (BackupPermission, 'GET'),
     'viewSystemSettings':  (SystemSettingsPermission, 'GET'),
 }
 
 # module -> (view_flag, edit_flag_or_None, delete_flag_or_None)
 # Used to overlay the REAL per-user override (using the true request.user,
 # not the _FakeRequest simulation above, which can never see it) onto the
-# simulated flags. Staff and Audit are deliberately absent — they're
-# hard-locked and never take an override, by design.
+# simulated flags. Staff, Audit, and Backups are deliberately absent —
+# they're hard-locked and never take an override, by design.
 _MODULE_FLAG_MAP = {
     'projects':          ('viewProjects',  'editProject',  'deleteProject'),
     'packages':          ('viewPackages',  'editPackages',  None),

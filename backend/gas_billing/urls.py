@@ -15,4 +15,5 @@ urlpatterns = [
     path('api/v1/reports/', include('apps.reports.urls')),
     path('api/v1/audit/', include('apps.audit.urls')),
     path('api/v1/portal/', include('apps.portal.urls')),
+    path('api/v1/settings/backups/', include('apps.backups.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

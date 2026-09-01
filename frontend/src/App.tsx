@@ -22,6 +22,7 @@ import RolesPage from "@/pages/settings/RolesPage";
 import QuickReadingPage from "@/pages/meters/QuickReadingPage";
 import PaymentChannelSettingsPage from '@/pages/settings/PaymentChannelSettingsPage'
 import AuditLogsPage from '@/pages/audit/AuditLogsPage'
+import BackupsPage from '@/pages/settings/BackupsPage'
 
 // Customer portal
 import PortalLayout from "@/components/layout/PortalLayout";
@@ -110,6 +111,10 @@ export default function App() {
             under /settings/ to match Roles & RBAC, which is the same
             Super-Admin-only tier. */}
         <Route path="settings/audit" element={<AuditLogsPage />} />
+        {/* Backups — Super Admin only, enforced backend-side (same
+            role check pattern as Audit Logs / bill deletion). Grouped
+            under /settings/ alongside Roles, Audit, and Payment Channels. */}
+        <Route path="settings/backups" element={<BackupsPage />} />
       </Route>
 
       {/* ── Legacy staff bookmarks ────────────────────────────────────────

@@ -41,7 +41,12 @@ class MeterSerializer(serializers.ModelSerializer):
 
 
 class MeterReadingSerializer(serializers.ModelSerializer):
-    usage              = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    # THE FIX: was DecimalField(decimal_places=2) — rounded a meter's real
+    # 3-decimal usage down to 2 places on every response, even once the
+    # underlying model fields are widened to decimal_places=3. This only
+    # controls serialization precision; models.py still needs the actual
+    # storage-level fix, applied separately.
+    usage              = serializers.DecimalField(max_digits=10, decimal_places=3, read_only=True)
     meter_no           = serializers.CharField(source='meter.meter_no',           read_only=True)
     unit_no            = serializers.CharField(source='meter.unit.unit_no',        read_only=True)
     building_name      = serializers.CharField(source='meter.unit.building.name',  read_only=True)

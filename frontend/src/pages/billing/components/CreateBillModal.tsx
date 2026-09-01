@@ -305,12 +305,12 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-surface-500 text-xs">Previous</span>
                       <span className="font-mono font-semibold">
-                        {Number(latestReading.previous_reading ?? 0).toFixed(2)} m³
+                        {Number(latestReading.previous_reading ?? 0).toFixed(3)} m³
                       </span>
                       <span className="text-surface-300">→</span>
                       <span className="text-surface-500 text-xs">Taken</span>
                       <span className="font-mono font-bold text-brand-700">
-                        {Number(latestReading.current_reading ?? 0).toFixed(2)} m³
+                        {Number(latestReading.current_reading ?? 0).toFixed(3)} m³
                       </span>
                     </div>
                     <p className="text-[11px] text-surface-400 mt-1">
@@ -340,7 +340,7 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
                 <input
                   {...register("previous_reading", { required: true, min: 0 })}
                   type="number"
-                  step="0.01"
+                  step="0.001"
                   className="input bg-surface-50"
                   readOnly={!!latestReading}
                   title={
@@ -360,7 +360,7 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
                 <input
                   {...register("current_reading", { required: true, min: 0 })}
                   type="number"
-                  step="0.01"
+                  step="0.001"
                   className="input"
                 />
                 {latestReading && Number(latestReading.current_reading) > 0 && (
@@ -477,7 +477,7 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-surface-500">Consumed (m³)</span>
-                  <span className="font-semibold">{usageM3.toFixed(2)} m³</span>
+                  <span className="font-semibold">{usageM3.toFixed(3)} m³</span>
                 </div>
                 {usageKg !== null && (
                   <div className="flex justify-between">
