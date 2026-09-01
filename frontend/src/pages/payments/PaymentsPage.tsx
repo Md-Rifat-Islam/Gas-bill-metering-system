@@ -501,7 +501,7 @@ export default function PaymentsPage() {
             ? `This will remove the payment and add ${formatCurrency(deleteTarget?.paid_amount || 0)} back to the bill's due amount. This cannot be undone.`
             : "This payment record will be permanently removed. This cannot be undone."
         }
-        confirmLabel={deletePayment.isPending ? 'Deleting…' : 'Delete Payment'}
+        // confirmLabel={deletePayment.isPending ? 'Deleting…' : 'Delete Payment'}
         danger
       />
     </div>
