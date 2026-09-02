@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Gauge, BookOpen, Eye, X, Pencil, Trash2,
-  Calendar, CalendarDays, Filter, LayoutGrid,
+  Calendar, CalendarDays, Filter, LayoutGrid, Search,
 } from 'lucide-react'
 import { metersAPI, projectsAPI, buildingsAPI } from '@/api/client'
 import { PageLoader, EmptyState, Pagination, ConfirmDialog } from '@/components/ui'
@@ -121,6 +121,48 @@ function DateFilterBar({ value, onChange }: { value: DateFilter; onChange: (v: D
   )
 }
 
+// ── Search + Project filter bar ───────────────────────────────────────────────
+// Separate from DateFilterBar on purpose — keeps the date-mode row focused,
+// and this row's controls (free-text search, project dropdown) are simple
+// enough not to need their own component beyond this function.
+function SearchProjectBar({
+  search, onSearchChange, projectId, onProjectChange, projects,
+}: {
+  search: string
+  onSearchChange: (v: string) => void
+  projectId: string
+  onProjectChange: (v: string) => void
+  projects: any[] | undefined
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row gap-3 mb-4">
+      <div className="relative flex-1 sm:min-w-[220px] sm:max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
+        <input
+          className="input pl-9 w-full"
+          placeholder="Search meter, unit, allottee…"
+          value={search}
+          onChange={e => onSearchChange(e.target.value)}
+          aria-label="Search readings"
+          title="Search readings"
+        />
+      </div>
+      <select
+        className="input flex-1 sm:flex-none sm:max-w-[220px]"
+        value={projectId}
+        onChange={e => onProjectChange(e.target.value)}
+        aria-label="Filter by project"
+        title="Filter by project"
+      >
+        <option value="">All Projects</option>
+        {projects?.map((p: any) => (
+          <option key={p.id} value={p.id}>{p.name}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 // ── Photo thumbnail in table ──────────────────────────────────────────────────
 function PhotoThumb({ url }: { url: string | null }) {
   const [show, setShow] = useState(false)
@@ -156,6 +198,12 @@ function PhotoThumb({ url }: { url: string | null }) {
 // an existing reading (Edit/Delete gated on can.editMeters / can.deleteMeters,
 // which mirror the Meters module's per-role default + per-user override on
 // the Staff -> Role & Permission tab / Roles & RBAC page).
+//
+// Search + Project filter: `search` hits the backend SearchFilter on
+// MeterReadingListCreateView (meter_no, unit_no, allottee name, building
+// name). `project` maps straight onto MeterReadingFilter.project
+// (meter__unit__building__project__id) — no backend change needed there,
+// it already existed, it just wasn't wired up on this page yet.
 export default function MetersPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -165,6 +213,8 @@ export default function MetersPage() {
   const [page, setPage] = useState(1)
   const [readingModal, setReadingModal] = useState(false)
   const [editingReading, setEditingReading] = useState<any | null>(null)
+  const [search, setSearch] = useState('')
+  const [projectFilter, setProjectFilter] = useState('')
 
   const now = new Date()
   const [dateFilter, setDateFilter] = useState<DateFilter>({
@@ -176,9 +226,11 @@ export default function MetersPage() {
     to:    '',
   })
 
-  // Build query params from date filter
+  // Build query params from date filter + search + project
   const readingParams = (): Record<string, string | number> => {
     const p: Record<string, string | number> = { page }
+    if (search) p.search = search
+    if (projectFilter) p.project = projectFilter
     switch (dateFilter.mode) {
       case 'month':
         p.month = dateFilter.month
@@ -199,7 +251,7 @@ export default function MetersPage() {
   }
 
   const { data: readingsData, isLoading: loadingReadings } = useQuery({
-    queryKey: ['meter-readings', dateFilter, page],
+    queryKey: ['meter-readings', dateFilter, page, search, projectFilter],
     queryFn: () => metersAPI.readings(readingParams()).then(r => r.data),
   })
 
@@ -212,8 +264,8 @@ export default function MetersPage() {
 
   // Projects + Buildings, used to drive the Project -> Building -> Meter
   // cascade in the Record Reading modal (same pattern as the Units page and
-  // Quick Reading Dashboard) — a single flat meter dropdown doesn't scale
-  // once there are hundreds/thousands of meters.
+  // Quick Reading Dashboard), and now also to power the Project filter
+  // dropdown above the table.
   const { data: projects } = useQuery({
     queryKey: ['projects-all'],
     queryFn: () => projectsAPI.list({ page_size: 500 }).then(r => r.data.results || r.data),
@@ -271,6 +323,14 @@ export default function MetersPage() {
         </div>
       </div>
 
+      <SearchProjectBar
+        search={search}
+        onSearchChange={v => { setSearch(v); setPage(1) }}
+        projectId={projectFilter}
+        onProjectChange={v => { setProjectFilter(v); setPage(1) }}
+        projects={projects}
+      />
+
       <DateFilterBar value={dateFilter} onChange={f => { setDateFilter(f); setPage(1) }} />
       {loadingReadings ? <PageLoader /> : (
         <>
@@ -299,7 +359,7 @@ export default function MetersPage() {
                     <EmptyState
                       icon={BookOpen}
                       title="No readings found"
-                      description="No readings match the selected date range"
+                      description="No readings match the selected filters"
                     />
                   </td></tr>
                 ) : readings.map((r: any) => (

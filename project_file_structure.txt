@@ -41,6 +41,17 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   ├── signals.py
 │   │   │   ├── urls.py
 │   │   │   └── views.py
+│   │   ├── backups
+│   │   │   ├── apps.py
+│   │   │   ├── migrations
+│   │   │   │   ├── 0001_initial.py
+│   │   │   │   └── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── permissions.py
+│   │   │   ├── serializers.py
+│   │   │   ├── tasks.py
+│   │   │   ├── urls.py
+│   │   │   └── views.py
 │   │   ├── billing
 │   │   │   ├── __init__.py
 │   │   │   ├── admin.py
@@ -49,6 +60,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   ├── migrations
 │   │   │   │   ├── 0001_initial.py
 │   │   │   │   ├── 0002_alter_bill_last_updated_by.py
+│   │   │   │   ├── 0003_widen_reading_precision.py
 │   │   │   │   └── __init__.py
 │   │   │   ├── models.py
 │   │   │   ├── serializers.py
@@ -76,6 +88,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   │   ├── 0004_meter_barcode_and_indexes.py
 │   │   │   │   ├── 0005_rename_meters_barcode_idx_meters_barcode_f3970e_idx_and_more.py
 │   │   │   │   ├── 0006_meter_initial_reading.py
+│   │   │   │   ├── 0007_widen_reading_precision.py
 │   │   │   │   └── __init__.py
 │   │   │   ├── models.py
 │   │   │   ├── serializers.py
@@ -95,6 +108,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   │   ├── 0007_alter_paymentchannelsettings_bkash_type_and_more.py
 │   │   │   │   └── __init__.py
 │   │   │   ├── models.py
+│   │   │   ├── permissions.py
 │   │   │   ├── serializers.py
 │   │   │   ├── urls.py
 │   │   │   └── views.py
@@ -167,8 +181,11 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   ├── media
 │   │   ├── meter_readings
 │   │   │   └── 2026
-│   │   │       └── 06
-│   │   │           └── 4.png
+│   │   │       ├── 06
+│   │   │       │   └── 4.png
+│   │   │       └── 08
+│   │   │           ├── Screenshot_from_2026-08-29_12-10-59.png
+│   │   │           └── rifat-nid.png
 │   │   └── payment_proofs
 │   │       └── 2026
 │   │           ├── 07
@@ -232,6 +249,8 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   ├── index.css
 │   │   ├── main.tsx
 │   │   ├── pages
+│   │   │   ├── audit
+│   │   │   │   └── AuditLogsPage.tsx
 │   │   │   ├── auth
 │   │   │   │   └── LoginPage.tsx
 │   │   │   ├── billing
@@ -267,6 +286,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   ├── reports
 │   │   │   │   └── ReportsPage.tsx
 │   │   │   ├── settings
+│   │   │   │   ├── BackupsPage.tsx
 │   │   │   │   ├── PaymentChannelSettingsPage.tsx
 │   │   │   │   ├── RolesPage.tsx
 │   │   │   │   └── StaffPage.tsx
@@ -279,7 +299,8 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   └── index.ts
 │   │   ├── utils
 │   │   │   ├── billingCalculations.ts
-│   │   │   └── helpers.ts
+│   │   │   ├── helpers.ts
+│   │   │   └── imageCompression.ts
 │   │   └── vite-env.d.ts
 │   ├── tailwind.config.js
 │   ├── tsconfig.json

@@ -53,8 +53,16 @@ class MeterReadingListCreateView(generics.ListCreateAPIView):
     serializer_class   = MeterReadingSerializer
     permission_classes = [IsAuthenticated, MeterPermission]
     parser_classes     = [MultiPartParser, FormParser, JSONParser]   # needed for photo upload
-    filter_backends    = [DjangoFilterBackend, filters.OrderingFilter]
+    # THE FIX: added filters.SearchFilter + search_fields so the Meter
+    # Readings page can search by meter no / unit no / allottee / building
+    # name, in addition to the date-range + project/building/meter filters
+    # already provided by MeterReadingFilter below.
+    filter_backends    = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class    = MeterReadingFilter
+    search_fields      = [
+        'meter__meter_no', 'meter__unit__unit_no',
+        'meter__unit__allottee__name', 'meter__unit__building__name',
+    ]
     ordering_fields    = ['reading_date', 'created_at']
     ordering           = ['-reading_date']
 
