@@ -113,11 +113,17 @@ export default function LoginPage() {
         />
 
         <div className="relative z-10 flex flex-col h-full">
-          {/* Logo */}
-          <div className="inline-flex w-fit bg-white rounded-2xl px-2 py-2 shadow-2xl shadow-black/30">
+          {/* Logo — DECO + DTEL side by side, one row */}
+          <div className="inline-flex w-fit items-center gap-3 bg-white rounded-2xl px-4 py-2 shadow-2xl shadow-black/30">
             <img
               src="/branding/deco-logo.png"
               alt="DECO Limited"
+              className="h-9 w-auto object-contain"
+            />
+            <div className="w-px h-7 bg-surface-200" />
+            <img
+              src="/branding/dtel-logo.png"
+              alt="DTEL"
               className="h-9 w-auto object-contain"
             />
           </div>
@@ -194,12 +200,18 @@ export default function LoginPage() {
       {/* ── Right — form ─────────────────────────────────────────────────────── */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-8">
         <div className="w-full max-w-sm">
-          {/* Mobile logo */}
+          {/* Mobile logo — DECO + DTEL, same row */}
           <div className="lg:hidden flex items-center justify-center mb-8">
-            <div className="bg-white rounded-2xl px-5 py-3 shadow-card border border-surface-100">
+            <div className="flex items-center gap-3 bg-white rounded-2xl px-5 py-3 shadow-card border border-surface-100">
               <img
                 src="/branding/deco-logo.png"
                 alt="DECO Limited"
+                className="h-8 w-auto object-contain"
+              />
+              <div className="w-px h-6 bg-surface-200" />
+              <img
+                src="/branding/dtel-logo.png"
+                alt="DTEL"
                 className="h-8 w-auto object-contain"
               />
             </div>
