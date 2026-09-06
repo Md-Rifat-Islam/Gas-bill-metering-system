@@ -206,6 +206,14 @@ export const paymentsAPI = {
   pending: (params?: any) => api.get('/payments/pending/', { params }),
   approve: (id: number, remarks?: string) => api.post(`/payments/${id}/approve/`, { remarks }),
   reject:  (id: number, remarks: string) => api.post(`/payments/${id}/reject/`, { remarks }),
+
+  // bkash payment initiation — returns a URL to redirect the user to for completing the payment.
+  // Staff-triggered bKash Tokenized Checkout — for a staff member helping
+  // a walk-in customer pay via bKash at the counter. Returns a bkash_url
+  // to redirect to; bKash redirects back to /billing/{bill_id}?bkash=...
+  // once the customer completes checkout on their own phone.
+  bkashInitiate: (bill_id: number) => api.post('/payments/bkash/initiate/', { bill_id }),
+
 }
 
 export const paymentChannelsAPI = {

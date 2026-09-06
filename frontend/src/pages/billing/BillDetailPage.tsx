@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, CreditCard, Printer, History, Trash2 } from 'lucide-react'
+import { ArrowLeft, CreditCard, Printer, History, Trash2, Smartphone, Loader2 } from 'lucide-react'
 import { billingAPI, paymentsAPI, auditAPI } from '@/api/client'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useConfirm } from '@/hooks'
@@ -18,6 +18,9 @@ export default function BillDetailPage() {
   const { can } = usePermissions()
   const { confirmState, confirm, handleClose } = useConfirm()
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [bkashLoading, setBkashLoading] = useState(false)
+
   const { data: bill, isLoading } = useQuery({
     queryKey: ['bill', id],
     queryFn: () => billingAPI.get(Number(id)).then(r => r.data),
@@ -27,6 +30,38 @@ export default function BillDetailPage() {
     queryFn: () => paymentsAPI.list({ bill: id }).then(r => r.data.results || r.data),
     enabled: !!id,
   })
+
+  // Handles the redirect bKash sends the browser back to after a
+  // staff-initiated checkout (see paymentsAPI.bkashInitiate). The Payment
+  // row is already created server-side by the callback by the time this
+  // fires — this just refreshes the page's data and clears the query
+  // params so a page refresh doesn't re-trigger the toast.
+  useEffect(() => {
+    const bkashStatus = searchParams.get('bkash')
+    if (!bkashStatus) return
+
+    if (bkashStatus === 'success') {
+      qc.invalidateQueries({ queryKey: ['bill', id] })
+      qc.invalidateQueries({ queryKey: ['payments', id] })
+      qc.invalidateQueries({ queryKey: ['bills'] })
+      toast.success('bKash payment confirmed and applied')
+    } else if (bkashStatus === 'cancelled') {
+      toast('bKash checkout was cancelled — no amount was charged.', { icon: '⚠️' })
+    } else {
+      toast.error('bKash payment could not be completed. No amount was charged.')
+    }
+
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('bkash')
+        next.delete('bill')
+        return next
+      },
+      { replace: true },
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, id])
 
   const deleteBill = useMutation({
     mutationFn: () => billingAPI.delete(Number(id)),
@@ -43,6 +78,20 @@ export default function BillDetailPage() {
       `Are you sure you want to delete bill #${bill?.bill_number}? This action cannot be undone.`
     )
     if (ok) deleteBill.mutate()
+  }
+
+  const handleStaffBkash = async () => {
+    setBkashLoading(true)
+    try {
+      const res = await paymentsAPI.bkashInitiate(Number(id))
+      // Full-page redirect to bKash's hosted checkout — the customer
+      // completes payment on their own phone/bKash app from here, and
+      // bKash sends the browser back to this exact page with ?bkash=...
+      window.location.href = res.data.bkash_url
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Could not start bKash checkout')
+      setBkashLoading(false)
+    }
   }
 
   if (isLoading) return <PageLoader />
@@ -70,6 +119,19 @@ export default function BillDetailPage() {
         </div>
         <StatusBadge status={bill.status} />
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          {!isPaid && can.recordPayment && (
+            <button
+              className="btn-secondary flex-1 sm:flex-none justify-center !bg-pink-600 !text-white !border-pink-600 hover:!bg-pink-700"
+              onClick={handleStaffBkash}
+              disabled={bkashLoading}
+              aria-label="Pay with bKash"
+              title="Start a bKash checkout for this bill"
+            >
+              {bkashLoading
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Redirecting…</>
+                : <><Smartphone className="w-4 h-4" /> Pay with bKash</>}
+            </button>
+          )}
           {!isPaid && can.recordPayment && (
             <button
               className="btn-primary flex-1 sm:flex-none justify-center"
