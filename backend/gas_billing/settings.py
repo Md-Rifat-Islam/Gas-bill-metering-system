@@ -168,8 +168,23 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
 OTP_EXPIRY_MINUTES = 5
 OTP_LENGTH = 6
 
+# ── Frontend / Backend public URLs ────────────────────────────────────────────
+# Used to build the bKash checkout callback URL and the post-payment
+# redirect target — must be the real, publicly reachable HTTPS origins
+# (bKash's servers hit BACKEND_URL directly; the browser is sent to
+# FRONTEND_URL after checkout completes).
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://billing.deco.com.bd')
+BACKEND_URL  = os.getenv('BACKEND_URL', 'https://billing-api.deco.com.bd')
+
 # ── Payment Gateways ──────────────────────────────────────────────────────────
-BKASH_BASE_URL   = 'https://tokenized.sandbox.bka.sh/v1.2.0-beta'
+# BKASH_BASE_URL now reads from env so switching sandbox → live later is a
+# .env change only, no code deploy. Default matches the V2 (Non-Beta)
+# sandbox host that bkash_client.py targets — but ALWAYS set this
+# explicitly per environment in .env rather than relying on this default;
+# a missing/wrong value here means every bKash call fails against
+# endpoints that don't exist, which looks nothing like a sandbox/live
+# mix-up and can be confusing to debug.
+BKASH_BASE_URL   = os.getenv('BKASH_BASE_URL', 'https://tokenized.sandbox.bka.sh/v2')
 BKASH_APP_KEY    = os.getenv('BKASH_APP_KEY', '')
 BKASH_APP_SECRET = os.getenv('BKASH_APP_SECRET', '')
 BKASH_USERNAME   = os.getenv('BKASH_USERNAME', '')
@@ -229,6 +244,14 @@ LOGGING = {
             'handlers': ['console', 'file'],
             'level': 'WARNING',
             'propagate': True,
+        },
+        # bKash calls are worth their own logger — Create/Execute failures
+        # and token re-grants land here instead of getting lost in the
+        # general 'django' logger's WARNING-level noise floor.
+        'bkash': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
         },
     },
 }
