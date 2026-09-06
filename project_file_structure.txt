@@ -98,6 +98,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   ├── __init__.py
 │   │   │   ├── admin.py
 │   │   │   ├── apps.py
+│   │   │   ├── bkash_client.py
 │   │   │   ├── migrations
 │   │   │   │   ├── 0001_initial.py
 │   │   │   │   ├── 0002_payment_approval_status_payment_approved_at_and_more.py
@@ -106,10 +107,12 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   │   ├── 0005_payment_approval_workflow.py
 │   │   │   │   ├── 0006_payment_channel_settings.py
 │   │   │   │   ├── 0007_alter_paymentchannelsettings_bkash_type_and_more.py
+│   │   │   │   ├── 0008_bkash_integration.py
 │   │   │   │   └── __init__.py
 │   │   │   ├── models.py
 │   │   │   ├── permissions.py
 │   │   │   ├── serializers.py
+│   │   │   ├── services.py
 │   │   │   ├── urls.py
 │   │   │   └── views.py
 │   │   ├── portal
@@ -183,9 +186,11 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   └── 2026
 │   │   │       ├── 06
 │   │   │       │   └── 4.png
-│   │   │       └── 08
-│   │   │           ├── Screenshot_from_2026-08-29_12-10-59.png
-│   │   │           └── rifat-nid.png
+│   │   │       ├── 08
+│   │   │       │   ├── Screenshot_from_2026-08-29_12-10-59.png
+│   │   │       │   └── rifat-nid.png
+│   │   │       └── 09
+│   │   │           └── mac-os-x-os-x-big-sur-hd-wallpaper-863ba887a4a08dd3896af12ae4bd7792.jpg
 │   │   └── payment_proofs
 │   │       └── 2026
 │   │           ├── 07
@@ -219,7 +224,8 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   ├── 3.png
 │   │   │   ├── 4.png
 │   │   │   ├── 5.png
-│   │   │   └── deco-logo.png
+│   │   │   ├── deco-logo.png
+│   │   │   └── dtel-logo.png
 │   │   └── vite.svg
 │   ├── src
 │   │   ├── App.tsx
@@ -275,6 +281,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   ├── portal
 │   │   │   │   ├── PortalBillDetailPage.tsx
 │   │   │   │   ├── PortalBillsPage.tsx
+│   │   │   │   ├── PortalBkashResultPage.tsx
 │   │   │   │   ├── PortalDashboardPage.tsx
 │   │   │   │   ├── PortalLoginPage.tsx
 │   │   │   │   ├── PortalPaymentPage.tsx
