@@ -3,11 +3,10 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Upload, AlertCircle, CheckCircle,
-  ArrowLeft, FileText, Clock, Loader2
+  ArrowLeft, FileText, Clock, Loader2, Smartphone
 } from 'lucide-react'
 import { portalAPI, paymentsAPI, portalPaymentChannelsAPI } from '@/api/portalClient'
 import { PaymentChannelsCard } from '@/components/payments/PaymentChannelsCard'
-import { BkashComingSoon } from '@/components/payments/BkashComingSoon'
 import { formatCurrency } from '@/utils/helpers'
 import { compressImage } from '@/utils/imageCompression'
 
@@ -26,6 +25,12 @@ export default function PortalPaymentPage(_: PortalPaymentPageProps) {
   const [compressing, setCompressing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // bKash checkout — separate loading/error state from the manual-proof
+  // form above, since the two flows are independent (a bKash failure
+  // shouldn't block filling out the manual form, and vice versa).
+  const [bkashLoading, setBkashLoading] = useState(false)
+  const [bkashError, setBkashError] = useState<string | null>(null)
+
   const { data: bill, isLoading } = useQuery({
     queryKey: ['portal-bill', billId],
     queryFn: () => billId ? portalAPI.bill(Number(billId)).then(r => r.data) : null,
@@ -36,6 +41,25 @@ export default function PortalPaymentPage(_: PortalPaymentPageProps) {
     queryKey: ['portal-payment-channels'],
     queryFn: () => portalPaymentChannelsAPI.get().then(r => r.data),
   })
+
+  const handleBkashPay = async () => {
+    if (!billId) return
+    setBkashError(null)
+    setBkashLoading(true)
+    try {
+      const res = await portalAPI.payInitiate(Number(billId))
+      // Full-page redirect to bKash's hosted checkout — bKash sends the
+      // browser back to our backend callback URL, which then redirects
+      // here again with ?bkash=success|failed once done.
+      window.location.href = res.data.bkash_url
+    } catch (err: any) {
+      const data = err.response?.data
+      setBkashError(
+        data?.error || 'Could not start bKash payment right now. Please use another channel below.'
+      )
+      setBkashLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -142,9 +166,41 @@ export default function PortalPaymentPage(_: PortalPaymentPageProps) {
         </div>
       </div>
 
-      {/* Where to send money, and current online-gateway status */}
+      {/* Where to send money manually */}
       <PaymentChannelsCard data={channels} />
-      <BkashComingSoon />
+
+      {/* bKash instant checkout — skips the manual proof-upload flow
+          entirely when it succeeds, since the callback auto-approves it. */}
+      {bill && Number(bill.due_amount) > 0 && (
+        <div className="card !border-2 !border-pink-200 !bg-pink-50/50 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-pink-100 flex items-center justify-center shrink-0">
+              <Smartphone className="w-4 h-4 text-pink-500" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold text-surface-800 text-sm truncate">bKash Payment Gateway</div>
+              <div className="text-xs text-surface-400 truncate">Pay instantly online via bKash checkout</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn-primary !bg-pink-600 hover:!bg-pink-700 shrink-0"
+            onClick={handleBkashPay}
+            disabled={bkashLoading}
+            aria-label="Pay with bKash"
+            title="Pay with bKash"
+          >
+            {bkashLoading
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Redirecting…</>
+              : 'Pay with bKash'}
+          </button>
+        </div>
+      )}
+      {bkashError && (
+        <div className="flex items-center gap-2 p-3 bg-danger-50 border border-danger-200 rounded-xl text-danger-700 text-sm">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {bkashError}
+        </div>
+      )}
 
       {/* Bill summary */}
       {isLoading && <div className="card animate-pulse h-24" />}
