@@ -255,7 +255,11 @@ class BkashCallbackView(APIView):
         is_customer = txn.source == PaymentTransaction.SOURCE_CUSTOMER
         redirect_base = (
             f"{settings.FRONTEND_URL}/portal/payments/bkash-result"
-            if is_customer else f"{settings.FRONTEND_URL}/billing/{txn.bill_id}"
+            # Straight to the real staff route, not the legacy `/billing/:id`
+            # path — that one redirects via a bare `<Navigate to=.../>` that
+            # drops the query string, which would silently swallow
+            # ?bkash=success&bill=... before BillDetailPage ever saw it.
+            if is_customer else f"{settings.FRONTEND_URL}/staff/billing/{txn.bill_id}"
         )
         sep = '&' if '?' in redirect_base else '?'
 
