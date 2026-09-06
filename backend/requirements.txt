@@ -28,7 +28,8 @@ python-dotenv==1.0.0
 pytz==2026.3.post1
 redis==5.0.1
 reportlab==4.0.7
-requests==2.31.0
+# requests==2.31.0
+requests>=2.31.0
 setuptools==80.10.2
 six==1.17.0
 sqlparse==0.5.5
