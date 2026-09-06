@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django.conf import settings
 from django.db.models import Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -258,6 +259,7 @@ class PortalInvoicePDFView(CustomerScopedMixin, APIView):
     def get(self, request, pk):
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import mm
+        from reportlab.lib.utils import ImageReader
         from reportlab.pdfgen import canvas
 
         bill = self.get_bill_queryset().filter(id=pk).first()
@@ -271,8 +273,41 @@ class PortalInvoicePDFView(CustomerScopedMixin, APIView):
         width, height = A4
         y = height - 25 * mm
 
-        p.setFont('Helvetica-Bold', 18)
-        p.drawString(20 * mm, y, 'DECO — Invoice')
+        def draw_logo(path, x, y, target_height):
+            """
+            Draws one logo at (x, y) scaled to target_height, preserving
+            its real aspect ratio (read via ImageReader rather than
+            assumed), and returns the width actually drawn so the next
+            logo can be placed after it without overlapping or guessing.
+            Fails silently — a missing logo file on a given deployment
+            shouldn't break invoice generation, just omit that logo.
+            """
+            try:
+                img = ImageReader(path)
+                iw, ih = img.getSize()
+                drawn_width = target_height * (iw / ih)
+                p.drawImage(
+                    img, x, y, width=drawn_width, height=target_height,
+                    preserveAspectRatio=True, mask='auto',
+                )
+                return drawn_width
+            except Exception:
+                return 0
+
+        logo_height = 12 * mm
+        logo_y = height - 20 * mm - logo_height
+        deco_logo = settings.BASE_DIR / 'static' / 'branding' / 'deco-logo.png'
+        dtel_logo = settings.BASE_DIR / 'static' / 'branding' / 'dtel-logo.png'
+
+        x = 20 * mm
+        drawn = draw_logo(str(deco_logo), x, logo_y, logo_height)
+        if drawn:
+            x += drawn + 6 * mm
+        draw_logo(str(dtel_logo), x, logo_y, logo_height)
+
+        y = logo_y - 8 * mm
+        p.setFont('Helvetica-Bold', 16)
+        p.drawString(20 * mm, y, 'Invoice')
         y -= 6 * mm
         p.setFont('Helvetica', 9)
         p.setFillGray(0.4)
