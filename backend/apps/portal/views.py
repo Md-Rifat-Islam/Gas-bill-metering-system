@@ -1,5 +1,3 @@
-import uuid
-
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -12,6 +10,8 @@ from django.shortcuts import get_object_or_404
 from apps.billing.models import Bill
 from apps.payments.models import Payment, PaymentTransaction, PaymentChannelSettings
 from apps.payments.serializers import PaymentChannelSettingsSerializer
+from apps.payments.bkash_client import BkashError
+from apps.payments.services import initiate_bkash_checkout
 from apps.authentication.customer_auth import CustomerJWTAuthentication
 from core.permissions import IsCustomer
 from .models import Notification
@@ -163,16 +163,16 @@ class PortalPaymentSubmitView(CustomerScopedMixin, generics.CreateAPIView):
 
 class PortalPaymentInitiateView(CustomerScopedMixin, APIView):
     """
-    Initiate an online payment for a bill (bKash / SSLCommerz).
+    Initiate a real bKash Tokenized Checkout payment for a bill. Returns
+    the bKash-hosted checkout URL — the frontend redirects the browser to
+    it (window.location.href), the customer completes payment there, and
+    bKash redirects back to BkashCallbackView (apps.payments.views), which
+    verifies the result server-side and auto-approves the payment.
 
-    NOTE: This is a stub — the real gateway isn't wired up yet (see
-    settings.BKASH_* / SSLCOMMERZ_* credentials, still TODO). The bug that
-    caused "Could not start payment" on a second click: gateway_transaction_id
-    used to be derived deterministically from bill_number + due_amount, so
-    clicking twice generated the exact same id and violated the model's
-    unique constraint. Fixed by (a) generating a random id per attempt, and
-    (b) reusing an existing Pending attempt for the same bill instead of
-    creating a new row every click.
+    If bKash itself is unreachable/misconfigured, falls back gracefully:
+    returns an error the frontend shows alongside the existing manual
+    payment-channels + proof-upload flow, so a bKash outage never blocks
+    a customer from paying.
     """
     def post(self, request):
         bill_id = request.data.get('bill_id')
@@ -182,27 +182,19 @@ class PortalPaymentInitiateView(CustomerScopedMixin, APIView):
         if bill.due_amount <= 0:
             return Response({'error': 'This bill has no due amount.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        txn = (
-            PaymentTransaction.objects
-            .filter(bill=bill, status=PaymentTransaction.STATUS_PENDING)
-            .order_by('-created_at')
-            .first()
-        )
-        if not txn:
-            txn = PaymentTransaction.objects.create(
-                bill=bill,
-                gateway_name='bKash',
-                gateway_transaction_id=f"TXN-{uuid.uuid4().hex[:12].upper()}",
-                amount=bill.due_amount,
-                status=PaymentTransaction.STATUS_PENDING,
+        try:
+            txn = initiate_bkash_checkout(
+                bill, source=PaymentTransaction.SOURCE_CUSTOMER, initiated_by_customer=request.user,
             )
+        except BkashError as exc:
+            return Response({
+                'error': str(exc),
+                'fallback': 'Please use one of the payment channels shown above and submit proof below.',
+            }, status=502)
 
         return Response({
-            'coming_soon': True,
-            'message': 'Online bKash payment is coming soon. Please use one of the payment '
-                       'channels shown above and submit your payment with proof below.',
+            'bkash_url': txn.raw_response.get('bkashURL'),
             'transaction_id': txn.gateway_transaction_id,
-            'amount': str(bill.due_amount),
         })
 
 
