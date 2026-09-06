@@ -1,16 +1,25 @@
+import logging
+
+from django.conf import settings
 from django.db import transaction
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, filters, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.audit.utils import log_action
+from apps.billing.models import Bill
 from core.permissions import PaymentPermission, PaymentWritePermission, SystemSettingsPermission
-from .models import Payment, PaymentChannelSettings
+from .bkash_client import BkashError
+from .models import Payment, PaymentChannelSettings, PaymentTransaction
 from .permissions import PaymentEditPermission
 from .serializers import PaymentSerializer, PaymentReviewSerializer, PaymentChannelSettingsSerializer
+from .services import initiate_bkash_checkout, complete_bkash_transaction
+
+logger = logging.getLogger('bkash')
 
 
 class PaymentListCreateView(generics.ListCreateAPIView):
@@ -21,11 +30,6 @@ class PaymentListCreateView(generics.ListCreateAPIView):
     serializer_class   = PaymentSerializer
     permission_classes = [IsAuthenticated, PaymentWritePermission]
     filter_backends    = [filters.SearchFilter]
-    # THE FIX: no search_fields existed here at all, so the global
-    # SearchFilter backend (already active project-wide via
-    # DEFAULT_FILTER_BACKENDS) had nothing to search against — a `?search=`
-    # param was silently ignored. Same pattern as BillListCreateView's
-    # search_fields.
     search_fields = [
         'bill__bill_number', 'bill__unit__unit_no',
         'bill__unit__allottee__name', 'transaction_id',
@@ -51,18 +55,6 @@ class PaymentListCreateView(generics.ListCreateAPIView):
 
 
 class PaymentDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    GET    — any role with PaymentPermission (existing, unchanged).
-    PATCH  — Super Admin only (PaymentEditPermission), for correcting a
-             payment's recorded details after the fact. PUT is intentionally
-             disabled: this is meant for targeted corrections (fix a typo'd
-             transaction id, adjust an amount), not full re-submission.
-    DELETE — Super Admin only (PaymentEditPermission). If the payment was
-             Approved, its amount is first reversed off the bill's
-             paid/due totals — otherwise deleting an applied payment would
-             leave the bill looking like it collected money it no longer
-             has a payment record for.
-    """
     queryset            = Payment.objects.all().select_related(
         'bill', 'bill__unit', 'bill__building', 'bill__unit__allottee',
     )
@@ -181,11 +173,6 @@ class PaymentRejectView(APIView):
 
 # ── Payment Channel Settings (bKash / Nagad / Bank details) ───────────────────
 class PaymentChannelSettingsView(APIView):
-    """
-    GET: any authenticated staff member can view (needed by any role that
-    might reference it, e.g. accountants reconciling manual payments).
-    PUT: Super Admin only — matches SystemSettingsPermission used elsewhere.
-    """
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
@@ -206,3 +193,82 @@ class PaymentChannelSettingsView(APIView):
             request.user, 'payment_channel_settings', settings_obj.id, 'UPDATE', None, serializer.data
         )
         return Response(serializer.data)
+
+
+# ── bKash Tokenized Checkout ───────────────────────────────────────────────────
+class BkashInitiateView(APIView):
+    """
+    Staff-triggered bKash checkout — for when an accountant helps a walk-in
+    customer pay their due bill via bKash at the counter. Returns the
+    bKash-hosted checkout URL; the frontend redirects to it, the customer
+    completes payment on their own phone/bKash app, and bKash redirects
+    back to BkashCallbackView below.
+    """
+    permission_classes = [IsAuthenticated, PaymentWritePermission]
+
+    def post(self, request):
+        bill_id = request.data.get('bill_id')
+        bill = get_object_or_404(
+            Bill.objects.select_related('unit', 'building', 'project'), pk=bill_id
+        )
+        try:
+            txn = initiate_bkash_checkout(
+                bill, source=PaymentTransaction.SOURCE_STAFF, initiated_by_staff=request.user,
+            )
+        except BkashError as exc:
+            return Response({'detail': str(exc)}, status=502)
+
+        return Response({
+            'bkash_url': txn.raw_response.get('bkashURL'),
+            'transaction_id': txn.gateway_transaction_id,
+        })
+
+
+class BkashCallbackView(APIView):
+    """
+    bKash Tokenized Checkout redirects the customer's browser here after
+    they complete/cancel/close the hosted checkout page. This is a browser
+    redirect, not a server-to-server webhook (bKash's tokenized flow
+    doesn't offer one) — so the query string is treated as only a pointer
+    to which transaction to check, and the actual result is always
+    re-verified via a server-side Execute Payment call before crediting
+    anything (see services.complete_bkash_transaction).
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        payment_id = request.GET.get('paymentID')
+        bkash_status = request.GET.get('status')  # 'success' | 'failure' | 'cancel'
+
+        txn = (
+            PaymentTransaction.objects
+            .filter(bkash_payment_id=payment_id)
+            .select_related('bill')
+            .first()
+        )
+        if not txn:
+            return HttpResponseRedirect(
+                f"{settings.FRONTEND_URL}/portal/payments/bkash-result?status=error"
+            )
+
+        is_customer = txn.source == PaymentTransaction.SOURCE_CUSTOMER
+        redirect_base = (
+            f"{settings.FRONTEND_URL}/portal/payments/bkash-result"
+            if is_customer else f"{settings.FRONTEND_URL}/billing/{txn.bill_id}"
+        )
+        sep = '&' if '?' in redirect_base else '?'
+
+        if bkash_status != 'success':
+            if txn.status == PaymentTransaction.STATUS_PENDING:
+                txn.status = PaymentTransaction.STATUS_FAILED
+                txn.save(update_fields=['status'])
+            return HttpResponseRedirect(f"{redirect_base}{sep}bkash=cancelled&bill={txn.bill_id}")
+
+        try:
+            complete_bkash_transaction(txn)
+        except BkashError as exc:
+            logger.warning('bKash callback failed for txn %s: %s', txn.id, exc)
+            return HttpResponseRedirect(f"{redirect_base}{sep}bkash=failed&bill={txn.bill_id}")
+
+        return HttpResponseRedirect(f"{redirect_base}{sep}bkash=success&bill={txn.bill_id}")

@@ -6,11 +6,15 @@ from .views import (
     PaymentApproveView,
     PaymentRejectView,
     PaymentChannelSettingsView,
+    BkashInitiateView,
+    BkashCallbackView,
 )
 
 urlpatterns = [
     path('channel-settings/', PaymentChannelSettingsView.as_view()),
     path('pending/',          PendingPaymentListView.as_view()),
+    path('bkash/initiate/',   BkashInitiateView.as_view()),
+    path('bkash/callback/',   BkashCallbackView.as_view()),
     path('',                  PaymentListCreateView.as_view()),
     path('<int:pk>/',         PaymentDetailView.as_view()),
     path('<int:pk>/approve/', PaymentApproveView.as_view()),
