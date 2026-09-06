@@ -106,12 +106,12 @@ export default function PortalBillDetailPage() {
       </div>
 
       {/* Payment channels + gateway status — only relevant while something is still due */}
-      {!isPaid && (
+      {/* {!isPaid && (
         <>
           <PaymentChannelsCard data={channels} />
           <BkashComingSoon />
         </>
-      )}
+      )} */}
 
       {/* Meter readings */}
       <div className="card">
@@ -165,7 +165,7 @@ export default function PortalBillDetailPage() {
             onClick={() => navigate(`/portal/payment?bill=${bill.id}`)}
             className="btn-primary flex-1"
           >
-            <Send className="w-4 h-4" /> Submit Payment
+            <Send className="w-4 h-4" /> make Payment
           </button>
         )}
       </div>
