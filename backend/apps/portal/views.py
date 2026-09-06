@@ -297,7 +297,7 @@ class PortalInvoicePDFView(CustomerScopedMixin, APIView):
         logo_height = 12 * mm
         logo_y = height - 20 * mm - logo_height
         deco_logo = settings.BASE_DIR / 'static' / 'branding' / 'deco-logo.png'
-        dtel_logo = settings.BASE_DIR / 'static' / 'branding' / 'dtel-logo.png'
+        dtel_logo = settings.BASE_DIR / 'static' / 'branding' / 'dtel-logo.jpeg'
 
         x = 20 * mm
         drawn = draw_logo(str(deco_logo), x, logo_y, logo_height)

@@ -122,7 +122,7 @@ export default function LoginPage() {
             />
             <div className="w-px h-7 bg-surface-200" />
             <img
-              src="/branding/dtel-logo.png"
+              src="/branding/dtel-logo.jpeg"
               alt="DTEL"
               className="h-9 w-auto object-contain"
             />
@@ -210,7 +210,7 @@ export default function LoginPage() {
               />
               <div className="w-px h-6 bg-surface-200" />
               <img
-                src="/branding/dtel-logo.png"
+                src="/branding/dtel-logo.jpeg"
                 alt="DTEL"
                 className="h-8 w-auto object-contain"
               />
