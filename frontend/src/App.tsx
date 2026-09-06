@@ -34,6 +34,8 @@ import PortalPaymentPage from "@/pages/portal/PortalPaymentPage";
 import PortalPaymentsPage from "@/pages/portal/PortalPaymentsPage";
 import PortalProfilePage from "@/pages/portal/PortalProfilePage";
 import PortalUnitSelectPage from "@/pages/portal/PortalUnitSelectPage";
+import PortalBkashResultPage from '@/pages/portal/PortalBkashResultPage'
+
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -141,6 +143,14 @@ export default function App() {
 
       {/* ── Customer portal ───────────────────────────────────────────────── */}
       <Route path="/portal/login" element={<PortalLoginPage />} />
+      {/* // The bKash checkout flow redirects the customer's browser to this page
+      // after the payment has been verified server-side. This page reads the
+      // result from the query string and shows a success/failure/cancelled
+      // message, but it never talks to bKash itself. */}
+      <Route
+        path="/portal/payments/bkash-result"
+        element={<PortalBkashResultPage />}
+      />
       {/*
         Sibling route, NOT nested inside PortalLayout below — this page runs
         before a unit is chosen, so it must not render through PortalLayout's
