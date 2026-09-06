@@ -36,16 +36,8 @@ class Payment(models.Model):
     paid_amount = models.DecimalField(max_digits=12, decimal_places=2)
     payment_method = models.CharField(max_length=50, choices=METHOD_CHOICES)
     transaction_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
-
-    # Previously auto_now_add=True — that made it impossible for anyone to
-    # actually record *when the payment was made* (as opposed to when the
-    # record was created). Now explicit and required; `created_at` below
-    # still tracks system record-creation time.
     payment_date = models.DateField()
 
-    # Proof of payment — required for both manual staff entry and customer
-    # portal submissions (enforced in the serializers, not here, since the
-    # two flows have different validation messages).
     proof_image = models.ImageField(upload_to='payment_proofs/%Y/%m/', null=True, blank=True)
     proof_invoice = models.FileField(upload_to='payment_proofs/%Y/%m/', null=True, blank=True)
 
@@ -89,16 +81,76 @@ class PaymentTransaction(models.Model):
         (STATUS_FAILED, 'Failed'),
     ]
 
+    # Who kicked off the checkout — staff assisting a walk-in customer, or
+    # the customer themselves from the portal. Drives which frontend the
+    # bKash callback redirects back to (see BkashCallbackView).
+    SOURCE_STAFF = 'staff'
+    SOURCE_CUSTOMER = 'customer'
+    SOURCE_CHOICES = [
+        (SOURCE_STAFF, 'Staff'),
+        (SOURCE_CUSTOMER, 'Customer Portal'),
+    ]
+
     bill = models.ForeignKey(Bill, on_delete=models.PROTECT, related_name='transactions')
     gateway_name = models.CharField(max_length=50)
+    # Our own reference (sent to bKash as merchantInvoiceNumber at Create
+    # time). Overwritten with bKash's real trxID once Execute succeeds —
+    # both are unique, so this stays a safe single unique slot either way.
     gateway_transaction_id = models.CharField(max_length=100, unique=True)
+    # bKash's own paymentID from the Create Payment response — this is
+    # what bKash sends back on the callback query string, so it's the
+    # lookup key in BkashCallbackView.
+    bkash_payment_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
+
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default=SOURCE_CUSTOMER)
+
+    initiated_by_customer = models.ForeignKey(
+        'authentication.CustomerUser', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='bkash_transactions',
+    )
+    initiated_by_staff = models.ForeignKey(
+        'authentication.StaffUser', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='bkash_transactions',
+    )
+    # Linked once the transaction completes and a real Payment row exists —
+    # also doubles as the idempotency check if bKash's redirect fires twice
+    # (e.g. browser back button) for the same paymentID.
+    payment = models.ForeignKey(
+        Payment, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='bkash_transaction',
+    )
+
     raw_response = models.JSONField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = 'payment_transactions'
+        ordering = ['-created_at']
+
+
+class BkashToken(models.Model):
+    """
+    Singleton (pk=1) cache of bKash's Tokenized Checkout id_token, shared
+    across all Gunicorn workers via the DB rather than Django's default
+    per-process LocMemCache (which wouldn't be visible across workers).
+    bKash tokens are valid ~1 hour; we re-grant a little early rather than
+    implementing the separate refresh-token endpoint, since call volume
+    here doesn't justify the extra complexity.
+    """
+    id_token = models.TextField(blank=True)
+    refresh_token = models.TextField(blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'bkash_token'
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
 
 
 class PaymentChannelSettings(models.Model):
