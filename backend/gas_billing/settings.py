@@ -104,6 +104,12 @@ USE_TZ   = True
 STATIC_URL  = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Source directory for project-level static assets not tied to a specific
+# app — currently just the DECO/DTEL branding logos used in the invoice
+# PDF (apps.portal.views.PortalInvoicePDFView). `collectstatic` will pick
+# these up into STATIC_ROOT for whitenoise; the PDF generator reads the
+# file directly off disk here rather than through a URL.
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 MEDIA_URL  = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
