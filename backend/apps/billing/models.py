@@ -83,11 +83,13 @@ class Bill(models.Model):
         self.total_usage_m3 = self.current_reading - self.previous_reading
 
         if self.conversion_factor:
-            self.total_usage_kg = round(self.total_usage_m3 * self.conversion_factor, 2)
-            billable_usage = self.total_usage_kg
+            precise_usage_kg = self.total_usage_m3 * self.conversion_factor  # unrounded, full precision
+            self.total_usage_kg = round(precise_usage_kg, 2)                  # rounded only for display/storage
+            billable_usage = precise_usage_kg                                 # ← use UNROUNDED for billing
         else:
             self.total_usage_kg = None
             billable_usage = self.total_usage_m3
+
 
         self.base_amount = round(billable_usage * self.unit_price, 2)
 

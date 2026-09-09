@@ -16,8 +16,9 @@ export function computeUsage(
 ): UsageResult {
   const usageM3 = Math.max(0, Number(currentReading) - Number(previousReading));
   const factor = conversionFactor ? Number(conversionFactor) : null;
-  const usageKg = factor ? Math.round(usageM3 * factor * 100) / 100 : null;
-  return { usageM3, usageKg, billableUsage: usageKg ?? usageM3 };
+  const preciseKg = factor ? usageM3 * factor : null;
+  const usageKg = preciseKg !== null ? Math.round(preciseKg * 100) / 100 : null; // for display
+  return { usageM3, usageKg, billableUsage: preciseKg ?? usageM3 };               // ← unrounded for billing math
 }
 
 export function computeBillTotal({
