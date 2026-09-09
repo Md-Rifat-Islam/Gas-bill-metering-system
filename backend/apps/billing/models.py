@@ -24,13 +24,14 @@ class Bill(models.Model):
 
     # Meter readings — decimal_places=3 to match the meter's actual dial
     # precision (see apps/meters/models.py's Meter.initial_reading for the
-    # same fix). total_usage_kg stays at 2 places: it's a converted/
-    # derived billing quantity, not a raw dial reading, and money-adjacent
-    # values conventionally round to 2 places.
+    # same fix). total_usage_kg now stores full conversion precision
+    # (decimal_places=4, matching conversion_factor) so billing math is
+    # never done against a pre-rounded usage figure — only base_amount
+    # and other money fields round to 2 places.
     previous_reading = models.DecimalField(max_digits=10, decimal_places=3, default=0)
     current_reading = models.DecimalField(max_digits=10, decimal_places=3, default=0)
     total_usage_m3 = models.DecimalField(max_digits=10, decimal_places=3, default=0)
-    total_usage_kg = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    total_usage_kg = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
     conversion_factor = models.DecimalField(max_digits=6, decimal_places=4, null=True, blank=True)
 
     # Pricing
@@ -84,7 +85,8 @@ class Bill(models.Model):
 
         if self.conversion_factor:
             precise_usage_kg = self.total_usage_m3 * self.conversion_factor  # unrounded, full precision
-            self.total_usage_kg = round(precise_usage_kg, 2)                  # rounded only for display/storage
+            # self.total_usage_kg = round(precise_usage_kg, 2)                  # rounded only for display/storage
+            self.total_usage_kg = precise_usage_kg                            # full precision now, no round()
             billable_usage = precise_usage_kg                                 # ← use UNROUNDED for billing
         else:
             self.total_usage_kg = None
