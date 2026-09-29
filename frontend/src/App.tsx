@@ -23,6 +23,7 @@ import QuickReadingPage from "@/pages/meters/QuickReadingPage";
 import PaymentChannelSettingsPage from '@/pages/settings/PaymentChannelSettingsPage'
 import AuditLogsPage from '@/pages/audit/AuditLogsPage'
 import BackupsPage from '@/pages/settings/BackupsPage'
+import MessagingPage from '@/pages/messaging/MessagingPage'
 
 // Customer portal
 import PortalLayout from "@/components/layout/PortalLayout";
@@ -107,6 +108,9 @@ export default function App() {
         <Route path="meters/quick-reading" element={<QuickReadingPage />} />
         <Route path="payments/pending" element={<PendingPaymentsPage />} />
         <Route path="settings/payment-channels" element={<PaymentChannelSettingsPage />} />
+        {/* Messaging (SMS) — access is enforced on the backend by
+            MessagingPermission; the page shows AccessDenied without view rights. */}
+        <Route path="messaging" element={<MessagingPage />} />
         {/* Audit Logs — Super Admin only, enforced both here (AccessDenied
             inside the page via can.viewAuditLogs) and on the backend
             (AuditLogPermission, hard-locked, not override-able). Grouped

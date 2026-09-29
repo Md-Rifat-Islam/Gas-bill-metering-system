@@ -21,11 +21,13 @@ import {
   Wallet,
   History,
   Database,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/utils/helpers";
 import { useAuthStore } from "@/store/authStore";
 import { usePermissions } from "@/hooks/usePermissions";
 import { authAPI, paymentsAPI } from "@/api/client";
+import { messagingAPI } from "@/api/messagingClient";
 import { PageLoader } from "@/components/ui";
 import toast from "react-hot-toast";
 
@@ -56,6 +58,14 @@ export default function AppLayout() {
     queryFn: () => paymentsAPI.pending().then((r) => r.data),
     enabled: canApprovePayments,
     refetchInterval: 60_000,
+  });
+
+  // Messaging (SMS) access comes from its own endpoint, which resolves the
+  // backend MessagingPermission (role default + any override) exactly.
+  const { data: messagingAccess } = useQuery({
+    queryKey: ["messaging-access"],
+    queryFn: () => messagingAPI.access().then((r) => r.data),
+    staleTime: 60_000,
   });
 
   const pendingCount = pendingData?.count ?? pendingData?.results?.length ?? 0;
@@ -98,6 +108,7 @@ export default function AppLayout() {
       show: canApprovePayments,
       badge: pendingCount > 0 ? pendingCount : undefined,
     },
+    { icon: MessageSquare, label: "Messaging", path: "/staff/messaging", show: !!messagingAccess?.can_view },
     { icon: BarChart3, label: "Reports", path: "/staff/reports", show: can.viewReports },
   ].filter((i) => i.show);
 
