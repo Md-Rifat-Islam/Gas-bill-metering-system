@@ -1,9 +1,30 @@
 from rest_framework import serializers
 from .models import Payment, PaymentChannelSettings
 from apps.billing.models import Bill
+from core.image_utils import optimize_image, process_proof_file, PROOF_IMAGE
 
 
-class PaymentSerializer(serializers.ModelSerializer):
+class ProofUploadValidationMixin:
+    """
+    Shared by every serializer that accepts payment proof files (staff
+    manual entry / edit, and the customer-portal submission).
+
+    proof_image   -> must be a real image; stored as .webp
+    proof_invoice -> image (stored as .webp) or PDF (validated, stored as-is)
+    """
+
+    def validate_proof_image(self, value):
+        if value is None:
+            return value
+        return optimize_image(value, **PROOF_IMAGE)
+
+    def validate_proof_invoice(self, value):
+        if value is None:
+            return value
+        return process_proof_file(value)
+
+
+class PaymentSerializer(ProofUploadValidationMixin, serializers.ModelSerializer):
     """
     Used for staff-facing list/detail/manual-entry-create, and now also
     Super-Admin-only edits (see PaymentEditPermission / PaymentDetailView).
@@ -154,7 +175,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         return instance
 
 
-class PortalPaymentSubmitSerializer(serializers.ModelSerializer):
+class PortalPaymentSubmitSerializer(ProofUploadValidationMixin, serializers.ModelSerializer):
     """
     Customer portal submission — always created as Pending, never touches
     the bill balance. The accountant's approve/reject action is what applies

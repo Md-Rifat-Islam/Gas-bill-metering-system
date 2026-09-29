@@ -1,19 +1,23 @@
 // src/utils/imageCompression.ts
 //
-// Client-side image compression before upload. Runs entirely in the
-// browser via <canvas> — no extra dependency required. Used by
-// PhotoCapture (meter reading photos) and ProofInput (payment proofs)
-// to shrink typical 2-3MB phone-camera photos down to ~1MB or less
-// before they ever leave the browser.
+// Client-side image compression + WebP conversion before upload. Runs
+// entirely in the browser via <canvas> — no extra dependency required.
+// Used by PhotoCapture (meter reading photos), ProofInput / PaymentModal
+// (staff payment proofs) and PortalPaymentPage (customer proofs).
+//
+// Output is WebP. Browsers that can't encode WebP from a canvas (older
+// Safari silently returns PNG) fall back to JPEG; the backend then
+// re-encodes whatever arrives to WebP (see backend core/image_utils.py),
+// so the stored file is always .webp regardless of the browser.
 
 export interface CompressOptions {
   /** Max output width in px. Images larger than this are downscaled. */
   maxWidth?: number
   /** Max output height in px. */
   maxHeight?: number
-  /** Initial JPEG quality, 0-1. Lowered automatically if still over maxSizeMB. */
+  /** Initial encode quality, 0-1. Lowered automatically if still over maxSizeMB. */
   quality?: number
-  /** Target max size in MB. Quality is stepped down until under this (or quality floor is hit). */
+  /** Target max size in MB. Quality is stepped down until under this (or the floor is hit). */
   maxSizeMB?: number
 }
 
@@ -24,31 +28,63 @@ const DEFAULTS: Required<CompressOptions> = {
   maxSizeMB: 1,
 }
 
+const QUALITY_FLOOR = 0.4
+
+/** Recommended presets — pass as `compressImage(file, PRESETS.meter)`. */
+export const PRESETS = {
+  /** Meter dial photos: digits must stay readable, so keep quality higher. */
+  meter: { maxWidth: 1600, maxHeight: 1600, quality: 0.8, maxSizeMB: 1 } as CompressOptions,
+  /** Payment screenshots / receipts. */
+  proof: { maxWidth: 1600, maxHeight: 1600, quality: 0.75, maxSizeMB: 1 } as CompressOptions,
+}
+
+function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
+  return new Promise((resolve) => canvas.toBlob(resolve, type, quality))
+}
+
+async function decode(file: File): Promise<ImageBitmap> {
+  try {
+    // Apply EXIF rotation so phone photos aren't saved sideways.
+    return await createImageBitmap(file, { imageOrientation: 'from-image' })
+  } catch {
+    return await createImageBitmap(file)
+  }
+}
+
 /**
- * Compresses an image File to a JPEG under roughly `maxSizeMB`, scaled to
- * fit within maxWidth x maxHeight (aspect ratio preserved, never upscaled).
+ * Compresses an image File to WebP under roughly `maxSizeMB`, scaled to fit
+ * within maxWidth x maxHeight (aspect ratio preserved, never upscaled).
  *
- * Non-image files (e.g. a PDF payment proof) are returned unchanged.
- * If compression fails for any reason (unsupported format, decode error),
- * the original file is returned rather than blocking the upload.
+ * - Non-image files (e.g. a PDF payment proof) are returned unchanged.
+ * - An image that is already WebP, within the size limit and within the
+ *   dimension limits is returned unchanged (avoids re-encoding twice).
+ * - If anything fails (unsupported format, decode error), the original file
+ *   is returned rather than blocking the upload — the server validates and
+ *   converts it anyway.
  */
 export async function compressImage(
   file: File,
   options: CompressOptions = {}
 ): Promise<File> {
   const { maxWidth, maxHeight, quality, maxSizeMB } = { ...DEFAULTS, ...options }
+  const maxBytes = maxSizeMB * 1024 * 1024
 
   if (!file.type.startsWith('image/')) return file
-
-  // Nothing to do if it's already small enough — skip the decode/encode
-  // round-trip entirely.
-  if (file.size <= maxSizeMB * 1024 * 1024) return file
+  // Leave vector / animated formats alone.
+  if (file.type === 'image/svg+xml' || file.type === 'image/gif') return file
 
   try {
-    const bitmap = await createImageBitmap(file)
+    const bitmap = await decode(file)
 
     let { width, height } = bitmap
-    if (width > maxWidth || height > maxHeight) {
+    const needsResize = width > maxWidth || height > maxHeight
+
+    if (file.type === 'image/webp' && !needsResize && file.size <= maxBytes) {
+      bitmap.close?.()
+      return file
+    }
+
+    if (needsResize) {
       const ratio = Math.min(maxWidth / width, maxHeight / height)
       width = Math.round(width * ratio)
       height = Math.round(height * ratio)
@@ -58,31 +94,35 @@ export async function compressImage(
     canvas.width = width
     canvas.height = height
     const ctx = canvas.getContext('2d')
-    if (!ctx) return file
+    if (!ctx) {
+      bitmap.close?.()
+      return file
+    }
 
     ctx.drawImage(bitmap, 0, 0, width, height)
     bitmap.close?.()
 
-    // Step quality down until under the target size, or until quality
-    // floor (0.3) is reached — whichever comes first. Avoids an endless
-    // loop on images that just can't get small enough via quality alone
-    // (in which case the downscale above is doing most of the work).
-    let blob: Blob | null = null
+    // Try WebP first. If the browser can't encode it, toBlob hands back a
+    // PNG (blob.type !== 'image/webp') — in that case use JPEG instead.
+    let outType = 'image/webp'
+    let blob = await toBlob(canvas, outType, quality)
+    if (!blob || blob.type !== 'image/webp') {
+      outType = 'image/jpeg'
+      blob = await toBlob(canvas, outType, quality)
+    }
+
+    // Step quality down until under the target size or the floor is hit.
     let q = quality
-    do {
-      blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, 'image/jpeg', q)
-      )
-      q -= 0.1
-    } while (blob && blob.size > maxSizeMB * 1024 * 1024 && q > 0.3)
+    while (blob && blob.size > maxBytes && q - 0.1 >= QUALITY_FLOOR) {
+      q = Math.round((q - 0.1) * 100) / 100
+      blob = await toBlob(canvas, outType, q)
+    }
 
     if (!blob) return file
 
-    return new File(
-      [blob],
-      file.name.replace(/\.\w+$/, '.jpg'),
-      { type: 'image/jpeg', lastModified: Date.now() }
-    )
+    const ext = outType === 'image/webp' ? 'webp' : 'jpg'
+    const base = file.name.replace(/\.[^./\\]+$/, '') || 'photo'
+    return new File([blob], `${base}.${ext}`, { type: outType, lastModified: Date.now() })
   } catch {
     // Decode failed, canvas unsupported, etc. — don't block the upload.
     return file

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Meter, MeterReading
 from apps.units.models import Unit
+from core.image_utils import optimize_image, METER_PHOTO
 
 
 class MeterSerializer(serializers.ModelSerializer):
@@ -72,6 +73,14 @@ class MeterReadingSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.reading_photo.url)
             return obj.reading_photo.url
         return None
+
+    def validate_reading_photo(self, value):
+        # Only runs when a photo is actually sent (create, or an edit that
+        # replaces it) — a PATCH without a photo leaves the stored one alone.
+        # Verifies it's a real image, fixes rotation, stores it as .webp.
+        if value is None:
+            return value
+        return optimize_image(value, **METER_PHOTO)
 
     def validate(self, data):
         curr = data.get('current_reading', 0)
