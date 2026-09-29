@@ -1,5 +1,10 @@
 from apps.authentication.models import Role, PermissionModule
 
+# Module key for the SMS / Messaging feature. Kept as a plain string so this
+# works without touching PermissionModule (see MESSAGING_SETUP.md — adding it
+# to the enum only matters if you want per-user overrides for Messaging).
+MESSAGING = 'messaging'
+
 ROLE_DEFAULT_PERMISSIONS = {
     Role.SUPER_ADMIN: {
         PermissionModule.DASHBOARD:          (True, False, False),
@@ -17,6 +22,7 @@ ROLE_DEFAULT_PERMISSIONS = {
         PermissionModule.FINANCIAL_REPORTS:  (True, False, False),
         PermissionModule.STAFF:              (True, True, True),
         PermissionModule.AUDIT:              (True, True, True),
+        MESSAGING:                           (True, True, True),
     },
     Role.ADMIN: {
         PermissionModule.DASHBOARD:          (True, False, False),
@@ -36,6 +42,7 @@ ROLE_DEFAULT_PERMISSIONS = {
         PermissionModule.FINANCIAL_REPORTS:  (False, False, False),
         PermissionModule.STAFF:              (True, True, False),
         PermissionModule.AUDIT:              (False, False, False),
+        MESSAGING:                           (True, True, False),
     },
     Role.BILLING_STAFF: {
         PermissionModule.DASHBOARD:          (True, False, False),
@@ -51,6 +58,7 @@ ROLE_DEFAULT_PERMISSIONS = {
         PermissionModule.FINANCIAL_REPORTS:  (False, False, False),
         PermissionModule.STAFF:              (False, False, False),
         PermissionModule.AUDIT:              (False, False, False),
+        MESSAGING:                           (False, False, False),
     },
     Role.ACCOUNTANT: {
         PermissionModule.DASHBOARD:          (True, False, False),
@@ -67,6 +75,9 @@ ROLE_DEFAULT_PERMISSIONS = {
         PermissionModule.FINANCIAL_REPORTS:  (True, False, False),
         PermissionModule.STAFF:              (False, False, False),
         PermissionModule.AUDIT:              (False, False, False),
+        # Can see the SMS history (e.g. to confirm a customer was notified),
+        # but cannot send notices or change settings.
+        MESSAGING:                           (True, False, False),
     },
     Role.VIEWER: {
         PermissionModule.DASHBOARD:          (True, False, False),
@@ -82,6 +93,7 @@ ROLE_DEFAULT_PERMISSIONS = {
         PermissionModule.FINANCIAL_REPORTS:  (False, False, False),
         PermissionModule.STAFF:              (False, False, False),
         PermissionModule.AUDIT:              (False, False, False),
+        MESSAGING:                           (False, False, False),
     },
 }
 

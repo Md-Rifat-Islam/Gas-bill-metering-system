@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'apps.audit',
     'apps.portal',
     'apps.backups',
+    'apps.messaging',
 ]
 
 MIDDLEWARE = [
@@ -200,9 +201,11 @@ SSLCOMMERZ_STORE_ID   = os.getenv('SSLCOMMERZ_STORE_ID', '')
 SSLCOMMERZ_STORE_PASS = os.getenv('SSLCOMMERZ_STORE_PASS', '')
 SSLCOMMERZ_BASE_URL   = 'https://sandbox.sslcommerz.com'
 
-# ── SMS ───────────────────────────────────────────────────────────────────────
-SMS_API_KEY   = os.getenv('SMS_API_KEY', '')
-SMS_SENDER_ID = os.getenv('SMS_SENDER_ID', 'GasBill')
+# ── SMS (bdbulksms.com) ───────────────────────────────────────────────────────
+# API token from the bdbulksms.com panel. Set it ONLY in the server's .env
+# (BDBULKSMS_TOKEN=...) — never in code, never in git. Everything else about
+# SMS (on/off, reminder days, templates) is managed from the Messaging page.
+BDBULKSMS_TOKEN = os.getenv('BDBULKSMS_TOKEN', '')
 
 # ── Redis / Celery ────────────────────────────────────────────────────────────
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
@@ -217,6 +220,13 @@ CELERY_BEAT_SCHEDULE = {
     'nightly-backup': {
         'task': 'apps.backups.tasks.run_scheduled_backup',
         'schedule': crontab(hour=2, minute=0),  # once daily, low-traffic hour
+    },
+    # SMS payment reminders. Runs hourly; the task itself checks the
+    # admin-set reminder days + send hour (Messaging -> Settings) and
+    # de-duplicates, so re-running is always safe.
+    'sms-scheduled-reminders': {
+        'task': 'apps.messaging.tasks.run_scheduled_reminders',
+        'schedule': crontab(minute=5),
     },
 }
 
@@ -255,6 +265,11 @@ LOGGING = {
         # and token re-grants land here instead of getting lost in the
         # general 'django' logger's WARNING-level noise floor.
         'bkash': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'apps.messaging': {
             'handlers': ['console', 'file'],
             'level': 'INFO',
             'propagate': False,
