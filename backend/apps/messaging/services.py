@@ -185,6 +185,12 @@ def get_token():
     return getattr(settings, 'BDBULKSMS_TOKEN', '') or ''
 
 
+def scrub(text):
+    """The gateway echoes the token back in some replies — never store or show it."""
+    token = get_token()
+    return text.replace(token, '***') if token and text else text
+
+
 def parse_send_response(status_code, text):
     """
     Returns (ok, detail). Deliberately tolerant about the response shape
@@ -261,7 +267,16 @@ class SMSClient:
                                 timeout=REQUEST_TIMEOUT)
         except requests.RequestException as exc:
             raise TransientSMSError(f'Could not reach the SMS gateway ({type(exc).__name__}).') from None
-        return resp.text.strip()[:300]
+        text = resp.text.strip()
+        try:
+            data = json.loads(text)
+            items = data if isinstance(data, list) else [data]
+            out = {str(i.get('action')): i.get('response') for i in items if isinstance(i, dict) and i.get('action')}
+            if out:
+                return out
+        except ValueError:
+            pass
+        return {'raw': scrub(text)[:200]}
 
 
 def deliver(msg):
@@ -279,14 +294,14 @@ def deliver(msg):
         return msg
 
     msg.attempts += 1
-    msg.provider_response = (raw or '')[:1000]
+    msg.provider_response = scrub(raw or '')[:1000]
     if ok:
         msg.status = SMSMessage.STATUS_SENT
         msg.sent_at = timezone.now()
         msg.error = ''
     else:
         msg.status = SMSMessage.STATUS_FAILED
-        msg.error = detail[:500]
+        msg.error = scrub(detail)[:500]
     msg.save(update_fields=['status', 'error', 'attempts', 'provider_response', 'sent_at'])
     return msg
 

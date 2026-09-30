@@ -52,15 +52,20 @@ class OverviewView(APIView):
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         month_start = day_start.replace(day=1)
 
-        balance, balance_error = cache.get('sms_balance'), ''
-        if balance is None:
+        info, balance_error = cache.get('sms_balance'), ''
+        if info is None:
             try:
-                balance = services.SMSClient().balance()
-                cache.set('sms_balance', balance, 60)
+                info = services.SMSClient().balance()
+                cache.set('sms_balance', info, 60)
             except (services.ProviderConfigError, services.TransientSMSError) as exc:
-                balance, balance_error = None, str(exc)
+                info, balance_error = {}, str(exc)
+        balance = info.get('balance')
+        balance = f'{balance} SMS' if balance is not None else info.get('raw')
+        expiry = info.get('expiry')
+        if expiry in (None, '', '00-00-0000'):
+            expiry = None
         return Response({
-            'balance': balance, 'balance_error': balance_error,
+            'balance': balance, 'expiry': expiry, 'balance_error': balance_error,
             'today': counts(day_start), 'month': counts(month_start),
         })
 

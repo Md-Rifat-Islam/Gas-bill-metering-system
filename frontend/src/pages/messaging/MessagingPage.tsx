@@ -135,6 +135,7 @@ function Overview() {
         <div className="text-sm font-semibold text-surface-800 mt-1 break-words">
           {data?.balance ?? (data?.balance_error ? <span className="text-danger-600 text-xs">{data.balance_error}</span> : '—')}
         </div>
+        {data?.expiry && <div className="text-xs text-surface-400 mt-0.5">Expires {data.expiry}</div>}
       </div>
       <div className={card}>
         <div className="text-xs text-surface-400">Sent today</div>
