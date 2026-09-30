@@ -4,7 +4,7 @@ message creation (with de-duplication) and delivery.
 
 Provider: https://bdbulksms.com  (API host api.bdbulksms.net)
   send    : POST https://api.bdbulksms.net/api.php?json      token, to, message
-  balance : GET  https://api.bdbulksms.net/g_api.php?token=..&balance&json
+  balance : GET  https://api.bdbulksms.net/g_api.php?token=..&balance&expiry&json
 The token is read from the BDBULKSMS_TOKEN environment variable only.
 """
 import json
@@ -14,6 +14,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 import requests
+from urllib.parse import quote
 from django.conf import settings
 from django.utils import timezone
 
@@ -241,20 +242,25 @@ class SMSClient:
                 timeout=REQUEST_TIMEOUT,
             )
         except requests.RequestException as exc:
-            raise TransientSMSError(f'Network error: {exc}') from exc
+            raise TransientSMSError(f'Network error ({type(exc).__name__}).') from None
         ok, detail = parse_send_response(resp.status_code, resp.text)
         return ok, detail, resp.text
 
     def balance(self):
-        """Raw balance text from the provider, or raises."""
+        """
+        Balance + expiry as raw provider text (per the bdbulksms manual:
+        g_api.php?token=..&balance&expiry&json). Raises on problems.
+        The token is in this URL, so error messages deliberately never
+        include the underlying exception text (it would contain the URL).
+        """
         token = get_token()
         if not token:
             raise ProviderConfigError('BDBULKSMS_TOKEN is not configured on the server.')
         try:
-            resp = requests.get(BALANCE_URL, params={'token': token, 'balance': '', 'json': ''},
+            resp = requests.get(f'{BALANCE_URL}?token={quote(token)}&balance&expiry&json',
                                 timeout=REQUEST_TIMEOUT)
         except requests.RequestException as exc:
-            raise TransientSMSError(f'Network error: {exc}') from exc
+            raise TransientSMSError(f'Could not reach the SMS gateway ({type(exc).__name__}).') from None
         return resp.text.strip()[:300]
 
 
