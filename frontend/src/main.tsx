@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster, ToastBar, toast } from 'react-hot-toast'
 import App from './App'
+import PwaPrompt from './components/pwa/PwaPrompt'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -20,6 +21,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <App />
+        {/* Registers the service worker; shows "new version" / "offline" banners. */}
+        <PwaPrompt />
         <Toaster
           position="top-center"
           // Sits below a phone's status bar / notch instead of tucked into
