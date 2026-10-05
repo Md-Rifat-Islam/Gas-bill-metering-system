@@ -163,6 +163,19 @@ class BulkCreateBillsView(APIView):
             return Response({'detail': 'Invalid billing_month format.'}, status=status.HTTP_400_BAD_REQUEST)
         next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
 
+        # Optional percentage charge applied to EVERY bill created in this run
+        # (a percent of each bill's own base amount). Default 0 = no change.
+        from decimal import Decimal, InvalidOperation
+        try:
+            percentage_rate = Decimal(str(request.data.get('percentage_rate') or 0))
+        except InvalidOperation:
+            return Response({'detail': 'Invalid percentage_rate.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not (Decimal('0') <= percentage_rate <= Decimal('100')):
+            return Response(
+                {'detail': 'percentage_rate must be between 0 and 100.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         building = get_object_or_404(
             Building.objects.select_related('project', 'default_package'), id=building_id
         )
@@ -216,6 +229,7 @@ class BulkCreateBillsView(APIView):
                 unit_price=unit_price,
                 service_charge=service_charge,
                 conversion_factor=conversion_factor,
+                percentage_rate=percentage_rate,
                 created_by=request.user,
             )
             bill.calculate()

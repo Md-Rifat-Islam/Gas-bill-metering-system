@@ -362,6 +362,8 @@ class PortalInvoicePDFView(CustomerScopedMixin, APIView):
             ('Base Amount',    bill.base_amount),
             ('Service Charge', bill.service_charge),
         ]
+        if bill.percentage_amount:
+            charge_rows.append((f"Percentage Charge ({bill.percentage_rate:.2f}%)", bill.percentage_amount))
         if bill.extra_charge:
             charge_rows.append(('Extra Charge', bill.extra_charge))
         if bill.late_fee:

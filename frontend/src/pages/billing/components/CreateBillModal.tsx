@@ -5,7 +5,7 @@ import { Info, Gauge } from "lucide-react";
 import { billingAPI, buildingsAPI, projectsAPI, unitsAPI } from "@/api/client";
 import { Modal } from "@/components/ui";
 import { formatCurrency, formatDate } from "@/utils/helpers";
-import { computeUsage, computeBillTotal } from "@/utils/billingCalculations";
+import { computeUsage, computeBillTotal, computePercentageAmount } from "@/utils/billingCalculations";
 import toast from "react-hot-toast";
 
 interface CreateBillModalProps {
@@ -25,6 +25,7 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
       current_reading: 0,
       unit_price: 0,
       service_charge: 0,
+      percentage_rate: 0,
       conversion_factor: "" as number | "",
       extra_charge: 0,
       discount: 0,
@@ -40,6 +41,7 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
   const currReading = watch("current_reading") || 0;
   const unitPrice = watch("unit_price") || 0;
   const serviceCharge = watch("service_charge") || 0;
+  const percentageRate = watch("percentage_rate") || 0;
   const extraCharge = watch("extra_charge") || 0;
   const discount = watch("discount") || 0;
   const lateFee = watch("late_fee") || 0;
@@ -52,10 +54,12 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
     conversionFactor,
   );
   const baseAmount = billableUsage * Number(unitPrice);
+  const percentageAmount = computePercentageAmount(billableUsage, unitPrice, percentageRate);
   const total = computeBillTotal({
     billableUsage,
     unitPrice,
     serviceCharge,
+    percentageRate,
     extraCharge,
     discount,
     lateFee,
@@ -170,6 +174,7 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
       current_reading: data.current_reading,
       unit_price: data.unit_price,
       service_charge: data.service_charge,
+      percentage_rate: Number(data.percentage_rate) || 0,
       extra_charge: data.extra_charge,
       discount: data.discount,
       late_fee: data.late_fee,
@@ -410,6 +415,30 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="label">
+                  Percentage Charge (%){" "}
+                  <span className="text-surface-400 font-normal text-xs">
+                    (of base amount)
+                  </span>
+                </label>
+                <input
+                  {...register("percentage_rate", { min: 0, max: 100 })}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  className="input"
+                />
+                <p className="text-[11px] text-surface-400 mt-1">
+                  {percentageAmount > 0
+                    ? `= ${formatCurrency(percentageAmount)} added to this bill`
+                    : "Leave 0 for no percentage charge"}
+                </p>
+              </div>
+            </div>
+
             {/* Adjustment section */}
             <div className="border border-surface-100 rounded-xl p-4 space-y-3">
               <div className="flex items-center gap-2">
@@ -506,6 +535,12 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
                   <span>Service Charge</span>
                   <span>+ {formatCurrency(serviceCharge)}</span>
                 </div>
+                {percentageAmount > 0 && (
+                  <div className="flex justify-between text-surface-500">
+                    <span>Percentage Charge ({Number(percentageRate)}%)</span>
+                    <span>+ {formatCurrency(percentageAmount)}</span>
+                  </div>
+                )}
                 {Number(extraCharge) > 0 && (
                   <div className="flex justify-between text-surface-500">
                     <span>Extra Charge</span>

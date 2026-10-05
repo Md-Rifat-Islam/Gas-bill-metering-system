@@ -30,12 +30,13 @@ class BillSerializer(serializers.ModelSerializer):
             'allottee_name', 'allottee_mobile',
             'previous_reading', 'current_reading', 'total_usage_m3', 'total_usage_kg', 'conversion_factor',
             'unit_price', 'base_amount', 'service_charge',
+            'percentage_rate', 'percentage_amount',
             'extra_charge', 'discount', 'late_fee', 'is_adjusted', 'adjustment_reason',
             'total_amount', 'paid_amount', 'due_amount', 'status',
             'created_by_name', 'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'bill_number', 'base_amount', 'total_amount', 'due_amount', 'status',
+            'bill_number', 'base_amount', 'percentage_amount', 'total_amount', 'due_amount', 'status',
             'total_usage_m3', 'total_usage_kg', 'paid_amount', 'created_at', 'updated_at',
         ]
 
@@ -63,6 +64,9 @@ class BillSerializer(serializers.ModelSerializer):
         curr = data.get('current_reading', 0)
         if curr < prev:
             raise serializers.ValidationError({'current_reading': 'Current reading must be ≥ previous reading.'})
+        rate = data.get('percentage_rate')
+        if rate is not None and not (0 <= rate <= 100):
+            raise serializers.ValidationError({'percentage_rate': 'Percentage must be between 0 and 100.'})
         return data
 
     def create(self, validated_data):

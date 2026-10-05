@@ -160,6 +160,8 @@ export interface Bill {
   unit_price: string
   base_amount: string
   service_charge: string
+  percentage_rate: string
+  percentage_amount: string
   extra_charge: string
   discount: string
   late_fee: string

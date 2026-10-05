@@ -39,6 +39,12 @@ class Bill(models.Model):
     base_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     service_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
+    # Percentage charge: `percentage_rate` is a percent (5 = 5%) applied to
+    # base_amount (usage x unit price, i.e. BEFORE service/extra/late/discount).
+    # `percentage_amount` is always computed server-side in calculate().
+    percentage_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    percentage_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
     # Adjustments
     extra_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -95,8 +101,14 @@ class Bill(models.Model):
 
         self.base_amount = round(billable_usage * self.unit_price, 2)
 
+        # Percentage charge on the base amount (0 for bills that don't use it).
+        self.percentage_amount = round(
+            self.base_amount * Decimal(str(self.percentage_rate or 0)) / 100, 2
+        )
+
         self.total_amount = round(
-            self.base_amount + self.service_charge + self.extra_charge + self.late_fee - self.discount, 2
+            self.base_amount + self.service_charge + self.percentage_amount
+            + self.extra_charge + self.late_fee - self.discount, 2
         )
         self.due_amount = round(self.total_amount - self.paid_amount, 2)
         self._update_status()
@@ -123,6 +135,8 @@ class Bill(models.Model):
             raise ValidationError('Current reading must be >= previous reading')
         if self.discount > self.base_amount:
             raise ValidationError('Discount cannot exceed base amount')
+        if not (0 <= (self.percentage_rate or 0) <= 100):
+            raise ValidationError('Percentage charge must be between 0 and 100.')
         if self.is_adjusted and not self.adjustment_reason:
             raise ValidationError('Adjustment reason is required when adjustments are applied')
 

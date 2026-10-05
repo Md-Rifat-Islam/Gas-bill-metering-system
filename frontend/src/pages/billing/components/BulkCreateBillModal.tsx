@@ -14,6 +14,7 @@ export function BulkCreateBillModal({ open, onClose }: BulkCreateBillModalProps)
   const [projectId, setProjectId] = useState("");
   const [buildingId, setBuildingId] = useState("");
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [percentage, setPercentage] = useState("");
   const [result, setResult] = useState<any | null>(null);
 
   const { data: projects } = useQuery({
@@ -35,7 +36,11 @@ export function BulkCreateBillModal({ open, onClose }: BulkCreateBillModalProps)
 
   const bulkCreate = useMutation({
     mutationFn: () =>
-      billingAPI.bulkCreate({ building_id: buildingId, billing_month: month }),
+      billingAPI.bulkCreate({
+        building_id: buildingId,
+        billing_month: month,
+        percentage_rate: Number(percentage || 0),
+      }),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["bills"] });
       setResult(res.data);
@@ -52,6 +57,7 @@ export function BulkCreateBillModal({ open, onClose }: BulkCreateBillModalProps)
     setResult(null);
     setProjectId("");
     setBuildingId("");
+    setPercentage("");
   };
 
   return (
@@ -128,6 +134,31 @@ export function BulkCreateBillModal({ open, onClose }: BulkCreateBillModalProps)
           </div>
         </div>
 
+        <div className="max-w-xs">
+          <label htmlFor="bulk-create-percentage" className="label">
+            Percentage Charge (%){" "}
+            <span className="text-surface-400 font-normal text-xs">(optional)</span>
+          </label>
+          <input
+            id="bulk-create-percentage"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            className="input"
+            placeholder="0"
+            value={percentage}
+            onChange={(e) => {
+              setPercentage(e.target.value);
+              setResult(null);
+            }}
+          />
+          <p className="text-[11px] text-surface-400 mt-1">
+            Added to every bill created in this run, calculated on each bill's
+            own base amount (usage × unit price). Leave empty for none.
+          </p>
+        </div>
+
         {result && (
           <div className="space-y-3 animate-fadeIn">
             <div className="bg-success-50 rounded-xl p-3 text-sm text-success-700">
@@ -173,7 +204,12 @@ export function BulkCreateBillModal({ open, onClose }: BulkCreateBillModalProps)
           </button>
           <button
             className="btn-primary w-full sm:w-auto justify-center"
-            disabled={!buildingId || bulkCreate.isPending}
+            disabled={
+              !buildingId ||
+              bulkCreate.isPending ||
+              Number(percentage || 0) < 0 ||
+              Number(percentage || 0) > 100
+            }
             onClick={() => bulkCreate.mutate()}
           >
             {bulkCreate.isPending ? "Creating…" : "Create Bills"}

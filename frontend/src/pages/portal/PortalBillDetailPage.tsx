@@ -139,6 +139,12 @@ export default function PortalBillDetailPage() {
           <Row label="Base Amount" value={formatCurrency(bill.base_amount)} />
           <Row label={`Unit Price (৳${bill.unit_price}/m³)`} value="" muted />
           <Row label="Service Charge" value={`+ ${formatCurrency(bill.service_charge)}`} />
+          {Number(bill.percentage_amount) > 0 && (
+            <Row
+              label={`Percentage Charge (${Number(bill.percentage_rate)}%)`}
+              value={`+ ${formatCurrency(bill.percentage_amount)}`}
+            />
+          )}
           {Number(bill.extra_charge) > 0 && <Row label="Extra Charge" value={`+ ${formatCurrency(bill.extra_charge)}`} />}
           {Number(bill.late_fee) > 0 && <Row label="Late Fee" value={`+ ${formatCurrency(bill.late_fee)}`} warn />}
           {Number(bill.discount) > 0 && <Row label="Discount" value={`− ${formatCurrency(bill.discount)}`} success />}

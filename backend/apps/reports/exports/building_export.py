@@ -50,12 +50,13 @@ BUILDING_HEADERS = [
     'SL', 'Floor No.', "Respective Allottee's Name", 'Meter No.', 'Month', 'Unit',
     'Previous Month\nReading', 'Current month\nReading', 'Total\nUsage (m3)',
     'Total\nUsage (Kg)', 'Unit Price\n(BDT)', 'Gas Price\n(BDT)',
-    'Service Charge\n(BDT)', 'Due Bill\n(BDT)', 'Total payable\n(BDT)',
+    'Service Charge\n(BDT)', 'Percentage\n(%)', 'Percentage Charge\n(BDT)',
+    'Due Bill\n(BDT)', 'Total payable\n(BDT)',
 ]
 # Column indices (1-based) for readability in formulas below
 COL_SL, COL_FLOOR, COL_NAME, COL_METER, COL_MONTH, COL_UNIT = 1, 2, 3, 4, 5, 6
 COL_PREV, COL_CURR, COL_USAGE_M3, COL_USAGE_KG = 7, 8, 9, 10
-COL_PRICE, COL_GAS_PRICE, COL_SERVICE, COL_DUE, COL_PAYABLE = 11, 12, 13, 14, 15
+COL_PRICE, COL_GAS_PRICE, COL_SERVICE, COL_PCT, COL_PCT_AMT, COL_DUE, COL_PAYABLE = 11, 12, 13, 14, 15, 16, 17
 
 
 def _style(cell, font=None, fill=None, align=None, border=True, num_fmt=None):
@@ -91,19 +92,19 @@ def build_building_sheet(wb: Workbook, building, bills, default_unit_price, defa
 
     project = building.project
 
-    ws.merge_cells('A1:O1')
+    ws.merge_cells('A1:Q1')
     ws['A1'] = project.name if project else 'Gas Billing Project'
     _style(ws['A1'], font=TITLE_FONT, align=CENTER, border=False)
 
-    ws.merge_cells('A2:O2')
+    ws.merge_cells('A2:Q2')
     ws['A2'] = 'LP Gas Bill Month'
     _style(ws['A2'], font=SUB_FONT, align=CENTER, border=False)
 
-    ws.merge_cells('A3:O3')
+    ws.merge_cells('A3:Q3')
     ws['A3'] = f'Building Name: {building.name}'
     _style(ws['A3'], font=SUB_FONT, align=CENTER, border=False)
 
-    ws.merge_cells('A4:O4')
+    ws.merge_cells('A4:Q4')
     ws['A4'] = f'Project Address: {project.address if project else ""}'
     _style(ws['A4'], font=NORMAL_FONT, align=CENTER, border=False)
 
@@ -173,24 +174,35 @@ def build_building_sheet(wb: Workbook, building, bills, default_unit_price, defa
         ws.cell(row=row, column=COL_SERVICE,
                 value=f'=IF({col_usage_m3}{row}=0,0,$E$6)')
 
+        # Percentage charge: editable rate (%) per row; the amount is a live
+        # formula on that row's Gas Price, so editing readings/price/rate
+        # flows through to Total Payable and every linked Unit sheet.
+        col_pct = get_column_letter(COL_PCT)
+        ws.cell(row=row, column=COL_PCT, value=float(bill.percentage_rate or 0))
+        ws.cell(row=row, column=COL_PCT_AMT,
+                value=f'=ROUND({col_gas_price}{row}*{col_pct}{row}/100,2)')
+
         # Carried-over due / arrears — editable input, defaults to 0
         ws.cell(row=row, column=COL_DUE, value=float(bill.due_amount) if bill.due_amount else 0)
 
         # Total Payable = Gas Price + Service Charge + Due  (FORMULA)
         ws.cell(row=row, column=COL_PAYABLE,
-                value=f'={col_gas_price}{row}+{col_service}{row}+{col_due}{row}')
+                value=(f'={col_gas_price}{row}+{col_service}{row}'
+                       f'+{get_column_letter(COL_PCT_AMT)}{row}+{col_due}{row}'))
 
         for col in range(1, len(BUILDING_HEADERS) + 1):
             cell = ws.cell(row=row, column=col)
             fmt = None
             if col in (COL_PREV, COL_CURR, COL_USAGE_M3, COL_USAGE_KG):
                 fmt = NUM_FMT
-            elif col in (COL_PRICE, COL_GAS_PRICE, COL_SERVICE, COL_DUE, COL_PAYABLE):
+            elif col == COL_PCT:
+                fmt = '0.00'
+            elif col in (COL_PRICE, COL_GAS_PRICE, COL_SERVICE, COL_PCT_AMT, COL_DUE, COL_PAYABLE):
                 fmt = CURRENCY_FMT
             align = CENTER if col in (COL_SL, COL_FLOOR, COL_METER, COL_MONTH, COL_UNIT) else (
                 LEFT if col == COL_NAME else RIGHT
             )
-            is_input = col in (COL_PREV, COL_CURR, COL_DUE)
+            is_input = col in (COL_PREV, COL_CURR, COL_PCT, COL_DUE)
             _style(cell, font=(INPUT_FONT if is_input else NORMAL_FONT), align=align, num_fmt=fmt)
 
         row += 1
@@ -204,7 +216,7 @@ def build_building_sheet(wb: Workbook, building, bills, default_unit_price, defa
         for col in range(2, 7):
             _style(ws.cell(row=total_row, column=col), fill=TOTAL_FILL)
 
-        for col in (COL_USAGE_M3, COL_USAGE_KG, COL_GAS_PRICE, COL_SERVICE, COL_DUE, COL_PAYABLE):
+        for col in (COL_USAGE_M3, COL_USAGE_KG, COL_GAS_PRICE, COL_SERVICE, COL_PCT_AMT, COL_DUE, COL_PAYABLE):
             letter = get_column_letter(col)
             cell = ws.cell(row=total_row, column=col,
                             value=f'=SUM({letter}{first_data_row}:{letter}{last_data_row})')
@@ -213,7 +225,7 @@ def build_building_sheet(wb: Workbook, building, bills, default_unit_price, defa
     else:
         total_row = row
 
-    widths = [5, 9, 26, 16, 8, 7, 13, 13, 11, 11, 11, 12, 13, 11, 13]
+    widths = [5, 9, 26, 16, 8, 7, 13, 13, 11, 11, 11, 12, 13, 10, 13, 11, 13]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
     ws.row_dimensions[header_row].height = 32
@@ -243,6 +255,8 @@ def build_unit_sheets(wb: Workbook, building_ws: Worksheet, first_row: int, last
         ('Unit Price (BDT):',        COL_PRICE,       False, True),
         ('Gas Price (BDT):',         COL_GAS_PRICE,   False, True),
         ('Service Charge (BDT):',    COL_SERVICE,     False, True),
+        ('Percentage (%):',          COL_PCT,         False, False),
+        ('Percentage Charge (BDT):', COL_PCT_AMT,     False, True),
         ('Due Bill (BDT):',          COL_DUE,         False, True),
         ('Total Payable (BDT):',     COL_PAYABLE,     False, True),
     ]

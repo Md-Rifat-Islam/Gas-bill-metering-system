@@ -57,6 +57,7 @@ def export_bills_excel(bills_qs, title='Billing Export') -> bytes:
         'Floor', 'Allottee', 'Meter No.',
         'Prev. Reading', 'Curr. Reading', 'Usage (m³)', 'Usage (Kg)',
         'Unit Price', 'Base Amount', 'Service Charge',
+        'Percentage (%)', 'Percentage Charge',
         'Extra Charge', 'Discount', 'Late Fee',
         'Total Amount', 'Paid', 'Due', 'Status', 'Created',
     ]
@@ -64,7 +65,7 @@ def export_bills_excel(bills_qs, title='Billing Export') -> bytes:
     _header_row(ws, headers)
 
     col_widths = [5, 14, 14, 18, 16, 8, 7, 20, 16,
-                  12, 12, 11, 11, 11, 12, 13, 12, 11, 11,
+                  12, 12, 11, 11, 11, 12, 13, 9, 13, 12, 11, 11,
                   13, 12, 12, 10, 12]
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
@@ -89,6 +90,8 @@ def export_bills_excel(bills_qs, title='Billing Export') -> bytes:
             float(bill.unit_price or 0),
             float(bill.base_amount or 0),
             float(bill.service_charge or 0),
+            float(bill.percentage_rate or 0),
+            float(bill.percentage_amount or 0),
             float(bill.extra_charge or 0),
             float(bill.discount or 0),
             float(bill.late_fee or 0),
@@ -102,7 +105,9 @@ def export_bills_excel(bills_qs, title='Billing Export') -> bytes:
             c = ws.cell(row=r, column=col, value=val)
             if col in (10, 11, 12, 13):
                 _style(c, font=NORMAL_FONT, align=RIGHT, num_fmt='#,##0.000')
-            elif col in (14, 15, 16, 17, 18, 19, 20, 21, 22):
+            elif col == 17:
+                _style(c, font=NORMAL_FONT, align=RIGHT, num_fmt='0.00')
+            elif col in (14, 15, 16, 18, 19, 20, 21, 22, 23, 24):
                 _style(c, font=NORMAL_FONT, align=RIGHT, num_fmt=CURRENCY)
             elif col == 1:
                 _style(c, font=NORMAL_FONT, align=CENTER)
@@ -118,7 +123,7 @@ def export_bills_excel(bills_qs, title='Billing Export') -> bytes:
     ws.cell(row=tr, column=1, value='Total')
     for col in range(1, len(headers) + 1):
         _style(ws.cell(row=tr, column=col), font=TOTAL_FONT, fill=TOTAL_FILL)
-    for col, val in [(20, float(total_billed)), (21, float(total_paid)), (22, float(total_due))]:
+    for col, val in [(22, float(total_billed)), (23, float(total_paid)), (24, float(total_due))]:
         c = ws.cell(row=tr, column=col, value=val)
         _style(c, font=TOTAL_FONT, fill=TOTAL_FILL, align=RIGHT, num_fmt=CURRENCY)
 

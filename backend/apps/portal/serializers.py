@@ -47,6 +47,7 @@ class PortalBillSerializer(serializers.ModelSerializer):
             'billing_month', 'billing_month_display',
             'previous_reading', 'current_reading', 'total_usage_m3',
             'unit_price', 'base_amount', 'service_charge',
+            'percentage_rate', 'percentage_amount',
             'extra_charge', 'discount', 'late_fee', 'is_adjusted', 'adjustment_reason',
             'total_amount', 'paid_amount', 'due_amount', 'status',
             'created_at',

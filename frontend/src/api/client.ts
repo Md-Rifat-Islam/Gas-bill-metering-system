@@ -180,7 +180,7 @@ export const billingAPI = {
   quickEdit: (id: number, data: any) => api.patch(`/billing/${id}/quick-edit/`, data),
   // Creates a bill for every active unit in a building with a recorded
   // meter reading for the month, auto-filling rate from the package.
-  bulkCreate: (data: { building_id: string | number; billing_month: string }) =>
+  bulkCreate: (data: { building_id: string | number; billing_month: string; percentage_rate?: number }) =>
     api.post('/billing/bulk-create/', data),
   // Fetches the latest reading for a unit, if any, to pre-fill the "Previous Reading" field when creating a new bill.
   latestReading: (unitId: string | number) =>

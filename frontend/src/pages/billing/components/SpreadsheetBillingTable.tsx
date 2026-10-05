@@ -11,6 +11,7 @@ const EDITABLE_FIELDS = [
   "current_reading",
   "unit_price",
   "service_charge",
+  "percentage_rate",
   "extra_charge",
   "discount",
   "late_fee",
@@ -33,6 +34,7 @@ function computePreviewTotal(
     billableUsage,
     unitPrice: get("unit_price"),
     serviceCharge: get("service_charge"),
+    percentageRate: get("percentage_rate"),
     extraCharge: get("extra_charge"),
     discount: get("discount"),
     lateFee: get("late_fee"),
@@ -123,6 +125,7 @@ export function SpreadsheetBillingTable({ bills }: { bills: any[] }) {
             <th className="text-right">Current</th>
             <th className="text-right">Unit Price</th>
             <th className="text-right">Service Charge</th>
+            <th className="text-right">Percentage %</th>
             <th className="text-right">Extra</th>
             <th className="text-right">Discount</th>
             <th className="text-right">Late Fee</th>
