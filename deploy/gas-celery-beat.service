@@ -1,0 +1,16 @@
+[Unit]
+Description=Gas Billing Celery Beat (scheduler)
+After=network.target redis-server.service gas-celery-worker.service
+
+[Service]
+Type=simple
+User=rifat
+Group=rifat
+WorkingDirectory=/home/rifat/apps/Gas-bill-metering-system/backend
+EnvironmentFile=/home/rifat/apps/Gas-bill-metering-system/backend/.env
+ExecStart=/home/rifat/apps/Gas-bill-metering-system/backend/venv/bin/celery -A gas_billing beat --loglevel=INFO --schedule=/home/rifat/apps/Gas-bill-metering-system/backend/celerybeat-schedule
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

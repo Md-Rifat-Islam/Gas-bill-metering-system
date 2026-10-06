@@ -1,0 +1,17 @@
+[Unit]
+Description=Gas Billing Celery Worker
+After=network.target redis-server.service postgresql.service
+
+[Service]
+Type=simple
+User=rifat
+Group=rifat
+WorkingDirectory=/home/rifat/apps/Gas-bill-metering-system/backend
+# Load the same .env the web app uses (BDBULKSMS_TOKEN, REDIS_URL, DB_*)
+EnvironmentFile=/home/rifat/apps/Gas-bill-metering-system/backend/.env
+ExecStart=/home/rifat/apps/Gas-bill-metering-system/backend/venv/bin/celery -A gas_billing worker --loglevel=INFO --concurrency=2
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
