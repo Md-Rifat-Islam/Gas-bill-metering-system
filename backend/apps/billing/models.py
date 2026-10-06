@@ -92,7 +92,9 @@ class Bill(models.Model):
         if self.conversion_factor:
             precise_usage_kg = self.total_usage_m3 * self.conversion_factor  # unrounded, full precision
             # self.total_usage_kg = round(precise_usage_kg, 2)                  # rounded only for display/storage
-            self.total_usage_kg = precise_usage_kg                            # full precision now, no round()
+            # Stored rounded to the column's 4 decimal places (usage x ratio can have
+            # up to 7). Billing below still uses the UNROUNDED precise_usage_kg.
+            self.total_usage_kg = precise_usage_kg.quantize(Decimal('0.0001'))
             billable_usage = precise_usage_kg                                 # ← use UNROUNDED for billing
         else:
             self.total_usage_kg = None
