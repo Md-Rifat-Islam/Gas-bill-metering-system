@@ -248,7 +248,7 @@ export default function BillDetailPage() {
               <SummaryRow label="Service Charge" value={`+ ${formatCurrency(bill.service_charge)}`} />
               {Number(bill.percentage_amount) > 0 && (
                 <SummaryRow
-                  label={`Percentage Charge (${Number(bill.percentage_rate)}%)`}
+                  label={`Bkash Charge (${Number(bill.percentage_rate)}%)`}
                   value={`+ ${formatCurrency(bill.percentage_amount)}`}
                 />
               )}
