@@ -9,7 +9,9 @@ Notes
 * Wording mirrors the on-screen bill pages (see frontend utils/billLabels.ts):
   "bKash Charge", kg vs m³ unit price, Conversion Ratio / Final Usage.
 """
+import os
 from decimal import Decimal
+from io import BytesIO
 
 from django.conf import settings
 from django.utils import timezone
@@ -40,14 +42,49 @@ def money(value) -> str:
     return f"BDT {Decimal(str(value or 0)):,.2f}"
 
 
+# Logos are decoded + downscaled ONCE per worker process and kept in memory.
+# Previously every download re-read and re-decoded the full-size image files
+# (slow for large PNGs, especially with alpha-mask handling), which made the
+# invoice take seconds. The key includes the file's mtime, so replacing a
+# logo file on disk is picked up automatically without a restart.
+_LOGO_CACHE = {}
+_LOGO_MAX_HEIGHT_PX = 220   # ~400 dpi at the 14 mm header height — plenty sharp
+
+
+def _prepared_logo(path):
+    """Returns (png_bytes, width_px, height_px) or None if unavailable."""
+    path = str(path)
+    try:
+        key = (path, os.path.getmtime(path))
+    except OSError:
+        return None
+    if key in _LOGO_CACHE:
+        return _LOGO_CACHE[key]
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            im.load()
+            has_alpha = im.mode in ('RGBA', 'LA') or (im.mode == 'P' and 'transparency' in im.info)
+            im = im.convert('RGBA' if has_alpha else 'RGB')
+            if im.height > _LOGO_MAX_HEIGHT_PX:
+                ratio = _LOGO_MAX_HEIGHT_PX / im.height
+                im = im.resize((max(1, round(im.width * ratio)), _LOGO_MAX_HEIGHT_PX), Image.LANCZOS)
+            buf = BytesIO()
+            im.save(buf, format='PNG')
+            result = (buf.getvalue(), im.width, im.height)
+    except Exception:
+        result = None
+    _LOGO_CACHE[key] = result
+    return result
+
+
 def _load_logo(path):
     """Returns (ImageReader, width_px, height_px) or None if unavailable."""
-    try:
-        img = ImageReader(str(path))
-        w, h = img.getSize()
-        return img, w, h
-    except Exception:
+    prepared = _prepared_logo(path)
+    if not prepared:
         return None
+    data, w, h = prepared
+    return ImageReader(BytesIO(data)), w, h
 
 
 def _is_kg_billed(bill) -> bool:
@@ -63,7 +100,8 @@ def generate_invoice_pdf(bill, fileobj):
     logo_y = height - 15 * mm - logo_h
     branding = settings.BASE_DIR / 'static' / 'branding'
 
-    dtel = _load_logo(branding / 'dtel-logo.png') or _load_logo(branding / 'dtel-logo.jpeg')
+    #dtel = _load_logo(branding / 'dtel-logo.png') or _load_logo(branding / 'dtel-logo.jpeg')
+    dtel = _load_logo(branding / 'dtel-logo.jpeg') # or _load_logo(branding / 'dtel-logo.jpeg')
     if dtel:
         img, iw, ih = dtel
         p.drawImage(img, LEFT, logo_y, width=logo_h * iw / ih, height=logo_h,

@@ -62,6 +62,7 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │   │   │   ├── 0002_alter_bill_last_updated_by.py
 │   │   │   │   ├── 0003_widen_reading_precision.py
 │   │   │   │   ├── 0004_widen_usage_kg_precision.py
+│   │   │   │   ├── 0005_bill_percentage_charge.py
 │   │   │   │   └── __init__.py
 │   │   │   ├── models.py
 │   │   │   ├── serializers.py
@@ -224,6 +225,9 @@ Project Root: /home/muhammad/Desktop/Deco/Utility Billing/Code/gas-billing-syste
 │   │       ├── dtel-logo.jpeg
 │   │       └── dtel-logo.png
 │   └── templates
+├── deploy
+│   ├── gas-celery-beat.service
+│   └── gas-celery-worker.service
 ├── docker-compose.yml
 ├── docs
 │   ├── images
