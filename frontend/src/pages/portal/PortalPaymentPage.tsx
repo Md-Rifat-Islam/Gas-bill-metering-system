@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Upload, AlertCircle, CheckCircle,
@@ -14,20 +14,18 @@ interface PortalPaymentPageProps {}
 
 export default function PortalPaymentPage(_: PortalPaymentPageProps) {
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const [params] = useSearchParams()
   const billId   = params.get('bill')
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   // Separate from `submitting` so the button can say "Compressing…" during
   // the (usually sub-second) client-side image shrink step, before the
-  // actual network submit starts — the two stages can otherwise look like
-  // one long, unexplained "Submitting…" hang on a slow phone connection.
+  // actual network submit starts.
   const [compressing, setCompressing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // bKash checkout — separate loading/error state from the manual-proof
-  // form above, since the two flows are independent (a bKash failure
-  // shouldn't block filling out the manual form, and vice versa).
+  // bKash checkout — separate loading/error state from the manual-proof form.
   const [bkashLoading, setBkashLoading] = useState(false)
   const [bkashError, setBkashError] = useState<string | null>(null)
 
@@ -41,6 +39,15 @@ export default function PortalPaymentPage(_: PortalPaymentPageProps) {
     queryKey: ['portal-payment-channels'],
     queryFn: () => portalPaymentChannelsAPI.get().then(r => r.data),
   })
+
+  // After any payment action, drop every cached portal query (bill, bills
+  // list, payments, dashboard, notifications…) so the next screen shows
+  // fresh data instead of the pre-payment snapshot. Matching on the
+  // 'portal-' key prefix means new portal queries are covered automatically.
+  const refreshPortalData = () =>
+    qc.invalidateQueries({
+      predicate: (q) => String(q.queryKey[0] ?? '').startsWith('portal-'),
+    })
 
   const handleBkashPay = async () => {
     if (!billId) return
@@ -85,9 +92,8 @@ export default function PortalPaymentPage(_: PortalPaymentPageProps) {
     }
 
     // Compress whichever proof file(s) are images before they go over the
-    // wire — these are typically 2-3MB straight off a phone camera/gallery.
-    // proof_invoice may legitimately be a PDF, which compressImage leaves
-    // untouched. Uses fd.set (not append) to replace the original entry.
+    // wire. proof_invoice may legitimately be a PDF, which compressImage
+    // leaves untouched. Uses fd.set (not append) to replace the entry.
     setCompressing(true)
     try {
       if (proofImage?.size) {
@@ -111,6 +117,9 @@ export default function PortalPaymentPage(_: PortalPaymentPageProps) {
 
     try {
       await paymentsAPI.customerSubmit(fd)
+      // Sync: bill detail, bills list, payment history and dashboard now
+      // show the new Pending submission straight away.
+      await refreshPortalData()
       setSubmitted(true)
     } catch (err: any) {
       const data = err.response?.data
@@ -169,8 +178,7 @@ export default function PortalPaymentPage(_: PortalPaymentPageProps) {
       {/* Where to send money manually */}
       <PaymentChannelsCard data={channels} />
 
-      {/* bKash instant checkout — skips the manual proof-upload flow
-          entirely when it succeeds, since the callback auto-approves it. */}
+      {/* bKash instant checkout */}
       {bill && Number(bill.due_amount) > 0 && (
         <div className="card !border-2 !border-pink-200 !bg-pink-50/50 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">

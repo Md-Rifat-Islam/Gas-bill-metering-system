@@ -182,12 +182,8 @@ export function PaymentModal({ open, onClose, bill, editPayment, onPaid }: Payme
 
   const save = useMutation({
     mutationFn: (data: any) => {
-      // THE FIX: this used to send a plain object with a manually forced
-      // multipart/form-data header — axios doesn't convert a plain object
-      // into real multipart data just because the header says so, so the
-      // backend was receiving a mismatched/malformed body. Building actual
-      // FormData (same pattern as ManualPaymentModal) fixes that, and lets
-      // an optional proof file ride along correctly when present.
+      // Builds real FormData (a plain object with a forced multipart header
+      // isn't converted by axios), so an optional proof file rides along.
       const fd = new FormData()
       Object.entries(data).forEach(([k, v]) => {
         if (v !== undefined && v !== null && v !== '') fd.append(k, String(v))
@@ -201,10 +197,17 @@ export function PaymentModal({ open, onClose, bill, editPayment, onPaid }: Payme
       return paymentsAPI.create(fd)
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['bill', bill?.id] })
-      qc.invalidateQueries({ queryKey: ['payments', bill?.id] })
+      // SYNC FIX: invalidate by key PREFIX. The bill page's keys are
+      // ['bill', id] / ['payments', id] where id is the URL *string*, but
+      // this used ['bill', bill?.id] (a *number*, and undefined in edit
+      // mode) — TanStack treats "12" and 12 as different keys, so the open
+      // bill page often wasn't refreshed after recording a payment.
+      qc.invalidateQueries({ queryKey: ['bill'] })
       qc.invalidateQueries({ queryKey: ['bills'] })
+      qc.invalidateQueries({ queryKey: ['payments'] })
       qc.invalidateQueries({ queryKey: ['all-payments'] })
+      qc.invalidateQueries({ queryKey: ['payments-pending'] })
+      qc.invalidateQueries({ queryKey: ['payments-pending-count'] })
       toast.success(isEdit ? 'Payment updated' : 'Payment recorded')
       onClose(); reset(); setProof(null)
       onPaid?.()
@@ -296,10 +299,6 @@ export function PaymentModal({ open, onClose, bill, editPayment, onPaid }: Payme
           />
         </div>
         <div>
-          {/* THE FIX: this field didn't exist at all — Payment.payment_date
-              is a required model field with no default, so every submission
-              through this modal failed with "payment_date: This field is
-              required." Added here, defaulting to today. */}
           <label className="label" htmlFor="pay-date">Payment Date <span className="text-danger-500">*</span></label>
           <input
             id="pay-date"

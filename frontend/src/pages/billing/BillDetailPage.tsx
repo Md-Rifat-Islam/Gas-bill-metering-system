@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, CreditCard, Printer, History, Trash2, Smartphone, Loader2 } from 'lucide-react'
-import { billingAPI, paymentsAPI, auditAPI } from '@/api/client'
+import { ArrowLeft, CreditCard, Trash2, Smartphone, Loader2 } from 'lucide-react'
+import { billingAPI, paymentsAPI } from '@/api/client'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useConfirm } from '@/hooks'
-import { Modal, PageLoader, StatusBadge, ConfirmDialog } from '@/components/ui'
+import { PageLoader, StatusBadge, ConfirmDialog } from '@/components/ui'
 import { PaymentModal } from '@/components/payments/PaymentModal'
-import { formatCurrency, formatDate, formatMonth } from '@/utils/helpers'
+import {
+  UnitDetailsCard, MeterReadingsCard, BillSummaryCard, PaymentHistoryCard,
+} from '@/components/billing/BillShared'
+import { formatMonth } from '@/utils/helpers'
 import toast from 'react-hot-toast'
 
 export default function BillDetailPage() {
@@ -24,11 +27,18 @@ export default function BillDetailPage() {
   const { data: bill, isLoading } = useQuery({
     queryKey: ['bill', id],
     queryFn: () => billingAPI.get(Number(id)).then(r => r.data),
+    // A customer may submit/pay from the portal while staff has this page
+    // open — re-check periodically and when the tab regains focus so the
+    // paid/due figures never go stale.
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   })
   const { data: payments = [] } = useQuery({
     queryKey: ['payments', id],
     queryFn: () => paymentsAPI.list({ bill: id }).then(r => r.data.results || r.data),
     enabled: !!id,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   })
 
   // Handles the redirect bKash sends the browser back to after a
@@ -101,9 +111,7 @@ export default function BillDetailPage() {
 
   return (
     <div className="max-w-4xl">
-      {/* Header — wraps to multiple rows on narrow screens instead of
-          squeezing the back button, title, badge, and action buttons
-          into one unbreakable row. */}
+      {/* Header — wraps to multiple rows on narrow screens. */}
       <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-8">
         <button
           className="btn-ghost btn-sm"
@@ -157,129 +165,14 @@ export default function BillDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Bill details */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Unit info */}
-          <div className="card">
-            <div className="text-sm font-bold text-surface-500 uppercase tracking-wider mb-4">Unit Details</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 text-sm">
-              <InfoRow label="Project"  value={bill.project_name} />
-              <InfoRow label="Building" value={bill.building_name} />
-              <InfoRow label="Unit"     value={bill.unit_no} />
-              <InfoRow label="Allottee" value={bill.allottee_name || '—'} />
-              <InfoRow label="Mobile"   value={bill.allottee_mobile || '—'} mono />
-            </div>
-          </div>
-
-          {/* Meter readings */}
-          <div className="card">
-            <div className="text-sm font-bold text-surface-500 uppercase tracking-wider mb-4">Meter Readings</div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
-              <div className="bg-surface-50 rounded-xl p-4">
-                <div className="text-xs text-surface-400 mb-1">Previous</div>
-                <div className="text-2xl font-bold font-mono text-surface-700">{bill.previous_reading}</div>
-                <div className="text-xs text-surface-400">m³</div>
-              </div>
-              <div className="bg-brand-50 rounded-xl p-4">
-                <div className="text-xs text-brand-400 mb-1">Consumed</div>
-                <div className="text-2xl font-bold font-mono text-brand-700">{bill.total_usage_m3}</div>
-                <div className="text-xs text-brand-400">m³</div>
-              </div>
-              <div className="bg-surface-50 rounded-xl p-4">
-                <div className="text-xs text-surface-400 mb-1">Current</div>
-                <div className="text-2xl font-bold font-mono text-surface-700">{bill.current_reading}</div>
-                <div className="text-xs text-surface-400">m³</div>
-              </div>
-            </div>
-
-            {bill.conversion_factor && bill.total_usage_kg && (
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-center">
-                <div className="bg-surface-50 rounded-xl p-4">
-                  <div className="text-xs text-surface-400 mb-1">Conversion Ratio</div>
-                  <div className="text-lg font-bold font-mono text-surface-700">{bill.conversion_factor}</div>
-                  <div className="text-xs text-surface-400">kg / m³</div>
-                </div>
-                <div className="bg-brand-50 rounded-xl p-4">
-                  <div className="text-xs text-brand-400 mb-1">Final Usage (Billed)</div>
-                  <div className="text-lg font-bold font-mono text-brand-700">{bill.total_usage_kg}</div>
-                  <div className="text-xs text-brand-400">kg</div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Payment history */}
-          <div className="card">
-            <div className="text-sm font-bold text-surface-500 uppercase tracking-wider mb-4">
-              Payment History ({payments.length})
-            </div>
-            {payments.length === 0 ? (
-              <p className="text-sm text-surface-400">No payments recorded yet</p>
-            ) : (
-              <div className="space-y-2">
-                {payments.map((p: any) => (
-                  <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 px-3 bg-surface-50 rounded-xl text-sm">
-                    <div>
-                      <span className="font-semibold text-surface-800">{formatCurrency(p.paid_amount)}</span>
-                      <span className="ml-2 badge-blue">{p.payment_method}</span>
-                      {p.transaction_id && (
-                        <span className="ml-2 text-xs font-mono text-surface-400">#{p.transaction_id}</span>
-                      )}
-                    </div>
-                    <div className="text-surface-400 text-xs">{formatDate(p.payment_date)}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <UnitDetailsCard bill={bill} showMobile />
+          <MeterReadingsCard bill={bill} />
+          <PaymentHistoryCard payments={payments} />
         </div>
 
-        {/* Amount summary */}
         <div>
-          <div className="card lg:sticky lg:top-4">
-            <div className="text-sm font-bold text-surface-500 uppercase tracking-wider mb-4">Bill Summary</div>
-            <div className="space-y-2.5 text-sm">
-              <SummaryRow label="Base Amount"   value={formatCurrency(bill.base_amount)} />
-              <SummaryRow
-                label="Unit Price"
-                value={`${formatCurrency(bill.unit_price)}/${bill.total_usage_kg ? 'kg' : 'm³'}`}
-                muted
-              />
-              <SummaryRow label="Service Charge" value={`+ ${formatCurrency(bill.service_charge)}`} />
-              {Number(bill.percentage_amount) > 0 && (
-                <SummaryRow
-                  label={`Bkash Charge (${Number(bill.percentage_rate)}%)`}
-                  value={`+ ${formatCurrency(bill.percentage_amount)}`}
-                />
-              )}
-              {Number(bill.extra_charge) > 0 && (
-                <SummaryRow label="Extra Charge" value={`+ ${formatCurrency(bill.extra_charge)}`} />
-              )}
-              {Number(bill.late_fee) > 0 && (
-                <SummaryRow label="Late Fee" value={`+ ${formatCurrency(bill.late_fee)}`} warn />
-              )}
-              {Number(bill.discount) > 0 && (
-                <SummaryRow label="Discount" value={`− ${formatCurrency(bill.discount)}`} success />
-              )}
-              <div className="border-t-2 border-surface-900 pt-3 flex justify-between">
-                <span className="font-bold text-surface-900">Total</span>
-                <span className="font-bold text-xl text-brand-700">{formatCurrency(bill.total_amount)}</span>
-              </div>
-              <div className="pt-1 space-y-2">
-                <SummaryRow label="Paid" value={formatCurrency(bill.paid_amount)} success />
-                <div className="bg-danger-50 rounded-xl p-3 flex justify-between">
-                  <span className="font-semibold text-danger-700">Due</span>
-                  <span className="font-bold text-danger-700">{formatCurrency(bill.due_amount)}</span>
-                </div>
-              </div>
-            </div>
-
-            {bill.is_adjusted && bill.adjustment_reason && (
-              <div className="mt-4 p-3 bg-warning-50 rounded-xl text-xs text-warning-700">
-                <span className="font-semibold">Adjustment: </span>{bill.adjustment_reason}
-              </div>
-            )}
-          </div>
+          <BillSummaryCard bill={bill} sticky />
         </div>
       </div>
 
@@ -293,26 +186,6 @@ export default function BillDetailPage() {
         onClose={() => handleClose(false)}
         onConfirm={() => handleClose(true)}
       />
-    </div>
-  )
-}
-
-function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <>
-      <div className="text-surface-500">{label}</div>
-      <div className={`font-semibold text-surface-800 ${mono ? 'font-mono' : ''}`}>{value}</div>
-    </>
-  )
-}
-
-function SummaryRow({ label, value, muted, warn, success }: any) {
-  return (
-    <div className="flex justify-between">
-      <span className="text-surface-500">{label}</span>
-      <span className={muted ? 'text-surface-400' : warn ? 'text-warning-600' : success ? 'text-success-600' : 'font-semibold text-surface-800'}>
-        {value}
-      </span>
     </div>
   )
 }

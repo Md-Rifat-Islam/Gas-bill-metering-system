@@ -56,15 +56,29 @@ export default function PendingPaymentsPage() {
     queryKey: ['payments-pending'],
     queryFn: () => paymentsAPI.pending().then(r => r.data),
     enabled: can.approvePayments,
+    // New customer submissions show up without a manual refresh.
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   })
   const pending = data?.results ?? []
+
+  // Approving applies the amount to the bill; rejecting changes the
+  // payment's status. Either way the bill detail, bills list and payment
+  // lists elsewhere in the staff app must refetch — prefix keys so they
+  // match regardless of how the id is typed in a given page's key.
+  const refreshAfterReview = () => {
+    qc.invalidateQueries({ queryKey: ['payments-pending'] })
+    qc.invalidateQueries({ queryKey: ['payments-pending-count'] })
+    qc.invalidateQueries({ queryKey: ['all-payments'] })
+    qc.invalidateQueries({ queryKey: ['payments'] })
+    qc.invalidateQueries({ queryKey: ['bill'] })
+    qc.invalidateQueries({ queryKey: ['bills'] })
+  }
 
   const approve = useMutation({
     mutationFn: (id: number) => paymentsAPI.approve(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['payments-pending'] })
-      qc.invalidateQueries({ queryKey: ['payments-pending-count'] })
-      qc.invalidateQueries({ queryKey: ['all-payments'] })
+      refreshAfterReview()
       toast.success('Payment approved — bill balance updated')
     },
   })
@@ -72,18 +86,13 @@ export default function PendingPaymentsPage() {
   const reject = useMutation({
     mutationFn: ({ id, remarks }: { id: number; remarks: string }) => paymentsAPI.reject(id, remarks),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['payments-pending'] })
-      qc.invalidateQueries({ queryKey: ['payments-pending-count'] })
-      qc.invalidateQueries({ queryKey: ['all-payments'] })
+      refreshAfterReview()
       toast.success('Payment rejected')
       setRejectTarget(null)
     },
   })
 
-  // Guard placed after all hooks (Rules of Hooks) — previously this page had
-  // no permission check at all, so any authenticated staff member (even
-  // Viewer) could reach /payments/pending directly by URL even though the
-  // sidebar hides the link for them.
+  // Guard placed after all hooks (Rules of Hooks).
   if (!can.approvePayments) return <AccessDenied />
 
   return (

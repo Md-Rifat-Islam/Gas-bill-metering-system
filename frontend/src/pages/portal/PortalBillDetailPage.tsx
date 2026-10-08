@@ -2,31 +2,30 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Download, Send, Loader2, Clock } from 'lucide-react'
-import { portalAPI, portalPaymentChannelsAPI } from '@/api/portalClient'
+import { portalAPI } from '@/api/portalClient'
 import { PageLoader, StatusBadge } from '@/components/ui'
-import { PaymentChannelsCard } from '@/components/payments/PaymentChannelsCard'
-import { BkashComingSoon } from '@/components/payments/BkashComingSoon'
-import { formatCurrency, formatDate } from '@/utils/helpers'
+import {
+  UnitDetailsCard, MeterReadingsCard, BillSummaryCard, PaymentHistoryCard,
+} from '@/components/billing/BillShared'
+import { BILL_LABELS as L } from '@/utils/billLabels'
+import { formatCurrency, formatDate, formatMonth } from '@/utils/helpers'
 import toast from 'react-hot-toast'
+
+// While a submitted payment is waiting for accountant review, re-check
+// this often so the bill flips to Paid/Partial without a manual refresh.
+const PENDING_POLL_MS = 30_000
+
+const hasPendingForBill = (list: any[] | undefined, billId: number) =>
+  (list ?? []).some((p: any) => p.bill === billId && p.status === 'Pending')
 
 export default function PortalBillDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [downloading, setDownloading] = useState(false)
-
-  const { data: bill, isLoading } = useQuery({
-    queryKey: ['portal-bill', id],
-    queryFn: () => portalAPI.bill(Number(id)).then(r => r.data),
-  })
-
-  const { data: channels } = useQuery({
-    queryKey: ['portal-payment-channels'],
-    queryFn: () => portalPaymentChannelsAPI.get().then(r => r.data),
-  })
+  const billId = Number(id)
 
   // All of this customer's payments — filtered client-side to this bill.
-  // Reuses the same query key/cache as PortalPaymentsPage, so no extra
-  // network round trip if that page was visited already this session.
+  // Shares its query key with PortalPaymentsPage.
   const { data: paymentsData } = useQuery({
     queryKey: ['portal-payments'],
     queryFn: async () => {
@@ -34,12 +33,21 @@ export default function PortalBillDetailPage() {
       const raw = res.data
       return Array.isArray(raw) ? raw : (raw.results ?? [])
     },
-    enabled: !!bill,
+    enabled: !!id,
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) =>
+      hasPendingForBill(query.state.data as any[] | undefined, billId) ? PENDING_POLL_MS : false,
   })
 
-  const pendingPayment = (paymentsData ?? []).find(
-    (p: any) => p.bill === bill?.id && p.status === 'Pending'
-  )
+  const billPayments = (paymentsData ?? []).filter((p: any) => p.bill === billId)
+  const pendingPayment = billPayments.find((p: any) => p.status === 'Pending')
+
+  const { data: bill, isLoading } = useQuery({
+    queryKey: ['portal-bill', id],
+    queryFn: () => portalAPI.bill(billId).then(r => r.data),
+    refetchOnWindowFocus: true,
+    refetchInterval: pendingPayment ? PENDING_POLL_MS : false,
+  })
 
   const handleDownload = async () => {
     if (!bill) return
@@ -60,21 +68,20 @@ export default function PortalBillDetailPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header — same title/subtitle as the staff page */}
       <div className="flex items-center gap-3">
         <button onClick={() => navigate('/portal/bills')} className="btn-ghost btn-sm !p-2" aria-label="Back">
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="flex-1">
-          <h1 className="text-lg font-bold text-surface-900">{bill.billing_month_display}</h1>
-          <p className="text-xs text-surface-400 font-mono">{bill.bill_number}</p>
+          <h1 className="text-lg font-bold text-surface-900">Bill #{bill.bill_number}</h1>
+          <p className="text-xs text-surface-400">{formatMonth(bill.billing_month)}</p>
         </div>
         <StatusBadge status={bill.status} />
       </div>
 
       {/* Pending payment notice — the bill balance intentionally isn't
-          updated until an accountant/admin approves it, but the customer
-          still needs to know their submission was received. */}
+          updated until an accountant/admin approves it. */}
       {pendingPayment && (
         <div className="flex items-start gap-3 p-3.5 bg-warning-50 border border-warning-200 rounded-xl">
           <Clock className="w-4 h-4 text-warning-600 mt-0.5 shrink-0" />
@@ -93,7 +100,7 @@ export default function PortalBillDetailPage() {
       {/* Amount card */}
       <div className="card text-center !py-6">
         <div className="text-xs text-surface-400 mb-1">
-          {isPaid ? 'Total Amount' : 'Amount Due'}
+          {isPaid ? L.totalAmount : L.amountDue}
         </div>
         <div className="text-3xl font-bold text-surface-900">
           {formatCurrency(isPaid ? bill.total_amount : bill.due_amount)}
@@ -105,90 +112,27 @@ export default function PortalBillDetailPage() {
         )}
       </div>
 
-      {/* Payment channels + gateway status — only relevant while something is still due */}
-      {/* {!isPaid && (
-        <>
-          <PaymentChannelsCard data={channels} />
-          <BkashComingSoon />
-        </>
-      )} */}
-
-      {/* Meter readings */}
-      <div className="card">
-        <div className="text-sm font-semibold text-surface-800 mb-3">Meter Readings</div>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="bg-surface-50 rounded-xl p-3">
-            <div className="text-[11px] text-surface-400">Previous</div>
-            <div className="font-mono font-bold text-surface-700">{bill.previous_reading}</div>
-          </div>
-          <div className="bg-brand-50 rounded-xl p-3">
-            <div className="text-[11px] text-brand-400">Usage</div>
-            <div className="font-mono font-bold text-brand-700">{bill.total_usage_m3}</div>
-          </div>
-          <div className="bg-surface-50 rounded-xl p-3">
-            <div className="text-[11px] text-surface-400">Current</div>
-            <div className="font-mono font-bold text-surface-700">{bill.current_reading}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Charges breakdown */}
-      <div className="card">
-        <div className="text-sm font-semibold text-surface-800 mb-3">Charges</div>
-        <div className="space-y-2 text-sm">
-          <Row label="Base Amount" value={formatCurrency(bill.base_amount)} />
-          <Row label={`Unit Price (৳${bill.unit_price}/m³)`} value="" muted />
-          <Row label="Service Charge" value={`+ ${formatCurrency(bill.service_charge)}`} />
-          {Number(bill.percentage_amount) > 0 && (
-            <Row
-              label={`Bkash Charge (${Number(bill.percentage_rate)}%)`}
-              value={`+ ${formatCurrency(bill.percentage_amount)}`}
-            />
-          )}
-          {Number(bill.extra_charge) > 0 && <Row label="Extra Charge" value={`+ ${formatCurrency(bill.extra_charge)}`} />}
-          {Number(bill.late_fee) > 0 && <Row label="Late Fee" value={`+ ${formatCurrency(bill.late_fee)}`} warn />}
-          {Number(bill.discount) > 0 && <Row label="Discount" value={`− ${formatCurrency(bill.discount)}`} success />}
-          <div className="border-t-2 border-surface-900 pt-2 flex justify-between">
-            <span className="font-bold text-surface-900">Total</span>
-            <span className="font-bold text-lg text-brand-700">{formatCurrency(bill.total_amount)}</span>
-          </div>
-        </div>
-        {bill.is_adjusted && bill.adjustment_reason && (
-          <div className="mt-3 p-2.5 bg-warning-50 rounded-lg text-xs text-warning-700">
-            <span className="font-semibold">Note: </span>{bill.adjustment_reason}
-          </div>
-        )}
-      </div>
+      {/* Same blocks, same order, same wording as the staff page */}
+      <UnitDetailsCard bill={bill} />
+      <MeterReadingsCard bill={bill} />
+      <BillSummaryCard bill={bill} />
+      <PaymentHistoryCard payments={billPayments} />
 
       {/* Actions */}
       <div className="flex gap-3">
         <button onClick={handleDownload} className="btn-secondary flex-1" disabled={downloading}>
           {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          Invoice
+          {L.invoice}
         </button>
         {!isPaid && !pendingPayment && (
           <button
             onClick={() => navigate(`/portal/payment?bill=${bill.id}`)}
             className="btn-primary flex-1"
           >
-            <Send className="w-4 h-4" /> make Payment
+            <Send className="w-4 h-4" /> {L.makePayment}
           </button>
         )}
       </div>
-    </div>
-  )
-}
-
-function Row({ label, value, muted, warn, success }: { label: string; value: string; muted?: boolean; warn?: boolean; success?: boolean }) {
-  return (
-    <div className="flex justify-between">
-      <span className={muted ? 'text-surface-400 text-xs' : 'text-surface-500'}>{label}</span>
-      <span className={
-        muted ? '' :
-        warn ? 'text-warning-600 font-medium' :
-        success ? 'text-success-600 font-medium' :
-        'font-semibold text-surface-800'
-      }>{value}</span>
     </div>
   )
 }

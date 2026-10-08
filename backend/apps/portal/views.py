@@ -3,7 +3,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from django.conf import settings
 from django.db.models import Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -256,144 +255,25 @@ class NotificationMarkAllReadView(CustomerScopedMixin, APIView):
 # ── Invoice PDF ───────────────────────────────────────────────────────────────
 
 class PortalInvoicePDFView(CustomerScopedMixin, APIView):
-    def get(self, request, pk):
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.units import mm
-        from reportlab.lib.utils import ImageReader
-        from reportlab.pdfgen import canvas
+    """
+    GET /api/v1/portal/bills/<pk>/invoice/ (whatever your urls.py maps)
 
-        bill = self.get_bill_queryset().filter(id=pk).first()
+    The PDF layout itself lives in apps/portal/invoice.py so the design can
+    be changed without touching this view.
+    """
+    def get(self, request, pk):
+        from .invoice import generate_invoice_pdf
+
+        bill = (
+            self.get_bill_queryset()
+            .select_related('project', 'building', 'unit', 'unit__allottee')
+            .filter(id=pk)
+            .first()
+        )
         if not bill:
             return Response({'error': 'Bill not found'}, status=status.HTTP_404_NOT_FOUND)
 
         response = HttpResponse(content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="invoice-{bill.bill_number}.pdf"'
-
-        p = canvas.Canvas(response, pagesize=A4)
-        width, height = A4
-        y = height - 25 * mm
-
-        def draw_logo(path, x, y, target_height):
-            """
-            Draws one logo at (x, y) scaled to target_height, preserving
-            its real aspect ratio (read via ImageReader rather than
-            assumed), and returns the width actually drawn so the next
-            logo can be placed after it without overlapping or guessing.
-            Fails silently — a missing logo file on a given deployment
-            shouldn't break invoice generation, just omit that logo.
-            """
-            try:
-                img = ImageReader(path)
-                iw, ih = img.getSize()
-                drawn_width = target_height * (iw / ih)
-                p.drawImage(
-                    img, x, y, width=drawn_width, height=target_height,
-                    preserveAspectRatio=True, mask='auto',
-                )
-                return drawn_width
-            except Exception:
-                return 0
-
-        logo_height = 12 * mm
-        logo_y = height - 20 * mm - logo_height
-        deco_logo = settings.BASE_DIR / 'static' / 'branding' / 'deco-logo.png'
-        dtel_logo = settings.BASE_DIR / 'static' / 'branding' / 'dtel-logo.jpeg'
-
-        x = 20 * mm
-        drawn = draw_logo(str(deco_logo), x, logo_y, logo_height)
-        if drawn:
-            x += drawn + 6 * mm
-        draw_logo(str(dtel_logo), x, logo_y, logo_height)
-
-        y = logo_y - 8 * mm
-        p.setFont('Helvetica-Bold', 16)
-        p.drawString(20 * mm, y, 'Invoice')
-        y -= 6 * mm
-        p.setFont('Helvetica', 9)
-        p.setFillGray(0.4)
-        p.drawString(20 * mm, y, 'Utility Billing System')
-        p.setFillGray(0)
-        y -= 12 * mm
-
-        p.setFont('Helvetica-Bold', 11)
-        p.drawString(20 * mm, y, f"Bill No: {bill.bill_number}")
-        p.drawString(120 * mm, y, f"Status: {bill.status}")
-        y -= 8 * mm
-
-        p.setFont('Helvetica', 10)
-        rows = [
-            ('Billing Month', bill.billing_month.strftime('%B %Y')),
-            ('Project',  bill.project.name),
-            ('Building', bill.building.name),
-            ('Unit',     bill.unit.unit_no),
-        ]
-        for label, val in rows:
-            p.drawString(20 * mm, y, f"{label}:")
-            p.drawString(60 * mm, y, str(val))
-            y -= 6 * mm
-
-        y -= 4 * mm
-        p.line(20 * mm, y, 190 * mm, y)
-        y -= 8 * mm
-
-        p.setFont('Helvetica-Bold', 10)
-        p.drawString(20 * mm, y, 'Meter Readings')
-        y -= 7 * mm
-        p.setFont('Helvetica', 10)
-        for label, val in [
-            ('Previous Reading', f"{bill.previous_reading} m³"),
-            ('Current Reading',  f"{bill.current_reading} m³"),
-            ('Usage',            f"{bill.total_usage_m3} m³"),
-            ('Unit Price',       f"৳ {bill.unit_price} / m³"),
-        ]:
-            p.drawString(20 * mm, y, label)
-            p.drawRightString(190 * mm, y, val)
-            y -= 6 * mm
-
-        y -= 4 * mm
-        p.line(20 * mm, y, 190 * mm, y)
-        y -= 8 * mm
-
-        p.setFont('Helvetica-Bold', 10)
-        p.drawString(20 * mm, y, 'Charges')
-        y -= 7 * mm
-        p.setFont('Helvetica', 10)
-        charge_rows = [
-            ('Base Amount',    bill.base_amount),
-            ('Service Charge', bill.service_charge),
-        ]
-        if bill.percentage_amount:
-            charge_rows.append((f"Percentage Charge ({bill.percentage_rate:.2f}%)", bill.percentage_amount))
-        if bill.extra_charge:
-            charge_rows.append(('Extra Charge', bill.extra_charge))
-        if bill.late_fee:
-            charge_rows.append(('Late Fee', bill.late_fee))
-        if bill.discount:
-            charge_rows.append(('Discount', -bill.discount))
-        for label, val in charge_rows:
-            p.drawString(20 * mm, y, label)
-            p.drawRightString(190 * mm, y, f"৳ {val}")
-            y -= 6 * mm
-
-        y -= 4 * mm
-        p.line(20 * mm, y, 190 * mm, y)
-        y -= 8 * mm
-
-        p.setFont('Helvetica-Bold', 12)
-        for label, val in [
-            ('Total Amount', bill.total_amount),
-            ('Paid Amount',  bill.paid_amount),
-            ('Due Amount',   bill.due_amount),
-        ]:
-            p.drawString(20 * mm, y, label)
-            p.drawRightString(190 * mm, y, f"৳ {val}")
-            y -= 7 * mm
-
-        if bill.is_adjusted and bill.adjustment_reason:
-            y -= 5 * mm
-            p.setFont('Helvetica-Oblique', 9)
-            p.drawString(20 * mm, y, f"Adjustment note: {bill.adjustment_reason}")
-
-        p.showPage()
-        p.save()
+        generate_invoice_pdf(bill, response)
         return response

@@ -38,14 +38,22 @@ class PortalBillSerializer(serializers.ModelSerializer):
     floor_no      = serializers.IntegerField(source='unit.floor_no', read_only=True)
     building_name = serializers.CharField(source='building.name', read_only=True)
     project_name  = serializers.CharField(source='project.name', read_only=True)
+    # Same field the staff BillSerializer exposes — lets the portal Bill
+    # Detail show the Unit Details block exactly like the staff page.
+    allottee_name = serializers.CharField(source='unit.allottee.name', read_only=True, default=None)
     billing_month_display = serializers.SerializerMethodField()
 
     class Meta:
         model  = Bill
         fields = [
             'id', 'bill_number', 'unit_no', 'floor_no', 'building_name', 'project_name',
+            'allottee_name',
             'billing_month', 'billing_month_display',
+            # total_usage_kg + conversion_factor were missing here, which is
+            # why the portal always fell back to "/m³" for the unit price on
+            # bills charged per kg (the staff serializer returns both).
             'previous_reading', 'current_reading', 'total_usage_m3',
+            'total_usage_kg', 'conversion_factor',
             'unit_price', 'base_amount', 'service_charge',
             'percentage_rate', 'percentage_amount',
             'extra_charge', 'discount', 'late_fee', 'is_adjusted', 'adjustment_reason',

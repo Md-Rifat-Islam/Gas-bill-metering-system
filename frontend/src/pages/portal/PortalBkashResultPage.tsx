@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { CheckCircle, XCircle, Clock, ArrowRight } from 'lucide-react'
 
 /**
@@ -11,11 +13,22 @@ import { CheckCircle, XCircle, Clock, ArrowRight } from 'lucide-react'
 export default function PortalBkashResultPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
+  const qc = useQueryClient()
   const status = params.get('bkash') || params.get('status')
   const billId = params.get('bill')
 
   const isSuccess   = status === 'success'
   const isCancelled = status === 'cancelled'
+
+  // The full-page redirect to bKash and back reloads the app, but a cached
+  // session can still serve a pre-payment snapshot — on arrival, drop every
+  // cached portal query so bills, payments and the dashboard show the
+  // result of this payment right away.
+  useEffect(() => {
+    qc.invalidateQueries({
+      predicate: (q) => String(q.queryKey[0] ?? '').startsWith('portal-'),
+    })
+  }, [qc])
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center p-6">
@@ -51,7 +64,9 @@ export default function PortalBkashResultPage() {
             Payment History
           </button>
         ) : billId ? (
-          <button className="btn-primary" onClick={() => navigate(`/portal/payments?bill=${billId}`)}
+          // Was `/portal/payments?bill=` (the history list). The make-payment
+          // screen is `/portal/payment` (singular), same as Bill Detail uses.
+          <button className="btn-primary" onClick={() => navigate(`/portal/payment?bill=${billId}`)}
             aria-label="Try again" title="Try again">
             Try Again <ArrowRight className="w-4 h-4" />
           </button>
