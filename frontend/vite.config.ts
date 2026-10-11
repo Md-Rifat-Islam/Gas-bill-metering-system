@@ -36,8 +36,12 @@ export default defineConfig({
       workbox: {
         // App shell only (built JS/CSS/HTML/images/fonts).
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        // The charts bundle can exceed workbox's 2 MB default, which would
-        // silently leave it out of the cache.
+        // The two heaviest libraries (charts, barcode scanner) are NOT
+        // precached on the first visit — the service worker downloads
+        // everything in its precache list in the background, and that
+        // competed with the page's own first load. They're cached the first
+        // time they're actually used instead (runtimeCaching below).
+        globIgnores: ['**/vendor-charts-*.js', '**/vendor-scanner-*.js'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         clientsClaim: true,
@@ -52,6 +56,18 @@ export default defineConfig({
             urlPattern: ({ url }: { url: URL }) =>
               url.pathname.startsWith('/api/') || url.pathname.startsWith('/media/'),
             handler: 'NetworkOnly',
+          },
+          {
+            // Heavy, rarely-first-needed vendor chunks: cached on first use.
+            // Filenames are content-hashed, so CacheFirst is safe.
+            urlPattern: ({ url }: { url: URL }) =>
+              /\/assets\/vendor-(charts|scanner)-.*\.js$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'heavy-vendor-chunks',
+              expiration: { maxEntries: 6, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
           },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -75,6 +91,34 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Stable, cache-friendly vendor chunks. Route-level code splitting
+        // (React.lazy in App.tsx) decides WHEN a chunk loads; this decides
+        // what is shared. Charts and the barcode scanner are big and only
+        // used on a few screens, so they get their own files and are never
+        // part of the first-load bundle.
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return undefined
+
+          if (id.includes('html5-qrcode')) return 'vendor-scanner'
+
+          if (
+            /node_modules\/(recharts|recharts-scale|react-smooth|victory-vendor|d3-[^/]+|internmap|decimal\.js-light|fast-equals|eventemitter3|lodash|react-transition-group)\//.test(id)
+          ) {
+            return 'vendor-charts'
+          }
+
+          if (/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom|@remix-run)\//.test(id)) {
+            return 'vendor-react'
+          }
+
+          return undefined
+        },
+      },
     },
   },
   server: {
