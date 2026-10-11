@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   CreditCard, ExternalLink, Plus, Clock, Upload, X, ZoomIn, Download, Loader2, Pencil, Trash2,
+  ArrowDownWideNarrow, ArrowUpNarrowWide,
 } from 'lucide-react'
 import { paymentsAPI, billingAPI, reportsAPI, projectsAPI } from '@/api/client'
 import { Modal, PageLoader, EmptyState, Pagination, ConfirmDialog } from '@/components/ui'
 import { SearchInput } from '@/components/forms'
-import { formatCurrency, formatDate } from '@/utils/helpers'
+import { formatCurrency, formatDate, formatMonth } from '@/utils/helpers'
 import { compressImage } from '@/utils/imageCompression'
 import { PaymentModal } from '@/components/payments/PaymentModal'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -174,8 +175,13 @@ function ManualPaymentModal({ open, onClose }: { open: boolean; onClose: () => v
       return paymentsAPI.create(fd)
     },
     onSuccess: () => {
+      // Prefix keys so every open bill/payment view refreshes (the old
+      // ['billing'] key didn't match anything the app actually uses).
       qc.invalidateQueries({ queryKey: ['all-payments'] })
-      qc.invalidateQueries({ queryKey: ['billing'] })
+      qc.invalidateQueries({ queryKey: ['payments'] })
+      qc.invalidateQueries({ queryKey: ['bills'] })
+      qc.invalidateQueries({ queryKey: ['bill'] })
+      qc.invalidateQueries({ queryKey: ['bills-for-payment'] })
       toast.success('Payment recorded')
       onClose(); reset(); setProof(null); setBillSearch('')
     },
@@ -278,11 +284,40 @@ export default function PaymentsPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { can } = usePermissions()
-  const [projectFilter, setProjectFilter] = useState('')
-  const [methodFilter, setMethodFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
+
+  // All filters live in the URL (?project=&method=&status=&search=&month=&order=&page=)
+  // instead of useState, so opening a bill and pressing Back returns to
+  // exactly the same filtered/sorted/paged view — and a filtered view can be
+  // bookmarked or shared. `replace: true` keeps filter tweaks out of the
+  // browser history, so Back from a bill lands here, not on a previous filter.
+  const [sp, setSp] = useSearchParams()
+  const projectFilter = sp.get('project') ?? ''
+  const methodFilter  = sp.get('method') ?? ''
+  const statusFilter  = sp.get('status') ?? ''
+  const search        = sp.get('search') ?? ''
+  const month         = sp.get('month') ?? ''            // 'YYYY-MM' or ''
+  const order         = sp.get('order') === 'asc' ? 'asc' : 'desc'
+  const page          = Math.max(1, Number(sp.get('page')) || 1)
+
+  const setParams = (patch: Record<string, string | null>, resetPage = true) =>
+    setSp(prev => {
+      const next = new URLSearchParams(prev)
+      Object.entries(patch).forEach(([k, v]) => (v ? next.set(k, v) : next.delete(k)))
+      if (resetPage) next.delete('page')
+      return next
+    }, { replace: true })
+
+  // Typing in the search box shouldn't rewrite the URL (and refetch) on
+  // every keystroke — keep a local copy and push it to the URL after a pause.
+  const [searchInput, setSearchInput] = useState(search)
+  useEffect(() => { setSearchInput(search) }, [search])
+  useEffect(() => {
+    if (searchInput === search) return
+    const t = setTimeout(() => setParams({ search: searchInput || null }), 350)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput])
+
   const [entryModal, setEntryModal] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [editTarget, setEditTarget] = useState<any | null>(null)
@@ -295,15 +330,19 @@ export default function PaymentsPage() {
     }),
   })
 
+  const filterParams = {
+    project: projectFilter || undefined,
+    payment_method: methodFilter || undefined,
+    status: statusFilter || undefined,
+    search: search || undefined,
+    month: month || undefined,
+    ordering: order === 'asc' ? 'payment_date' : '-payment_date',
+  }
+
   const { data, isLoading } = useQuery({
-    queryKey: ['all-payments', page, projectFilter, methodFilter, statusFilter, search],
-    queryFn: () => paymentsAPI.list({
-      page,
-      project: projectFilter || undefined,
-      payment_method: methodFilter || undefined,
-      status: statusFilter || undefined,
-      search: search || undefined,
-    }).then(r => r.data),
+    queryKey: ['all-payments', page, projectFilter, methodFilter, statusFilter, search, month, order],
+    queryFn: () => paymentsAPI.list({ page, ...filterParams }).then(r => r.data),
+    placeholderData: (prev) => prev,   // keep rows on screen while a filter change loads
   })
 
   const { data: pendingData } = useQuery({
@@ -313,18 +352,25 @@ export default function PaymentsPage() {
   })
   const pendingCount = pendingData?.count ?? pendingData?.results?.length ?? 0
 
-  const payments = data?.results || []
+  const payments: any[] = data?.results || []
 
-  const handleFilterChange = (setter: (v: string) => void) => (value: string) => {
-    setter(value)
-    setPage(1)
-  }
+  // Group the rows on screen by payment month ("September 2026") with a
+  // heading row per month. Totals are for the rows on THIS page only.
+  const groups: { key: string; rows: any[] }[] = []
+  payments.forEach(p => {
+    const key = String(p.payment_date || '').slice(0, 7)
+    const last = groups[groups.length - 1]
+    if (last && last.key === key) last.rows.push(p)
+    else groups.push({ key, rows: [p] })
+  })
 
   const deletePayment = useMutation({
     mutationFn: (id: number) => paymentsAPI.remove(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['all-payments'] })
+      qc.invalidateQueries({ queryKey: ['payments'] })
       qc.invalidateQueries({ queryKey: ['bills'] })
+      qc.invalidateQueries({ queryKey: ['bill'] })
       toast.success('Payment deleted')
       setDeleteTarget(null)
     },
@@ -338,6 +384,7 @@ export default function PaymentsPage() {
         payment_method: methodFilter || undefined,
         status: statusFilter || undefined,
         search: search || undefined,
+        month: month || undefined,
       })
     } catch {
       toast.error('Could not export payments')
@@ -345,6 +392,8 @@ export default function PaymentsPage() {
       setExporting(false)
     }
   }
+
+  const hasFilters = Boolean(projectFilter || methodFilter || statusFilter || search || month)
 
   return (
     <div>
@@ -375,7 +424,7 @@ export default function PaymentsPage() {
 
       <div className="flex flex-wrap gap-3 mb-6">
         <select className="input max-w-[200px]" value={projectFilter}
-          onChange={e => handleFilterChange(setProjectFilter)(e.target.value)}
+          onChange={e => setParams({ project: e.target.value || null })}
           title="Filter by project"
         >
           <option value="">All Projects</option>
@@ -384,7 +433,7 @@ export default function PaymentsPage() {
           ))}
         </select>
         <select className="input max-w-[160px]" value={methodFilter}
-          onChange={e => handleFilterChange(setMethodFilter)(e.target.value)}
+          onChange={e => setParams({ method: e.target.value || null })}
           title="Filter by payment method"
         >
           <option value="">All Methods</option>
@@ -395,7 +444,7 @@ export default function PaymentsPage() {
           <option>SSLCommerz</option>
         </select>
         <select className="input max-w-[160px]" value={statusFilter}
-          onChange={e => handleFilterChange(setStatusFilter)(e.target.value)}
+          onChange={e => setParams({ status: e.target.value || null })}
           title="Filter by status"
         >
           <option value="">All Statuses</option>
@@ -403,13 +452,49 @@ export default function PaymentsPage() {
           <option value="Approved">Approved</option>
           <option value="Rejected">Rejected</option>
         </select>
+
+        {/* Month filter + month sort order */}
+        <input
+          type="month"
+          className="input max-w-[170px]"
+          value={month}
+          onChange={e => setParams({ month: e.target.value || null })}
+          title="Filter by payment month"
+          aria-label="Filter by payment month"
+        />
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => setParams({ order: order === 'desc' ? 'asc' : null })}
+          title={order === 'desc' ? 'Newest month first — click for oldest first' : 'Oldest month first — click for newest first'}
+        >
+          {order === 'desc'
+            ? <><ArrowDownWideNarrow className="w-4 h-4" /> Newest first</>
+            : <><ArrowUpNarrowWide className="w-4 h-4" /> Oldest first</>}
+        </button>
+
         <div className="w-full sm:w-64">
           <SearchInput
-            value={search}
-            onChange={handleFilterChange(setSearch)}
+            value={searchInput}
+            onChange={setSearchInput}
             placeholder="Bill no., unit, customer, transaction ID…"
           />
         </div>
+
+        {hasFilters && (
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => setSp(prev => {
+              // clear filters, keep sort order
+              const next = new URLSearchParams()
+              const o = prev.get('order'); if (o) next.set('order', o)
+              return next
+            }, { replace: true })}
+          >
+            <X className="w-4 h-4" /> Clear filters
+          </button>
+        )}
       </div>
 
       {isLoading ? <PageLoader /> : (
@@ -434,52 +519,81 @@ export default function PaymentsPage() {
                   <tr><td colSpan={9}>
                     <EmptyState icon={CreditCard} title="No payments found" />
                   </td></tr>
-                ) : payments.map((p: any) => (
-                  <tr key={p.id}>
-                    <td className="text-surface-600 text-sm">{formatDate(p.payment_date)}</td>
-                    <td>
-                      <span className="font-mono text-xs font-semibold text-brand-700">{p.bill_number}</span>
-                    </td>
-                    <td className="font-mono font-bold text-success-600">{formatCurrency(p.paid_amount)}</td>
-                    <td><span className={METHOD_COLORS[p.payment_method] || 'badge-gray'}>{p.payment_method}</span></td>
-                    <td><span className={STATUS_COLORS[p.status] || 'badge-gray'}>{p.status}</span></td>
-                    <td className="text-xs text-surface-400 capitalize">{p.source}</td>
-                    <td className="font-mono text-xs text-surface-400">{p.transaction_id || '—'}</td>
-                    <td className="text-surface-600 text-sm">
-                      {p.reviewed_by_name || p.received_by_name || '—'}
-                    </td>
-                    <td>
-                      <div className="flex gap-1 justify-end">
-                        {can.editPayments && (
-                          <button className="btn-ghost btn-sm"
-                            onClick={() => setEditTarget(p)}
-                            title="Edit Payment"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        {can.editPayments && (
-                          <button className="btn-ghost btn-sm text-danger-600 hover:bg-danger-50"
-                            onClick={() => setDeleteTarget(p)}
-                            title="Delete Payment"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        <button className="btn-ghost btn-sm"
-                          onClick={() => navigate(`/staff/billing/${p.bill}`)}
-                          title="View Bill"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                ) : groups.map(g => {
+                  const approvedTotal = g.rows
+                    .filter(r => r.status === 'Approved')
+                    .reduce((sum, r) => sum + Number(r.paid_amount || 0), 0)
+                  return (
+                    <Fragment key={g.key}>
+                      <tr className="bg-surface-50">
+                        <td colSpan={9} className="!py-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <span className="font-bold uppercase tracking-wider text-surface-600">
+                              {g.key ? formatMonth(`${g.key}-01`) : 'No date'}
+                            </span>
+                            <span className="text-surface-400">
+                              {g.rows.length} payment{g.rows.length === 1 ? '' : 's'} on this page
+                              {' · '}Approved: <span className="font-semibold text-success-600">{formatCurrency(approvedTotal)}</span>
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                      {g.rows.map((p: any) => (
+                        <tr key={p.id}>
+                          <td className="text-surface-600 text-sm">{formatDate(p.payment_date)}</td>
+                          <td>
+                            <span className="font-mono text-xs font-semibold text-brand-700">{p.bill_number}</span>
+                          </td>
+                          <td className="font-mono font-bold text-success-600">{formatCurrency(p.paid_amount)}</td>
+                          <td><span className={METHOD_COLORS[p.payment_method] || 'badge-gray'}>{p.payment_method}</span></td>
+                          <td><span className={STATUS_COLORS[p.status] || 'badge-gray'}>{p.status}</span></td>
+                          <td className="text-xs text-surface-400 capitalize">{p.source}</td>
+                          <td className="font-mono text-xs text-surface-400">{p.transaction_id || '—'}</td>
+                          <td className="text-surface-600 text-sm">
+                            {p.reviewed_by_name || p.received_by_name || '—'}
+                          </td>
+                          <td>
+                            <div className="flex gap-1 justify-end">
+                              {can.editPayments && (
+                                <button className="btn-ghost btn-sm"
+                                  onClick={() => setEditTarget(p)}
+                                  title="Edit Payment"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {can.editPayments && (
+                                <button className="btn-ghost btn-sm text-danger-600 hover:bg-danger-50"
+                                  onClick={() => setDeleteTarget(p)}
+                                  title="Delete Payment"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {/* Normal push navigation — the bill page's Back
+                                  button now returns here, and because the filters
+                                  are in this page's URL they come back intact. */}
+                              <button className="btn-ghost btn-sm"
+                                onClick={() => navigate(`/staff/billing/${p.bill}`)}
+                                title="View Bill"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>
-          <Pagination page={page} count={data?.count || 0} onChange={setPage} />
+          <Pagination
+            page={page}
+            count={data?.count || 0}
+            onChange={(p: number) => setParams({ page: p > 1 ? String(p) : null }, false)}
+          />
         </>
       )}
 

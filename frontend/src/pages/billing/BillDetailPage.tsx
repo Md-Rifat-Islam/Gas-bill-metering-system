@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, CreditCard, Trash2, Smartphone, Loader2 } from 'lucide-react'
 import { billingAPI, paymentsAPI } from '@/api/client'
@@ -16,6 +16,7 @@ import toast from 'react-hot-toast'
 export default function BillDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const qc = useQueryClient()
   const [payModal, setPayModal] = useState(false)
   const { can } = usePermissions()
@@ -78,7 +79,7 @@ export default function BillDetailPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bills'] })
       toast.success('Bill deleted')
-      navigate('/billing')
+      navigate('/staff/billing')
     },
   })
 
@@ -104,6 +105,15 @@ export default function BillDetailPage() {
     }
   }
 
+  // Go back to wherever the user actually came from (Payments page with its
+  // filters, Pending Approvals, Billing list…) instead of always /billing.
+  // location.key is 'default' on a fresh page load (direct link, or the
+  // return from bKash), when there's no in-app history to go back to.
+  const goBack = () => {
+    if (location.key !== 'default') navigate(-1)
+    else navigate('/staff/billing')
+  }
+
   if (isLoading) return <PageLoader />
   if (!bill) return <div className="text-center py-20 text-surface-400">Bill not found</div>
 
@@ -115,9 +125,9 @@ export default function BillDetailPage() {
       <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-8">
         <button
           className="btn-ghost btn-sm"
-          onClick={() => navigate('/billing')}
-          aria-label="Back to billing list"
-          title="Back to billing list"
+          onClick={goBack}
+          aria-label="Go back"
+          title="Go back"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>

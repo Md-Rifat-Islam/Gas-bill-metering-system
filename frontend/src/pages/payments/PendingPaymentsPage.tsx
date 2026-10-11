@@ -99,7 +99,7 @@ export default function PendingPaymentsPage() {
     <div>
       <div className="page-header">
         <div className="flex items-center gap-3">
-          <button className="btn-ghost btn-sm !p-2" onClick={() => navigate('/payments')} title="Back to Payments">
+          <button className="btn-ghost btn-sm !p-2" onClick={() => navigate('/staff/payments')} title="Back to Payments">
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
@@ -154,7 +154,7 @@ export default function PendingPaymentsPage() {
                 )}
                 <button
                   className="flex items-center gap-2 text-xs text-surface-500 bg-surface-50 rounded-lg px-3 py-2 hover:bg-surface-100 transition-colors"
-                  onClick={() => navigate(`/billing/${p.bill}`)}
+                  onClick={() => navigate(`/staff/billing/${p.bill}`)}
                 >
                   <ExternalLink className="w-3.5 h-3.5" /> View Bill
                 </button>

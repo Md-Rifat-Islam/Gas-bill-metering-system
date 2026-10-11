@@ -296,30 +296,41 @@ class ExportBillsExcelView(APIView):
 class ExportPaymentsExcelView(APIView):
     """
     GET /api/v1/reports/export/payments/
-        ?status=&source=&payment_method=&bill=&date_from=&date_to=
+        ?status=&source=&payment_method=&bill=&project=&search=
+        &month=YYYY-MM | &date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
 
     status: Pending / Approved / Rejected
     source: staff / customer — covers spec's "Customer" vs "Accountant"
             dimension (accountant-recorded payments are source=staff with
             received_by set; customer-submitted are source=customer)
+    project / search / month: the same filters the Payments page applies
+            to its list, so "Export current view" matches what's on screen
+            (project and search used to be ignored here, so the export
+            contained more rows than the filtered page showed).
+    month:  payment month (by payment_date), same meaning as the list.
     """
     permission_classes = [IsAuthenticated, ReportPermission]
 
     def get(self, request):
         from django.http import HttpResponse
         from apps.reports.exports.excel_exports import export_payments_excel
+        from apps.payments.views import parse_month_param
 
         qs = Payment.objects.all().select_related(
             'bill__unit__allottee', 'bill__building', 'bill__project',
             'received_by', 'reviewed_by', 'submitted_by_customer',
         )
 
-        status = request.query_params.get('status')
-        source = request.query_params.get('source')
-        method = request.query_params.get('payment_method')
-        bill = request.query_params.get('bill')
-        date_from = request.query_params.get('date_from')
-        date_to = request.query_params.get('date_to')
+        params = request.query_params
+        status = params.get('status')
+        source = params.get('source')
+        method = params.get('payment_method')
+        bill = params.get('bill')
+        project = params.get('project')
+        search = params.get('search')
+        month = params.get('month')
+        date_from = params.get('date_from')
+        date_to = params.get('date_to')
 
         if status:
             qs = qs.filter(status=status)
@@ -329,16 +340,31 @@ class ExportPaymentsExcelView(APIView):
             qs = qs.filter(payment_method=method)
         if bill:
             qs = qs.filter(bill_id=bill)
+        if project:
+            qs = qs.filter(bill__project_id=project)
+        if search:
+            # Same fields the Payments list search covers
+            qs = qs.filter(
+                Q(bill__bill_number__icontains=search) |
+                Q(bill__unit__unit_no__icontains=search) |
+                Q(bill__unit__allottee__name__icontains=search) |
+                Q(transaction_id__icontains=search)
+            )
+        if month:
+            start, end = parse_month_param(month)   # 400 on a malformed value
+            qs = qs.filter(payment_date__gte=start, payment_date__lt=end)
         if date_from:
             qs = qs.filter(payment_date__gte=date_from)
         if date_to:
             qs = qs.filter(payment_date__lte=date_to)
 
-        qs = qs.order_by('-payment_date')
+        qs = qs.order_by('-payment_date', '-id')
 
         title = 'Payment Export'
         if status:
             title = f'Payment Export — {status}'
+        if month:
+            title = f'{title} — {month}'
 
         xlsx_bytes = export_payments_excel(qs, title=title)
 

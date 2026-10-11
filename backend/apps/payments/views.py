@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 
 from django.conf import settings
 from django.db import transaction
@@ -6,6 +7,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, filters, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -22,6 +24,22 @@ from .services import initiate_bkash_checkout, complete_bkash_transaction
 logger = logging.getLogger('bkash')
 
 
+def parse_month_param(value):
+    """
+    'YYYY-MM' (what <input type="month"> sends) -> (first_day, first_day_of_next_month).
+    Raises a 400 ValidationError on anything else, so a malformed value is
+    reported instead of silently returning every payment.
+    """
+    try:
+        year_s, month_s = value.split('-')
+        year, month = int(year_s), int(month_s)
+        start = date(year, month, 1)
+    except (ValueError, AttributeError):
+        raise ValidationError({'month': 'Use the format YYYY-MM, e.g. 2026-09.'})
+    end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    return start, end
+
+
 class PaymentListCreateView(generics.ListCreateAPIView):
     queryset           = Payment.objects.all().select_related(
         'bill', 'bill__unit', 'bill__building', 'bill__project', 'bill__unit__allottee',
@@ -29,24 +47,45 @@ class PaymentListCreateView(generics.ListCreateAPIView):
     )
     serializer_class   = PaymentSerializer
     permission_classes = [IsAuthenticated, PaymentWritePermission]
-    filter_backends    = [filters.SearchFilter]
+    filter_backends    = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
         'bill__bill_number', 'bill__unit__unit_no',
         'bill__unit__allottee__name', 'transaction_id',
     ]
+    # ?ordering=payment_date (oldest first) or ?ordering=-payment_date (newest first)
+    ordering_fields = ['payment_date', 'created_at', 'paid_amount']
+    ordering        = ['-payment_date', '-created_at']
 
     def get_queryset(self):
         qs           = super().get_queryset()
-        bill         = self.request.query_params.get('bill')
-        status_param = self.request.query_params.get('status')
-        project      = self.request.query_params.get('project')
+        params       = self.request.query_params
+        bill         = params.get('bill')
+        status_param = params.get('status')
+        project      = params.get('project')
+        method       = params.get('payment_method')
+        month        = params.get('month')
         if bill:
             qs = qs.filter(bill_id=bill)
         if status_param:
             qs = qs.filter(status=status_param)
         if project:
             qs = qs.filter(bill__project_id=project)
+        if method:
+            qs = qs.filter(payment_method=method)
+        if month:
+            # Month the payment was made (payment_date), not the bill's
+            # billing month. Range filter so a date index can be used.
+            start, end = parse_month_param(month)
+            qs = qs.filter(payment_date__gte=start, payment_date__lt=end)
         return qs
+
+    def filter_queryset(self, queryset):
+        # Deterministic tiebreak: many payments share a date, and without a
+        # unique last sort key the same row can appear on two pages (or none)
+        # when paginating.
+        qs = super().filter_queryset(queryset)
+        explicit = list(qs.query.order_by)
+        return qs.order_by(*explicit, '-id') if explicit else qs.order_by('-payment_date', '-id')
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
