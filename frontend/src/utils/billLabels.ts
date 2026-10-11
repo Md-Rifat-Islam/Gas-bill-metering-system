@@ -46,7 +46,8 @@ export const BILL_LABELS = {
   adjustment: 'Adjustment',
   noPayments: 'No payments recorded yet',
   invoice: 'Invoice',
-  makePayment: 'Make Payment',
+  makePayment: 'Pay Manually',
+  payWithBkash: 'Pay with bKash',
 } as const
 
 /** True when the bill is charged per kg (conversion ratio present). */

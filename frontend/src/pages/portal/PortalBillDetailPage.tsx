@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Download, Send, Loader2, Clock } from 'lucide-react'
+import { ArrowLeft, Download, Send, Loader2, Clock, Smartphone, AlertCircle } from 'lucide-react'
 import { portalAPI } from '@/api/portalClient'
 import { PageLoader, StatusBadge } from '@/components/ui'
 import {
@@ -22,6 +22,10 @@ export default function PortalBillDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [downloading, setDownloading] = useState(false)
+  // One-tap bKash checkout straight from this page (no detour through the
+  // Make Payment screen). Same endpoint the Make Payment page uses.
+  const [bkashLoading, setBkashLoading] = useState(false)
+  const [bkashError, setBkashError] = useState<string | null>(null)
   const billId = Number(id)
 
   // All of this customer's payments — filtered client-side to this bill.
@@ -58,6 +62,24 @@ export default function PortalBillDetailPage() {
       toast.error('Could not download invoice')
     } finally {
       setDownloading(false)
+    }
+  }
+
+  const handleBkashPay = async () => {
+    if (!bill) return
+    setBkashError(null)
+    setBkashLoading(true)
+    try {
+      const res = await portalAPI.payInitiate(bill.id)
+      // Full-page redirect to bKash's hosted checkout; bKash sends the
+      // browser back through the backend callback to the result page.
+      window.location.href = res.data.bkash_url
+    } catch (err: any) {
+      setBkashError(
+        err.response?.data?.error ||
+        'Could not start bKash payment right now. Please try "Pay Manually" below.'
+      )
+      setBkashLoading(false)
     }
   }
 
@@ -111,6 +133,29 @@ export default function PortalBillDetailPage() {
           </div>
         )}
       </div>
+
+      {/* One-tap bKash payment — shown while something is due and no manual
+          payment is waiting for review (same condition as Pay Manually). */}
+      {!isPaid && !pendingPayment && Number(bill.due_amount) > 0 && (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={handleBkashPay}
+            disabled={bkashLoading}
+            className="btn-primary w-full justify-center !bg-pink-600 hover:!bg-pink-700 !py-3 text-base"
+            aria-label="Pay with bKash"
+          >
+            {bkashLoading
+              ? <><Loader2 className="w-5 h-5 animate-spin" /> Redirecting to bKash…</>
+              : <><Smartphone className="w-5 h-5" /> {L.payWithBkash} · {formatCurrency(bill.due_amount)}</>}
+          </button>
+          {bkashError && (
+            <div className="flex items-start gap-2 p-3 bg-danger-50 border border-danger-200 rounded-xl text-danger-700 text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {bkashError}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Same blocks, same order, same wording as the staff page */}
       <UnitDetailsCard bill={bill} />
