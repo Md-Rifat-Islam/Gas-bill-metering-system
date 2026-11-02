@@ -110,7 +110,7 @@ export function BillsTable({
                         )}
                       <button
                         className="btn-ghost btn-sm"
-                        onClick={() => navigate(`/billing/${b.id}`)}
+                        onClick={() => navigate(`/staff/billing/${b.id}`)}
                         title="View Details"
                       >
                         <Eye className="w-3.5 h-3.5" />

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Table2, List, Download, Loader2, Layers } from "lucide-react";
 import { billingAPI, reportsAPI } from "@/api/client";
 import { PageLoader } from "@/components/ui";
 import { PaymentModal } from "@/components/payments/PaymentModal";
 import { usePermissions } from "@/hooks/usePermissions";
+import { usePersistedState } from "@/hooks";
 import toast from "react-hot-toast";
 
 import { CreateBillModal } from "./components/CreateBillModal";
@@ -56,13 +57,23 @@ function buildExportParams(filters: BillingFilterState) {
 
 export default function BillingPage() {
   const { can } = usePermissions();
-  const [filters, setFilters] = useState<BillingFilterState>(
+
+  // Persisted in sessionStorage so the search, filters, page number and
+  // table/spreadsheet view survive opening a bill's detail page or switching
+  // to another sidebar menu and coming back.
+  const [filters, setFilters] = usePersistedState<BillingFilterState>(
+    "billing:filters",
     EMPTY_BILLING_FILTERS,
   );
-  const [page, setPage] = useState(1);
+  const [page, setPage] = usePersistedState<number>("billing:page", 1);
+  const [view, setView] = usePersistedState<"table" | "spreadsheet">(
+    "billing:view",
+    "table",
+  );
+
+  // Modals / transient UI stay in plain local state on purpose.
   const [createModal, setCreateModal] = useState(false);
   const [bulkModal, setBulkModal] = useState(false);
-  const [view, setView] = useState<"table" | "spreadsheet">("table");
   const [exporting, setExporting] = useState(false);
   const [payTarget, setPayTarget] = useState<any | null>(null);
 
@@ -71,13 +82,20 @@ export default function BillingPage() {
     setPage(1);
   };
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["bills", filters, page],
     queryFn: () =>
       billingAPI
         .list({ ...buildBillingParams(filters), page })
         .then((r) => r.data),
   });
+
+  // A restored page number can be past the end if bills were deleted since
+  // (the backend answers with an error for an out-of-range page). Fall back
+  // to the first page instead of leaving the table broken.
+  useEffect(() => {
+    if (isError && page > 1) setPage(1);
+  }, [isError, page, setPage]);
 
   const bills = data?.results || [];
 
