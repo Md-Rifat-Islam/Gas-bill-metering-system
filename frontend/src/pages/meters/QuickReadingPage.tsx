@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ScanLine, Filter as FilterIcon, ArrowLeft, ArrowRight, Gauge } from 'lucide-react'
 import { projectsAPI, buildingsAPI, metersAPI } from '@/api/client'
@@ -8,6 +8,7 @@ import { MeterCard } from '@/components/meters/MeterCard'
 import { ReadingModal } from '@/components/meters/ReadingModal'
 import { BarcodeScanner } from '@/components/meters/BarcodeScanner'
 import { usePermissions } from '@/hooks/usePermissions'
+import { usePersistedState } from '@/hooks'
 import type { MeterCardData, Project, Building } from '@/types'
 import toast from 'react-hot-toast'
 
@@ -18,11 +19,13 @@ export default function QuickReadingPage() {
   const qc = useQueryClient()
   const { can } = usePermissions()
 
-  const [projectId,  setProjectId]  = useState<string>('')
-  const [buildingId, setBuildingId] = useState<string>('')
-  const [search,     setSearch]     = useState('')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('Pending')
-  const [sortBy, setSortBy] = useState<'unit' | 'status'>('unit')
+  // Persisted in sessionStorage so the selected project/building, search,
+  // status chip and sort survive switching menus or opening another page.
+  const [projectId,  setProjectId]  = usePersistedState<string>('quickreading:project', '')
+  const [buildingId, setBuildingId] = usePersistedState<string>('quickreading:building', '')
+  const [search,     setSearch]     = usePersistedState<string>('quickreading:search', '')
+  const [statusFilter, setStatusFilter] = usePersistedState<StatusFilter>('quickreading:status', 'Pending')
+  const [sortBy, setSortBy] = usePersistedState<'unit' | 'status'>('quickreading:sort', 'unit')
 
   const [activeCard, setActiveCard] = useState<MeterCardData | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -49,8 +52,13 @@ export default function QuickReadingPage() {
     [allBuildings, projectId]
   )
 
-  // Reset building when project changes
-  useEffect(() => { setBuildingId('') }, [projectId])
+  // Reset building only when the user actually changes the project. This used
+  // to be a useEffect on [projectId], but that also fires on mount and would
+  // wipe the restored building every time you came back to this page.
+  const handleProjectChange = (value: string) => {
+    setProjectId(value)
+    setBuildingId('')
+  }
 
   const dashboardQueryKey = ['meters-quick-dashboard', projectId, buildingId]
 
@@ -170,7 +178,7 @@ export default function QuickReadingPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6 p-4 bg-white rounded-2xl border border-surface-100 shadow-card">
         <div className="w-full">
           <label className="label" htmlFor="project-select">Project</label>
-          <select id="project-select" className="input" value={projectId} onChange={e => setProjectId(e.target.value)}>
+          <select id="project-select" className="input" value={projectId} onChange={e => handleProjectChange(e.target.value)}>
             <option value="">— Select project —</option>
             {(projects ?? []).map((p: Project) => (
               <option key={p.id} value={p.id}>{p.name}</option>
