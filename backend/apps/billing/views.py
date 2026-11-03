@@ -7,6 +7,7 @@ from rest_framework.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db import transaction
+from django.db.models import ProtectedError
 from .models import Bill
 from .filters import BillFilter
 from .serializers import BillSerializer
@@ -60,8 +61,41 @@ class BillDetailView(generics.RetrieveUpdateDestroyAPIView):
         if request.user.role_name != 'super_admin':
             raise PermissionDenied('Only Super Admin can delete bills.')
         bill = self.get_object()
-        log_action(request.user, 'bills', bill.id, 'DELETE', BillSerializer(bill).data, None)
-        return super().destroy(request, *args, **kwargs)
+
+        # Payment.bill and PaymentTransaction.bill are on_delete=PROTECT, so a
+        # bill with ANY payment record (any status) or ANY bKash transaction
+        # record (even an abandoned/failed checkout) can't be deleted. Check
+        # up front and say why, instead of letting Django raise ProtectedError
+        # (which surfaced as a bare 500 / generic toast).
+        reasons = []
+        payment_count = bill.payments.count()
+        txn_count = bill.transactions.count()
+        if payment_count:
+            reasons.append(f'{payment_count} payment record(s)')
+        if txn_count:
+            reasons.append(f'{txn_count} bKash transaction record(s)')
+        if reasons:
+            return Response(
+                {'detail': (
+                    f'Bill #{bill.bill_number} cannot be deleted because it has '
+                    f'{" and ".join(reasons)}. Remove those first.'
+                )},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Audit entry and delete share one transaction: if the delete fails,
+        # the DELETE audit row is rolled back instead of being left behind
+        # for a bill that still exists.
+        try:
+            with transaction.atomic():
+                log_action(request.user, 'bills', bill.id, 'DELETE', BillSerializer(bill).data, None)
+                return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            # Safety net for any other model that protects Bill.
+            return Response(
+                {'detail': f'Bill #{bill.bill_number} is referenced by other records and cannot be deleted.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class BillQuickEditView(generics.UpdateAPIView):
