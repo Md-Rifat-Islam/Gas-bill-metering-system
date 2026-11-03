@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal, InvalidOperation
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -213,24 +214,49 @@ class ExportBuildingExcelView(APIView):
         return response
 
 
-# ── Excel Export: Billing (generic, filter-aware) ─────────────────────────────
+# ── Bills Export (Excel or PDF, selectable columns, filter-aware) ────────────
 
 class ExportBillsExcelView(APIView):
     """
     GET /api/v1/reports/export/bills/
         ?status=&project=&building=&unit=&search=
         &month=YYYY-MM | &year=YYYY | &date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+        &columns=bill_number,unit,total_amount     (optional, comma-separated)
+        &file_format=xlsx|pdf                       (optional, default xlsx)
 
     Mirrors the filter fields BillListCreateView already supports (status,
     project, building, unit, search) plus explicit date-range dimensions
     (Monthly / Yearly / Custom Date per spec) so this always exports exactly
     what's currently filtered, regardless of which screen triggered it.
+
+    `columns` picks which bill columns go into the file (keys listed in
+    apps/reports/exports/excel_exports.py → BILL_EXPORT_COLUMNS; unknown keys
+    → 400). Omitted → every column, so older callers behave as before.
+
+    The format parameter is called `file_format`, NOT `format`: DRF reserves
+    ?format= for content negotiation (URL_FORMAT_OVERRIDE) and would answer
+    404 for ?format=pdf because no renderer is registered under that name.
     """
     permission_classes = [IsAuthenticated, ReportPermission]
 
     def get(self, request):
         from django.http import HttpResponse
-        from apps.reports.exports.excel_exports import export_bills_excel
+        from apps.reports.exports.excel_exports import (
+            export_bills_excel, export_bills_pdf, resolve_bill_columns,
+        )
+
+        # Validate the export options first — cheap, and avoids running the
+        # query for a request that is going to be rejected anyway.
+        file_format = (request.query_params.get('file_format') or 'xlsx').lower()
+        if file_format not in ('xlsx', 'pdf'):
+            return Response({'detail': "file_format must be 'xlsx' or 'pdf'."}, status=400)
+
+        raw_columns = request.query_params.get('columns')
+        columns = [c.strip() for c in raw_columns.split(',') if c.strip()] if raw_columns else None
+        try:
+            resolve_bill_columns(columns)
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=400)
 
         qs = Bill.objects.all().select_related(
             'unit__allottee', 'building', 'project'
@@ -281,14 +307,54 @@ class ExportBillsExcelView(APIView):
 
         qs = qs.order_by('-billing_month', 'building__name', 'unit__unit_no')
 
-        xlsx_bytes = export_bills_excel(qs, title=title)
+        if file_format == 'pdf':
+            body = export_bills_pdf(
+                qs, title=title, columns=columns,
+                filter_summary=self._filter_summary(request.query_params),
+            )
+            content_type = 'application/pdf'
+        else:
+            body = export_bills_excel(qs, title=title, columns=columns)
+            content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
-        response = HttpResponse(
-            xlsx_bytes,
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        )
-        response['Content-Disposition'] = 'attachment; filename="billing_export.xlsx"'
+        # Month goes into the filename only after stripping anything that
+        # isn't filename-safe — it comes straight from the query string.
+        suffix = re.sub(r'[^0-9A-Za-z_-]', '', month or year or '')
+        filename = f"billing_export{'_' + suffix if suffix else ''}.{file_format}"
+
+        response = HttpResponse(body, content_type=content_type)
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
+
+    @staticmethod
+    def _filter_summary(params):
+        """Human-readable list of the active filters, printed on the PDF."""
+        from apps.projects.models import Project
+        from apps.buildings.models import Building
+
+        def name_of(model, pk):
+            try:
+                obj = model.objects.filter(pk=pk).first()
+            except (ValueError, TypeError):
+                obj = None
+            return obj.name if obj else str(pk)
+
+        parts = []
+        if params.get('status'):
+            parts.append(f"Status: {params['status']}")
+        if params.get('project'):
+            parts.append(f"Project: {name_of(Project, params['project'])}")
+        if params.get('building'):
+            parts.append(f"Building: {name_of(Building, params['building'])}")
+        if params.get('month'):
+            parts.append(f"Month: {params['month']}")
+        elif params.get('year'):
+            parts.append(f"Year: {params['year']}")
+        if params.get('date_from') or params.get('date_to'):
+            parts.append(f"Range: {params.get('date_from') or '…'} to {params.get('date_to') or '…'}")
+        if params.get('search'):
+            parts.append(f"Search: {params['search']}")
+        return parts
 
 
 # ── Excel Export: Payments (generic, filter-aware) ────────────────────────────
