@@ -418,7 +418,7 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="label">
-                  Bkash Charge (%){" "}
+                  Service Charge (%){" "}
                   <span className="text-surface-400 font-normal text-xs">
                     (of base amount)
                   </span>
@@ -537,7 +537,7 @@ export function CreateBillModal({ open, onClose }: CreateBillModalProps) {
                 </div>
                 {percentageAmount > 0 && (
                   <div className="flex justify-between text-surface-500">
-                    <span>Bkash Charge ({Number(percentageRate)}%)</span>
+                    <span>Service Charge ({Number(percentageRate)}%)</span>
                     <span>+ {formatCurrency(percentageAmount)}</span>
                   </div>
                 )}

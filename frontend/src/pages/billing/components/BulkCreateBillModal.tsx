@@ -137,7 +137,7 @@ export function BulkCreateBillModal({ open, onClose }: BulkCreateBillModalProps)
 
         <div className="max-w-xs">
           <label htmlFor="bulk-create-percentage" className="label">
-            Bkash Charge (%){" "}
+            Service Charge (%){" "}
             <span className="text-surface-400 font-normal text-xs">(optional)</span>
           </label>
           <input

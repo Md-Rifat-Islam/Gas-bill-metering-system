@@ -7,7 +7,7 @@ Notes
   glyph for the taka sign, which is why it used to render as a black box.
 * DTEL logo is left-aligned, DECO logo right-aligned, on the same row.
 * Wording mirrors the on-screen bill pages (see frontend utils/billLabels.ts):
-  "bKash Charge", kg vs m³ unit price, Conversion Ratio / Final Usage.
+  "bKash  (Service Charge- updated)", kg vs m³ unit price, Conversion Ratio / Final Usage.
 """
 import os
 from decimal import Decimal
@@ -219,7 +219,7 @@ def generate_invoice_pdf(bill, fileobj):
     amount('Service Charge', f"+ {money(bill.service_charge)}")
     if bill.percentage_amount and Decimal(str(bill.percentage_amount)) > 0:
         rate = f"{float(bill.percentage_rate):g}"
-        amount(f"bKash Charge ({rate}%)", f"+ {money(bill.percentage_amount)}")
+        amount(f"Service Charge ({rate}%)", f"+ {money(bill.percentage_amount)}")
     if bill.extra_charge and Decimal(str(bill.extra_charge)) > 0:
         amount('Extra Charge', f"+ {money(bill.extra_charge)}")
     if bill.late_fee and Decimal(str(bill.late_fee)) > 0:

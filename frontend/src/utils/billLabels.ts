@@ -36,7 +36,7 @@ export const BILL_LABELS = {
   total: 'Total',
   paid: 'Paid',
   due: 'Due',
-  percentageCharge: (rate: number) => `bKash Charge (${rate}%)`,
+  percentageCharge: (rate: number) => `Service Charge (${rate}%)`,
 
   // Top-of-page amount card (portal)
   totalAmount: 'Total Amount',
