@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Table2, List, Download, Loader2, Layers } from "lucide-react";
+import { Plus, Table2, List, Download, Layers } from "lucide-react";
 import { billingAPI, reportsAPI } from "@/api/client";
 import { PageLoader } from "@/components/ui";
 import { PaymentModal } from "@/components/payments/PaymentModal";
@@ -12,6 +12,7 @@ import { CreateBillModal } from "./components/CreateBillModal";
 import { BulkCreateBillModal } from "./components/BulkCreateBillModal";
 import { SpreadsheetBillingTable } from "./components/SpreadsheetBillingTable";
 import { BillsTable } from "./components/BillsTable";
+import { ExportBillsModal, type ExportFormat } from "./components/ExportBillsModal";
 import {
   BillingFilters,
   EMPTY_BILLING_FILTERS,
@@ -74,6 +75,7 @@ export default function BillingPage() {
   // Modals / transient UI stay in plain local state on purpose.
   const [createModal, setCreateModal] = useState(false);
   const [bulkModal, setBulkModal] = useState(false);
+  const [exportModal, setExportModal] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [payTarget, setPayTarget] = useState<any | null>(null);
 
@@ -99,12 +101,17 @@ export default function BillingPage() {
 
   const bills = data?.results || [];
 
-  const handleExport = async () => {
+  const handleExport = async (columns: string[], format: ExportFormat) => {
     setExporting(true);
     try {
       // Exports exactly what's currently filtered on this page — same
-      // params the list query itself is using.
-      await reportsAPI.exportBillsExcel(buildExportParams(filters));
+      // params the list query itself is using — limited to the columns
+      // and file format picked in the Export modal.
+      await reportsAPI.exportBills(buildExportParams(filters), {
+        columns,
+        format,
+      });
+      setExportModal(false);
     } catch {
       toast.error("Could not export bills");
     } finally {
@@ -148,16 +155,11 @@ export default function BillingPage() {
           )}
           <button
             className="btn-secondary w-full sm:w-auto justify-center"
-            onClick={handleExport}
-            disabled={exporting}
-            title="Export current view to Excel"
+            onClick={() => setExportModal(true)}
+            title="Export current view to Excel or PDF"
           >
-            {exporting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Download className="w-4 h-4" />
-            )}
-            Export Excel
+            <Download className="w-4 h-4" />
+            Export
           </button>
           {can.createBill && (
             <button
@@ -203,6 +205,12 @@ export default function BillingPage() {
       <BulkCreateBillModal
         open={bulkModal}
         onClose={() => setBulkModal(false)}
+      />
+      <ExportBillsModal
+        open={exportModal}
+        onClose={() => setExportModal(false)}
+        exporting={exporting}
+        onExport={handleExport}
       />
       <PaymentModal
         open={Boolean(payTarget)}

@@ -221,6 +221,18 @@ export const paymentChannelsAPI = {
   update: (data: any) => api.put('/payments/channel-settings/', data),
 }
 
+// Saves a blob response as a file download in the browser.
+function saveBlob(data: BlobPart, filename: string) {
+  const url = window.URL.createObjectURL(new Blob([data]))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  window.URL.revokeObjectURL(url)
+}
+
 export const reportsAPI = {
   dashboard: () => api.get('/reports/dashboard/'),
   monthlyRevenue: () => api.get('/reports/monthly-revenue/'),
@@ -234,40 +246,39 @@ export const reportsAPI = {
       params: month ? { month } : undefined,
       responseType: 'blob',
     })
-    const url = window.URL.createObjectURL(new Blob([res.data]))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${buildingName.replace(/\s+/g, '_')}_gas_bill_export.xlsx`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    window.URL.revokeObjectURL(url)
+    saveBlob(res.data, `${buildingName.replace(/\s+/g, '_')}_gas_bill_export.xlsx`)
   },
 
   // Exports exactly whatever filters are passed — pass the same params the
   // list page is currently querying with (status, search, date range, etc.)
+  // Always the full Excel with every column; the Billing page now uses
+  // exportBills below (column picker + PDF) instead.
   exportBillsExcel: async (params?: Record<string, any>) => {
     const res = await api.get('/reports/export/bills/', { params, responseType: 'blob' })
-    const url = window.URL.createObjectURL(new Blob([res.data]))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'billing_export.xlsx'
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    window.URL.revokeObjectURL(url)
+    saveBlob(res.data, 'billing_export.xlsx')
+  },
+
+  // Bills export with a column selection and a choice of Excel or PDF.
+  // `columns` are the keys from BILL_EXPORT_COLUMNS (ExportBillsModal.tsx);
+  // the backend rejects unknown keys. The format is sent as `file_format`
+  // because DRF reserves ?format= for its own content negotiation.
+  exportBills: async (
+    params: Record<string, any> | undefined,
+    options: { columns: string[]; format: 'xlsx' | 'pdf' },
+  ) => {
+    const res = await api.get('/reports/export/bills/', {
+      params: { ...params, columns: options.columns.join(','), file_format: options.format },
+      responseType: 'blob',
+    })
+    // Prefer the server's filename (it includes the month when filtered).
+    const disposition = res.headers['content-disposition'] as string | undefined
+    const match = disposition?.match(/filename="?([^"]+)"?/)
+    saveBlob(res.data, match?.[1] || `billing_export.${options.format}`)
   },
 
   exportPaymentsExcel: async (params?: Record<string, any>) => {
     const res = await api.get('/reports/export/payments/', { params, responseType: 'blob' })
-    const url = window.URL.createObjectURL(new Blob([res.data]))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'payments_export.xlsx'
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    window.URL.revokeObjectURL(url)
+    saveBlob(res.data, 'payments_export.xlsx')
   },
 }
 
@@ -284,13 +295,6 @@ export const backupsAPI = {
     const disposition = res.headers['content-disposition'] as string | undefined
     const filenameMatch = disposition?.match(/filename="?([^"]+)"?/)
     const filename = filenameMatch?.[1] || `backup_${id}.zip`
-    const url = window.URL.createObjectURL(new Blob([res.data]))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    window.URL.revokeObjectURL(url)
+    saveBlob(res.data, filename)
   },
 }
