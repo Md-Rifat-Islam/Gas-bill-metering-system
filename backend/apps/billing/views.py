@@ -116,6 +116,7 @@ class BulkCreateBillsView(APIView):
     For every Active unit in the building that:
       - has a meter, AND
       - has a MeterReading recorded within that billing month, AND
+      - that reading shows NON-ZERO usage (current_reading > previous_reading), AND
       - does not already have a Bill for that month,
     creates a Bill automatically using:
       - previous_reading / current_reading from that MeterReading
@@ -128,6 +129,11 @@ class BulkCreateBillsView(APIView):
         package (same resolution order as the single-bill auto-fill)
       - service_charge from the project
 
+    Units whose reading shows zero usage are NOT billed in bulk (no usage =
+    nothing to bill, and it would otherwise create a bill made up only of the
+    project's service charge). They are reported in `skipped_zero_usage`.
+    This rule is bulk-only: the single Create Bill flow is unchanged.
+
     Does NOT apply any extra_charge / discount / late_fee / adjustment —
     those still go through the normal per-bill edit flow afterward if needed.
 
@@ -137,6 +143,7 @@ class BulkCreateBillsView(APIView):
         created_count, created: [...],
         skipped_already_billed: [...],
         skipped_no_reading: [...],
+        skipped_zero_usage: [...],
       }
     """
     permission_classes = [IsAuthenticated, BillPermission]
@@ -187,7 +194,7 @@ class BulkCreateBillsView(APIView):
             .select_related('meter', 'allottee', 'package')
         )
 
-        created, skipped_billed, skipped_no_reading = [], [], []
+        created, skipped_billed, skipped_no_reading, skipped_zero_usage = [], [], [], []
 
         for unit in units:
             if Bill.objects.filter(unit=unit, billing_month=month_start).exists():
@@ -209,6 +216,18 @@ class BulkCreateBillsView(APIView):
                 skipped_no_reading.append({
                     'unit_no': unit.unit_no,
                     'reason': 'No meter reading recorded for this month yet',
+                })
+                continue
+
+            # Zero usage → nothing to bill. Checked on the reading's own
+            # current/previous values (the same numbers Bill.calculate() uses
+            # for total_usage_m3), so this can't disagree with the bill math.
+            # Done BEFORE building the Bill so no row is created, and no
+            # bill number is consumed, for a skipped unit.
+            if (reading.current_reading - reading.previous_reading) <= 0:
+                skipped_zero_usage.append({
+                    'unit_no': unit.unit_no,
+                    'reason': 'Zero meter usage this month — not billed',
                 })
                 continue
 
@@ -250,6 +269,7 @@ class BulkCreateBillsView(APIView):
             'created': created,
             'skipped_already_billed': skipped_billed,
             'skipped_no_reading': skipped_no_reading,
+            'skipped_zero_usage': skipped_zero_usage,
         })
 
 
