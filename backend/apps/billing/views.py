@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db import transaction
 from django.db.models import ProtectedError
+from django.utils import timezone
 from .models import Bill
 from .filters import BillFilter
 from .serializers import BillSerializer
@@ -62,33 +63,75 @@ class BillDetailView(generics.RetrieveUpdateDestroyAPIView):
             raise PermissionDenied('Only Super Admin can delete bills.')
         bill = self.get_object()
 
-        # Payment.bill and PaymentTransaction.bill are on_delete=PROTECT, so a
-        # bill with ANY payment record (any status) or ANY bKash transaction
-        # record (even an abandoned/failed checkout) can't be deleted. Check
-        # up front and say why, instead of letting Django raise ProtectedError
-        # (which surfaced as a bare 500 / generic toast).
-        reasons = []
+        # Payment.bill and PaymentTransaction.bill are on_delete=PROTECT, so
+        # Django would refuse to delete any bill that has either. We decide
+        # up front instead of letting ProtectedError surface as a bare 500:
+        #   - ANY Payment record (any status)            -> blocked (accounting record)
+        #   - a Success bKash transaction                -> blocked (money moved)
+        #   - a Pending bKash transaction started within -> blocked (customer may still be
+        #     the last hour                                 completing checkout on their phone;
+        #                                                   deleting the bill now could leave
+        #                                                   a charge with nothing to attach to)
+        #   - Failed / old abandoned Pending transactions-> removed together with the bill,
+        #                                                   they never moved any money.
+        # Removed transactions are written into the audit log entry so the
+        # trace isn't lost.
+        from apps.payments.models import PaymentTransaction
+
         payment_count = bill.payments.count()
-        txn_count = bill.transactions.count()
+        txns = list(bill.transactions.all())
+        recent_cutoff = timezone.now() - timedelta(hours=1)
+
+        completed = [t for t in txns if t.status == PaymentTransaction.STATUS_SUCCESS]
+        in_progress = [
+            t for t in txns
+            if t.status == PaymentTransaction.STATUS_PENDING and t.created_at > recent_cutoff
+        ]
+        blocking_ids = {t.id for t in completed} | {t.id for t in in_progress}
+        removable = [t for t in txns if t.id not in blocking_ids]
+
+        reasons = []
         if payment_count:
             reasons.append(f'{payment_count} payment record(s)')
-        if txn_count:
-            reasons.append(f'{txn_count} bKash transaction record(s)')
+        if completed:
+            reasons.append(f'{len(completed)} completed bKash transaction(s)')
+        if in_progress:
+            reasons.append(
+                f'{len(in_progress)} bKash checkout(s) that may still be in progress '
+                f'(started within the last hour)'
+            )
         if reasons:
             return Response(
                 {'detail': (
                     f'Bill #{bill.bill_number} cannot be deleted because it has '
-                    f'{" and ".join(reasons)}. Remove those first.'
+                    f'{" and ".join(reasons)}.'
                 )},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Audit entry and delete share one transaction: if the delete fails,
-        # the DELETE audit row is rolled back instead of being left behind
-        # for a bill that still exists.
+        # Audit entry, transaction cleanup and delete share one DB
+        # transaction: if anything fails, none of it sticks (no DELETE audit
+        # row left behind for a bill that still exists).
         try:
             with transaction.atomic():
-                log_action(request.user, 'bills', bill.id, 'DELETE', BillSerializer(bill).data, None)
+                old_data = BillSerializer(bill).data
+                if removable:
+                    old_data = {
+                        **old_data,
+                        'removed_bkash_transactions': [
+                            {
+                                'gateway_transaction_id': t.gateway_transaction_id,
+                                'bkash_payment_id': t.bkash_payment_id,
+                                'status': t.status,
+                                'amount': str(t.amount),
+                                'created_at': t.created_at.isoformat(),
+                            }
+                            for t in removable
+                        ],
+                    }
+                log_action(request.user, 'bills', bill.id, 'DELETE', old_data, None)
+                if removable:
+                    PaymentTransaction.objects.filter(id__in=[t.id for t in removable]).delete()
                 return super().destroy(request, *args, **kwargs)
         except ProtectedError:
             # Safety net for any other model that protects Bill.
