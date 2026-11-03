@@ -72,7 +72,8 @@ export function BulkCreateBillModal({ open, onClose }: BulkCreateBillModalProps)
           Creates a bill for every active unit in the selected building that
           already has a meter reading recorded for the chosen month — no
           re-typing readings here. Units without a reading yet are skipped;
-          record their reading first via the Quick Reading Dashboard.
+          record their reading first via the Quick Reading Dashboard. Units
+          with zero meter usage for the month are also skipped and not billed.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -174,6 +175,19 @@ export function BulkCreateBillModal({ open, onClose }: BulkCreateBillModalProps)
                 </div>
                 <ul className="text-xs text-surface-400 space-y-0.5 max-h-32 overflow-y-auto">
                   {result.skipped_already_billed.map((s: any, i: number) => (
+                    <li key={i}>{s.unit_no}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {result.skipped_zero_usage?.length > 0 && (
+              <div className="bg-surface-50 rounded-xl p-3 text-sm">
+                <div className="font-semibold text-surface-600 mb-1.5">
+                  Zero usage — not billed ({result.skipped_zero_usage.length})
+                </div>
+                <ul className="text-xs text-surface-400 space-y-0.5 max-h-32 overflow-y-auto">
+                  {result.skipped_zero_usage.map((s: any, i: number) => (
                     <li key={i}>{s.unit_no}</li>
                   ))}
                 </ul>
