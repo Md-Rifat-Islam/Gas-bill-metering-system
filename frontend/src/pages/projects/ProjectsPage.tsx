@@ -5,7 +5,7 @@ import { Plus, Pencil, Trash2, Package, Building2, Search } from 'lucide-react'
 import { projectsAPI } from '@/api/client'
 import { Modal, PageLoader, EmptyState, Pagination, ConfirmDialog } from '@/components/ui'
 import { usePermissions } from '@/hooks/usePermissions'
-import { useConfirm } from '@/hooks'
+import { useConfirm, usePersistedState } from '@/hooks'
 import { formatCurrency } from '@/utils/helpers'
 import toast from 'react-hot-toast'
 
@@ -280,8 +280,10 @@ function ProjectModal({ open, onClose, editItem, packages, readOnly }: any) {
 export default function ProjectsPage() {
   const { can } = usePermissions()
   const qc = useQueryClient()
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
+  // Search and page are persisted in sessionStorage so they survive opening
+  // another page or switching menus and coming back.
+  const [search, setSearch] = usePersistedState<string>('projects:search', '')
+  const [page, setPage] = usePersistedState<number>('projects:page', 1)
   const [projectModal, setProjectModal] = useState<{ open: boolean; item?: any }>({ open: false })
   const [packageModal, setPackageModal] = useState<{ open: boolean; item?: any }>({ open: false })
   const { confirmState, confirm, handleClose } = useConfirm()
@@ -310,6 +312,30 @@ export default function ProjectsPage() {
     )
     if (ok) deleteProject.mutate(p.id)
   }
+
+  // The backend refuses (400, with the reason shown by the global error
+  // toast) while a project, building or unit still uses the package, so a
+  // package in use can't be deleted by accident.
+  const deletePackage = useMutation({
+    mutationFn: (id: number) => projectsAPI.deletePackage(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['packages'] })
+      toast.success('Package deleted')
+    },
+  })
+
+  const handleDeletePackage = async (p: any) => {
+    const ok = await confirm(
+      'Delete package',
+      `Are you sure you want to delete the package "${p.name}"? This action cannot be undone. A package that is still assigned to a project, building or unit cannot be deleted.`
+    )
+    if (ok) deletePackage.mutate(p.id)
+  }
+
+  // Prefer a dedicated delete capability if the permissions endpoint
+  // provides one; otherwise fall back to package edit rights. The backend
+  // enforces the real delete permission either way.
+  const canDeletePackages = Boolean(can.deletePackages ?? can.editPackages)
 
   const projects = data?.results || []
 
@@ -371,14 +397,27 @@ export default function ProjectsPage() {
                       {p.unit_type === 'kg' && p.conversion_factor && ` · ${p.conversion_factor} kg/m³`}
                     </div>
                   </div>
-                  <button
-                    className="btn-ghost btn-sm !p-1"
-                    onClick={e => { e.stopPropagation(); setPackageModal({ open: true, item: p }) }}
-                    aria-label={`Edit package ${p.name}`}
-                    title={`Edit package ${p.name}`}
-                  >
-                    <Pencil className="w-3 h-3" />
-                  </button>
+                  <div className="flex gap-0.5">
+                    <button
+                      className="btn-ghost btn-sm !p-1"
+                      onClick={e => { e.stopPropagation(); setPackageModal({ open: true, item: p }) }}
+                      aria-label={`Edit package ${p.name}`}
+                      title={`Edit package ${p.name}`}
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                    {canDeletePackages && (
+                      <button
+                        className="btn-ghost btn-sm !p-1 text-danger-500 hover:bg-danger-50"
+                        onClick={e => { e.stopPropagation(); handleDeletePackage(p) }}
+                        disabled={deletePackage.isPending}
+                        aria-label={`Delete package ${p.name}`}
+                        title={`Delete package ${p.name}`}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

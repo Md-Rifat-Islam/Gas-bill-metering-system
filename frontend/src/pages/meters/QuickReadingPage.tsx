@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ScanLine, Filter as FilterIcon, ArrowLeft, ArrowRight, Gauge } from 'lucide-react'
+import { ScanLine, Filter as FilterIcon, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Gauge } from 'lucide-react'
 import { projectsAPI, buildingsAPI, metersAPI } from '@/api/client'
 import { PageLoader, EmptyState, AccessDenied } from '@/components/ui'
 import { SearchInput } from '@/components/forms'
@@ -15,6 +15,26 @@ import toast from 'react-hot-toast'
 const STATUS_FILTERS = ['All', 'Pending', 'Completed', 'Problem', 'Inactive'] as const
 type StatusFilter = typeof STATUS_FILTERS[number]
 
+// Sort options. Keep the keys stable — the chosen key is remembered in
+// sessionStorage, and an unknown/old stored key falls back to 'unit' below.
+const SORT_OPTIONS = [
+  { value: 'unit',     label: 'Floor / Unit' },
+  { value: 'meter',    label: 'Meter No.' },
+  { value: 'name',     label: 'Allottee name' },
+  { value: 'status',   label: 'Status' },
+  { value: 'previous', label: 'Previous reading' },
+] as const
+type SortKey = typeof SORT_OPTIONS[number]['value']
+type SortDir = 'asc' | 'desc'
+
+// "Needs attention first" when ascending: what still has to be read comes
+// before what's done. (The old Status sort was plain A–Z, which put
+// Completed first.)
+const STATUS_ORDER: Record<string, number> = { Pending: 0, Problem: 1, Completed: 2, Inactive: 3 }
+
+// Natural ordering: "A-2" before "A-10", "101" before "1001".
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+
 export default function QuickReadingPage() {
   const qc = useQueryClient()
   const { can } = usePermissions()
@@ -25,7 +45,9 @@ export default function QuickReadingPage() {
   const [buildingId, setBuildingId] = usePersistedState<string>('quickreading:building', '')
   const [search,     setSearch]     = usePersistedState<string>('quickreading:search', '')
   const [statusFilter, setStatusFilter] = usePersistedState<StatusFilter>('quickreading:status', 'Pending')
-  const [sortBy, setSortBy] = usePersistedState<'unit' | 'status'>('quickreading:sort', 'unit')
+  const [storedSortBy, setSortBy] = usePersistedState<SortKey>('quickreading:sort', 'unit')
+  const [sortDir, setSortDir] = usePersistedState<SortDir>('quickreading:sortdir', 'asc')
+  const sortBy: SortKey = SORT_OPTIONS.some(o => o.value === storedSortBy) ? storedSortBy : 'unit'
 
   const [activeCard, setActiveCard] = useState<MeterCardData | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -87,14 +109,35 @@ export default function QuickReadingPage() {
         (c.allottee_mobile || '').toLowerCase().includes(q)
       )
     }
+    const dir = sortDir === 'asc' ? 1 : -1
+    const byUnit = (a: MeterCardData, b: MeterCardData) =>
+      a.floor_no - b.floor_no || collator.compare(a.unit_no, b.unit_no)
+
     const sorted = [...list]
-    if (sortBy === 'unit') {
-      sorted.sort((a, b) => a.floor_no - b.floor_no || a.unit_no.localeCompare(b.unit_no))
-    } else {
-      sorted.sort((a, b) => a.reading_status.localeCompare(b.reading_status))
-    }
+    sorted.sort((a, b) => {
+      switch (sortBy) {
+        case 'meter':
+          return dir * collator.compare(a.meter_no, b.meter_no) || byUnit(a, b)
+        case 'name': {
+          // Units with no allottee name always sink to the bottom, in either direction.
+          const an = (a.allottee_name || '').trim()
+          const bn = (b.allottee_name || '').trim()
+          if (!an && !bn) return byUnit(a, b)
+          if (!an) return 1
+          if (!bn) return -1
+          return dir * collator.compare(an, bn) || byUnit(a, b)
+        }
+        case 'status':
+          return dir * ((STATUS_ORDER[a.reading_status] ?? 99) - (STATUS_ORDER[b.reading_status] ?? 99)) || byUnit(a, b)
+        case 'previous':
+          return dir * (Number(a.previous_reading) - Number(b.previous_reading)) || byUnit(a, b)
+        case 'unit':
+        default:
+          return dir * byUnit(a, b)
+      }
+    })
     return sorted
-  }, [allCards, statusFilter, search, sortBy])
+  }, [allCards, statusFilter, search, sortBy, sortDir])
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { All: allCards.length, Pending: 0, Completed: 0, Problem: 0, Inactive: 0 }
@@ -206,10 +249,22 @@ export default function QuickReadingPage() {
         </div>
         <div className="w-full">
           <label htmlFor="sort-select" className="label">Sort</label>
-          <select id="sort-select" className="input" value={sortBy} onChange={e => setSortBy(e.target.value as any)}>
-            <option value="unit">Floor / Unit</option>
-            <option value="status">Status</option>
-          </select>
+          <div className="flex gap-2">
+            <select id="sort-select" className="input flex-1 min-w-0" value={sortBy} onChange={e => setSortBy(e.target.value as SortKey)}>
+              {SORT_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn-secondary !px-3 shrink-0"
+              onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+              title={sortDir === 'asc' ? 'Ascending — click for descending' : 'Descending — click for ascending'}
+              aria-label={sortDir === 'asc' ? 'Sort ascending' : 'Sort descending'}
+            >
+              {sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
       </div>
 

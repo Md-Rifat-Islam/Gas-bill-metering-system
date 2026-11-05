@@ -88,6 +88,9 @@ export const projectsAPI = {
   packages: () => api.get('/projects/packages/'),
   createPackage: (data: any) => api.post('/projects/packages/', data),
   updatePackage: (id: number, data: any) => api.patch(`/projects/packages/${id}/`, data),
+  // Backend refuses (400, with a reason) while the package is still used by
+  // a project, building or unit.
+  deletePackage: (id: number) => api.delete(`/projects/packages/${id}/`),
 }
 
 export const buildingsAPI = {
