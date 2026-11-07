@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
-import { Plus, Pencil, Trash2, Home, Search, Gauge, PlusCircle, Upload, Download, KeyRound, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Home, Search, Gauge, PlusCircle, Upload, Download, KeyRound, Loader2, ShieldCheck } from 'lucide-react'
 import { unitsAPI, buildingsAPI, projectsAPI } from '@/api/client'
 import { Modal, PageLoader, EmptyState, Pagination, ConfirmDialog } from '@/components/ui'
 import { MeterAssignModal } from '@/components/meters/MeterAssignModal'
 import { usePermissions } from '@/hooks/usePermissions'
-import { useConfirm } from '@/hooks'
+import { useConfirm, usePersistedState } from '@/hooks'
 import toast from 'react-hot-toast'
 
 /* ── Portal Password reset — admin/staff side, no OTP ────────────────────── */
@@ -99,7 +99,7 @@ function CustomerPasswordResetSection({ mobile, readOnly }: { mobile: string; re
   )
 }
 
-function UnitModal({ open, onClose, editItem, buildings, projects, packages, readOnly }: any) {
+function UnitModal({ open, onClose, editItem, buildings, projects, packages, readOnly, canAssignManager }: any) {
   const qc = useQueryClient()
   // Project is a UI-only selector used to narrow the Building dropdown —
   // it is never submitted to the backend, only building_id is.
@@ -109,10 +109,12 @@ function UnitModal({ open, onClose, editItem, buildings, projects, packages, rea
     defaultValues: {
       building_id: '', floor_no: '', unit_no: '', mobile_number: '',
       package_id: '', status: 'Active', allottee_name: '', allottee_email: '', allottee_nid: '',
+      set_project_manager: false,
     },
   })
 
   const currentMobile = watch('mobile_number')
+  const wantsManager = watch('set_project_manager')
 
   // Fix: re-populate the form whenever the modal opens / target item changes.
   // Previously `defaultValues` was only evaluated on first mount, so editing
@@ -136,12 +138,14 @@ function UnitModal({ open, onClose, editItem, buildings, projects, packages, rea
           allottee_name: editItem.allottee?.name ?? '',
           allottee_email: editItem.allottee?.email ?? '',
           allottee_nid: editItem.allottee?.nid ?? '',
+          set_project_manager: Boolean(editItem.is_project_manager),
         })
       } else {
         setProjectId('')
         reset({
           building_id: '', floor_no: '', unit_no: '', mobile_number: '',
           package_id: '', status: 'Active', allottee_name: '', allottee_email: '', allottee_nid: '',
+          set_project_manager: false,
         })
       }
     }
@@ -176,14 +180,27 @@ function UnitModal({ open, onClose, editItem, buildings, projects, packages, rea
   }
 
   const save = useMutation({
-    mutationFn: (data: any) =>
-      editItem ? unitsAPI.update(editItem.id, data) : unitsAPI.create(data),
+    mutationFn: (data: any) => {
+      const payload = { ...data }
+      // Only Admin / Super Admin may assign the project manager unit. The form
+      // always carries the field (it has a default value), so drop it for
+      // everyone else instead of sending a value they aren't allowed to set.
+      if (!canAssignManager) delete payload.set_project_manager
+      return editItem ? unitsAPI.update(editItem.id, payload) : unitsAPI.create(payload)
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['units'] })
+      // The portal's Project tab depends on which unit is the manager.
+      qc.invalidateQueries({ queryKey: ['projects'] })
       toast.success(editItem ? 'Unit updated' : 'Unit created')
       onClose()
     },
   })
+
+  // Another unit already manages this project (shown so the admin knows a
+  // save will replace it). Only known when editing an existing unit.
+  const replacesOther =
+    wantsManager && editItem && !editItem.is_project_manager && editItem.project_manager_unit_label
 
   return (
     <Modal open={open} onClose={onClose} title={editItem ? 'Edit Unit' : 'New Unit'} size="lg">
@@ -344,6 +361,40 @@ function UnitModal({ open, onClose, editItem, buildings, projects, packages, rea
             </div>
           </div>
         </div>
+
+        {/* Project manager unit — Admin / Super Admin only (also enforced by
+            the API). A project has ONE manager unit; picking this replaces
+            the current one. The resident of this unit then gets a read-only
+            "Project" tab in the Resident Portal showing paid / partial /
+            unpaid for every unit in the project. Access follows this unit's
+            mobile number, so changing that number moves the access too. */}
+        {canAssignManager && (
+          <div className="border-t border-surface-100 pt-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-1 rounded border-surface-300"
+                disabled={readOnly}
+                {...register('set_project_manager')}
+              />
+              <div>
+                <div className="text-sm font-semibold text-surface-700 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-brand-500" /> Project manager unit
+                </div>
+                <p className="text-xs text-surface-400 mt-0.5">
+                  The resident of this unit can view the bill status (paid / partial / unpaid) of every
+                  unit in the project from the Resident Portal. Read-only; no meter or contact details
+                  are shown. A project has one manager unit, and it must be Active.
+                </p>
+                {replacesOther && (
+                  <p className="text-xs text-warning-700 mt-1.5">
+                    Saving will replace the current manager unit: {editItem.project_manager_unit_label}.
+                  </p>
+                )}
+              </div>
+            </label>
+          </div>
+        )}
 
         {/* Portal password reset — only meaningful for an existing unit that
             already has a mobile number (and therefore, in principle, a
@@ -525,12 +576,17 @@ function BulkImportModal({ open, onClose, buildings, projects }: any) {
 }
 
 export default function UnitsPage() {
-  const { can } = usePermissions()
+  const { can, role } = usePermissions()
   const qc = useQueryClient()
-  const [search, setSearch] = useState('')
-  const [buildingFilter, setBuildingFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [page, setPage] = useState(1)
+  // Only Admin / Super Admin may assign a project manager unit (the API
+  // enforces the same rule).
+  const canAssignManager = role === 'super_admin' || role === 'admin'
+  // Search, filters and page are persisted in sessionStorage so they survive
+  // opening another page or switching menus and coming back.
+  const [search, setSearch] = usePersistedState<string>('units:search', '')
+  const [buildingFilter, setBuildingFilter] = usePersistedState<string>('units:building', '')
+  const [statusFilter, setStatusFilter] = usePersistedState<string>('units:status', '')
+  const [page, setPage] = usePersistedState<number>('units:page', 1)
   const [modal, setModal] = useState<{ open: boolean; item?: any }>({ open: false })
   const [meterModal, setMeterModal] = useState<{ open: boolean; unit?: any }>({ open: false })
   const [bulkModalOpen, setBulkModalOpen] = useState(false)
@@ -672,6 +728,14 @@ export default function UnitsPage() {
                       <div className="font-semibold text-surface-900">
                         Floor {u.floor_no} — {u.unit_no}
                       </div>
+                      {u.is_project_manager && (
+                        <span
+                          className="badge-blue text-[10px] inline-flex items-center gap-1 mt-1"
+                          title="This unit's resident can view the whole project's bill status in the portal"
+                        >
+                          <ShieldCheck className="w-3 h-3" /> Project manager
+                        </span>
+                      )}
                     </td>
                     <td>
                       <div className="text-surface-700 text-sm">{u.building_name}</div>
@@ -743,6 +807,7 @@ export default function UnitsPage() {
         projects={projects}
         packages={packages}
         readOnly={!can.editBuildings}
+        canAssignManager={canAssignManager}
       />
 
       <BulkImportModal

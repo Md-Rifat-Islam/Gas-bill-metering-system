@@ -151,30 +151,81 @@ interface PaginationProps {
   pageSize?: number
   onChange: (page: number) => void
 }
+
+// Page numbers to show: always the first and last, the current page and one
+// either side, with "…" where pages are skipped — e.g. 1 … 4 5 6 … 12.
+function pageWindow(page: number, pages: number): (number | '…')[] {
+  const wanted = new Set([1, pages, page - 1, page, page + 1])
+  const nums = [...wanted].filter(n => n >= 1 && n <= pages).sort((a, b) => a - b)
+  const out: (number | '…')[] = []
+  nums.forEach((n, i) => {
+    if (i > 0 && n - nums[i - 1] > 1) out.push('…')
+    out.push(n)
+  })
+  return out
+}
+
 export function Pagination({ page, count, pageSize = 20, onChange }: PaginationProps) {
   const pages = Math.ceil(count / pageSize)
   if (pages <= 1) return null
+  const from = (page - 1) * pageSize + 1
+  const to = Math.min(page * pageSize, count)
+
   return (
-    <div className="flex items-center gap-2 justify-end mt-4">
-      <button
-        className="btn-secondary btn-sm !px-2"
-        disabled={page === 1}
-        onClick={() => onChange(page - 1)}
-        title="Previous Page"
-      >
-        <ChevronLeft className="w-4 h-4" />
-      </button>
-      <span className="text-sm text-surface-500">
-        Page {page} of {pages}
-      </span>
-      <button
-        className="btn-secondary btn-sm !px-2"
-        disabled={page === pages}
-        onClick={() => onChange(page + 1)}
-        title="Next Page"
-      >
-        <ChevronRight className="w-4 h-4" />
-      </button>
+    <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 mt-4">
+      <div className="text-sm text-surface-500">
+        Showing <span className="font-semibold text-surface-700">{from}–{to}</span> of{' '}
+        <span className="font-semibold text-surface-700">{count}</span>
+      </div>
+
+      <nav className="flex items-center gap-1" aria-label="Pagination">
+        <button
+          className="btn-secondary btn-sm !px-2"
+          disabled={page === 1}
+          onClick={() => onChange(page - 1)}
+          title="Previous Page"
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+
+        {/* Phones: just "Page x of y" — numbered buttons wouldn't fit. */}
+        <span className="sm:hidden text-sm text-surface-500 px-2">
+          Page {page} of {pages}
+        </span>
+
+        {/* Wider screens: numbered pages. */}
+        <div className="hidden sm:flex items-center gap-1">
+          {pageWindow(page, pages).map((p, i) =>
+            p === '…' ? (
+              <span key={`gap-${i}`} className="px-1 text-surface-400 select-none">…</span>
+            ) : (
+              <button
+                key={p}
+                onClick={() => onChange(p)}
+                aria-label={`Page ${p}`}
+                aria-current={p === page ? 'page' : undefined}
+                className={cn(
+                  'btn-sm min-w-[2rem] !px-2 justify-center',
+                  p === page ? 'btn-primary' : 'btn-ghost text-surface-600'
+                )}
+              >
+                {p}
+              </button>
+            )
+          )}
+        </div>
+
+        <button
+          className="btn-secondary btn-sm !px-2"
+          disabled={page === pages}
+          onClick={() => onChange(page + 1)}
+          title="Next Page"
+          aria-label="Next page"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </nav>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard,
@@ -13,17 +13,23 @@ import {
   CheckCheck,
   Building2,
   ChevronDown,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/utils/helpers";
 import { useCustomerAuthStore, type PortalUnit } from "@/store/customerAuthStore";
 import { portalAPI } from "@/api/portalClient";
+import { clearPersistedState } from "@/hooks";
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Home", path: "/portal/dashboard" },
   { icon: FileText, label: "Bills", path: "/portal/bills" },
   { icon: CreditCard, label: "Payments", path: "/portal/payments" },
   { icon: User, label: "Profile", path: "/portal/profile" },
 ];
+
+// Extra tab, shown only to the resident of a project's manager unit
+// (see /portal/manager/access/). Goes before Profile.
+const PROJECT_NAV_ITEM = { icon: ClipboardList, label: "Project", path: "/portal/project" };
 
 const NOTIFICATION_ICON: Record<string, any> = {
   bill_created: Receipt,
@@ -230,12 +236,33 @@ function UnitSwitcher({ units }: { units: PortalUnit[] }) {
 export default function PortalLayout() {
   const { customer, clearAuth, selectedUnit, setSelectedUnit } = useCustomerAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const { data: units } = useQuery({
     queryKey: ["portal-units"],
     queryFn: () => portalAPI.myUnits().then((r) => r.data as PortalUnit[]),
     enabled: !!customer,
   });
+
+  // Is this resident the manager unit of a project? Drives the extra
+  // "Project" tab. Cosmetic only — the backend re-checks on every request.
+  // Same query key as the Project page, so it is fetched once and shared.
+  const { data: managerAccess } = useQuery({
+    queryKey: ["portal-manager-access"],
+    queryFn: () => portalAPI.managerAccess().then((r) => r.data),
+    enabled: !!customer,
+    staleTime: 5 * 60_000,
+  });
+  const isManager = Boolean(managerAccess?.is_manager);
+
+  const navItems = isManager
+    ? [...BASE_NAV_ITEMS.slice(0, -1), PROJECT_NAV_ITEM, BASE_NAV_ITEMS[BASE_NAV_ITEMS.length - 1]]
+    : BASE_NAV_ITEMS;
+
+  // The Project page is a project-wide bill list, which needs more room than
+  // the single-flat pages. Everything else keeps the narrow phone-style column.
+  const wide = location.pathname.startsWith("/portal/project");
+  const widthClass = wide ? "max-w-5xl" : "max-w-2xl";
 
   // Resolves unit selection on mount/whenever the units list loads:
   //   - exactly 1 unit  -> auto-select it silently (covers both a brand
@@ -255,6 +282,8 @@ export default function PortalLayout() {
 
   const handleLogout = () => {
     clearAuth();
+    // Don't leave this resident's saved filters in the tab for the next person.
+    clearPersistedState();
     navigate("/portal/login");
   };
 
@@ -302,13 +331,13 @@ export default function PortalLayout() {
         </button>
       </header>
       {/* Content */}
-      <main className="flex-1 max-w-2xl w-full mx-auto p-4 pb-24">
+      <main className={cn("flex-1 w-full mx-auto p-4 pb-24", widthClass)}>
         <Outlet />
       </main>
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-surface-100 flex z-20">
-        <div className="max-w-2xl w-full mx-auto flex">
-          {NAV_ITEMS.map(({ icon: Icon, label, path }) => (
+        <div className={cn("w-full mx-auto flex", widthClass)}>
+          {navItems.map(({ icon: Icon, label, path }) => (
             <NavLink
               key={path}
               to={path}

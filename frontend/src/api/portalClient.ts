@@ -100,6 +100,18 @@ export const portalAPI = {
   // Powers the post-login unit picker and the header unit switcher.
   myUnits: () => portalApi.get('/portal/units/'),
 
+  // Project manager unit — read-only project-wide bill status. `access`
+  // only says whether to show the Project section; the other two re-check
+  // on the server. `project` is only needed when one account manages
+  // several projects.
+  managerAccess:   () => portalApi.get('/portal/manager/access/'),
+  managerOverview: (params?: { project?: number | string; month?: string }) =>
+    portalApi.get('/portal/manager/overview/', { params }),
+  managerBills: (params?: {
+    project?: number | string; month?: string; status?: string
+    building?: number | string; search?: string; page?: number
+  }) => portalApi.get('/portal/manager/bills/', { params }),
+
   // Notifications — must use portalApi (customer JWT), not the staff `api`
   // instance, or every call here would send the wrong auth token entirely.
   notifications:            () => portalApi.get('/portal/notifications/'),

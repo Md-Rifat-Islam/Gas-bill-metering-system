@@ -46,6 +46,23 @@ const STATUS_BADGE: Record<string, string> = {
   Sent: 'badge-green', Failed: 'badge-red', Queued: 'badge-yellow', Skipped: 'badge-gray',
 }
 
+// A list endpoint answers with one page at a time, and the server caps how big
+// a page can be — so asking for page_size=500 and reading only the first
+// response silently drops everything past the cap. This walks every page
+// (200 per request) until there is no `next`, so pickers get the COMPLETE
+// list no matter how many rows exist. The 50-page ceiling (10,000 rows) only
+// guards against a runaway loop.
+async function fetchAllPages(fetchPage: (page: number) => Promise<any>): Promise<any[]> {
+  const all: any[] = []
+  for (let page = 1; page <= 50; page++) {
+    const { data } = await fetchPage(page)
+    if (Array.isArray(data)) return data           // endpoint isn't paginated
+    all.push(...(data.results ?? []))
+    if (!data.next) break
+  }
+  return all
+}
+
 function Counter({ text }: { text: string }) {
   const i = smsInfo(text)
   return (
@@ -170,27 +187,47 @@ function SendTab() {
   const [preview, setPreview] = useState<AudiencePreview | null>(null)
   const [confirm, setConfirm] = useState(false)
 
-  const list = (r: any) => (Array.isArray(r.data) ? r.data : r.data.results ?? [])
-  const { data: projects = [] } = useQuery({ queryKey: ['projects-all'], queryFn: () => projectsAPI.list({ page_size: 500 }).then(list) })
-  const { data: buildings = [] } = useQuery({ queryKey: ['buildings-all'], queryFn: () => buildingsAPI.list({ page_size: 500 }).then(list) })
+  // Projects and buildings use the walk-every-page helper too: with a plain
+  // page_size request, anything beyond the server's page cap would be missing
+  // from these dropdowns as well.
+  const { data: projects = [] } = useQuery({
+    queryKey: ['projects-all-pages'],
+    queryFn: () => fetchAllPages(page => projectsAPI.list({ page_size: 200, page })),
+  })
+  const { data: buildings = [] } = useQuery({
+    queryKey: ['buildings-all-pages'],
+    queryFn: () => fetchAllPages(page => buildingsAPI.list({ page_size: 200, page })),
+  })
   const { data: templates = [] } = useQuery({ queryKey: ['sms-templates'], queryFn: () => messagingAPI.templates().then(r => r.data) })
   const { data: campaigns = [] } = useQuery({
     queryKey: ['sms-campaigns'], queryFn: () => messagingAPI.campaigns().then(r => r.data), refetchInterval: 10_000,
   })
-  const { data: allUnits = [] } = useQuery({
-    queryKey: ['units-all-for-sms'],
-    queryFn: () => unitsAPI.list({ page_size: 500 }).then(list),
+
+  // The unit picker: every unit (all pages) for the chosen project / building.
+  // Both filters are applied on the SERVER. Before, only a single page of
+  // units was fetched and the building was filtered in the browser — and the
+  // Project selection was never applied to the unit list at all.
+  const { data: allUnits = [], isLoading: unitsLoading } = useQuery({
+    queryKey: ['units-for-sms', projectId, buildingId],
+    queryFn: () => fetchAllPages(page => unitsAPI.list({
+      page_size: 200,
+      page,
+      building: buildingId || undefined,
+      building__project: projectId || undefined,
+    })),
     enabled: audience === 'units',
+    staleTime: 60_000,
   })
 
   const noticeTemplates = templates.filter((t: SMSTemplate) => t.kind === 'notice' && t.is_active)
   const shownBuildings = buildings.filter((b: any) => !projectId || String(b.project_id) === projectId)
   const shownUnits = useMemo(() => {
     const q = unitSearch.trim().toLowerCase()
-    return allUnits
-      .filter((u: any) => !buildingId || String(u.building_id) === buildingId)
-      .filter((u: any) => !q || `${u.unit_no} ${u.allottee?.name ?? ''} ${u.mobile_number ?? ''}`.toLowerCase().includes(q))
-  }, [allUnits, buildingId, unitSearch])
+    if (!q) return allUnits
+    return allUnits.filter((u: any) =>
+      `${u.unit_no} ${u.allottee?.name ?? ''} ${u.mobile_number ?? ''} ${u.building_name ?? ''}`.toLowerCase().includes(q)
+    )
+  }, [allUnits, unitSearch])
 
   const payload = (): CampaignPayload => ({
     title: title.trim(),
@@ -290,7 +327,9 @@ function SendTab() {
                 </div>
               </div>
               <div className="max-h-56 overflow-y-auto border border-surface-100 rounded-xl divide-y divide-surface-100">
-                {shownUnits.length === 0 ? (
+                {unitsLoading ? (
+                  <div className="p-4 text-sm text-surface-400 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading all units…</div>
+                ) : shownUnits.length === 0 ? (
                   <div className="p-4 text-sm text-surface-400">No units to show.</div>
                 ) : shownUnits.map((u: any) => (
                   <label key={u.id} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-surface-50">
@@ -298,11 +337,19 @@ function SendTab() {
                       onChange={e => setUnitIds(e.target.checked ? [...unitIds, u.id] : unitIds.filter(x => x !== u.id))} />
                     <span className="font-medium text-surface-800">{u.unit_no}</span>
                     <span className="text-surface-500 truncate">{u.allottee?.name ?? '—'}</span>
+                    {u.status === 'Inactive' && <span className="badge-gray text-[10px]">Inactive</span>}
                     <span className="ml-auto text-xs text-surface-400">{u.building_name}</span>
                   </label>
                 ))}
               </div>
-              <p className="text-xs text-surface-400 mt-1">{unitIds.length} unit(s) selected</p>
+              <p className="text-xs text-surface-400 mt-1">
+                {unitIds.length} unit(s) selected · {unitsLoading ? 'loading…' : `${shownUnits.length} of ${allUnits.length} unit(s) shown`}
+              </p>
+              {unitIds.length > 1500 && (
+                <p className="text-xs text-warning-600 mt-1">
+                  A single notice can target at most 2,000 selected units. For larger groups choose “A building”, “A project” or “Everyone” instead.
+                </p>
+              )}
             </div>
           )}
 

@@ -44,6 +44,8 @@ const PortalPaymentsPage = lazy(() => import("@/pages/portal/PortalPaymentsPage"
 const PortalProfilePage = lazy(() => import("@/pages/portal/PortalProfilePage"));
 const PortalUnitSelectPage = lazy(() => import("@/pages/portal/PortalUnitSelectPage"));
 const PortalBkashResultPage = lazy(() => import("@/pages/portal/PortalBkashResultPage"));
+// Project manager unit's read-only project bill status
+const PortalProjectPage = lazy(() => import("@/pages/portal/PortalProjectPage"));
 
 // Each lazy page gets its own Suspense boundary, so inside a layout only the
 // content area shows the loader while a chunk downloads — the sidebar/header
@@ -196,6 +198,10 @@ export default function App() {
         <Route path="bills/:id" element={page(<PortalBillDetailPage />)} />
         <Route path="payment" element={page(<PortalPaymentPage />)} />
         <Route path="payments" element={page(<PortalPaymentsPage />)} />
+        {/* Only meaningful for a project's manager unit — the page itself
+            shows a "not available" message otherwise, and the backend
+            refuses anyone who isn't the manager regardless of this route. */}
+        <Route path="project" element={page(<PortalProjectPage />)} />
         <Route path="profile" element={page(<PortalProfilePage />)} />
       </Route>
 
