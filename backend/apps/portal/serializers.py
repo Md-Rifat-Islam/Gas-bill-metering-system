@@ -65,6 +65,32 @@ class PortalBillSerializer(serializers.ModelSerializer):
         return obj.billing_month.strftime('%B %Y')
 
 
+class PortalManagerBillSerializer(serializers.ModelSerializer):
+    """
+    One row of the project-wide bill status list shown to a project's
+    manager unit. Deliberately NARROW: unit location, month, money and
+    status only. No allottee name/mobile, readings, adjustments or payment
+    details of other residents — the manager sees who has paid, not
+    anyone's personal or meter data.
+    """
+    unit_no       = serializers.CharField(source='unit.unit_no', read_only=True)
+    floor_no      = serializers.IntegerField(source='unit.floor_no', read_only=True)
+    building_name = serializers.CharField(source='building.name', read_only=True)
+    billing_month_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Bill
+        fields = [
+            'id', 'bill_number', 'unit_no', 'floor_no', 'building_name',
+            'billing_month', 'billing_month_display',
+            'total_amount', 'paid_amount', 'due_amount', 'status',
+        ]
+        read_only_fields = fields
+
+    def get_billing_month_display(self, obj):
+        return obj.billing_month.strftime('%B %Y')
+
+
 class PortalPaymentSerializer(serializers.ModelSerializer):
     """
     Payment history entry for the customer portal. Extended to support the

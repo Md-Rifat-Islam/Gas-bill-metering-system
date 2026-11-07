@@ -15,4 +15,9 @@ urlpatterns = [
     path('notifications/',          views.NotificationListView.as_view(), name='portal-notifications'),
     path('notifications/<int:pk>/read/', views.NotificationMarkReadView.as_view(), name='portal-notification-read'),
     path('notifications/read-all/', views.NotificationMarkAllReadView.as_view(), name='portal-notifications-read-all'),
+
+    # Project manager unit — read-only project-wide bill status
+    path('manager/access/',         views.PortalManagerAccessView.as_view(), name='portal-manager-access'),
+    path('manager/overview/',       views.PortalManagerOverviewView.as_view(), name='portal-manager-overview'),
+    path('manager/bills/',          views.PortalManagerBillListView.as_view(), name='portal-manager-bills'),
 ]

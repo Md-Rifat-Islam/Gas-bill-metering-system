@@ -1,9 +1,12 @@
+from datetime import datetime
+
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from django.db.models import Sum
+from django.db.models import Sum, Count, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 
@@ -13,11 +16,14 @@ from apps.payments.serializers import PaymentChannelSettingsSerializer
 from apps.payments.bkash_client import BkashError
 from apps.payments.services import initiate_bkash_checkout
 from apps.authentication.customer_auth import CustomerJWTAuthentication
+from apps.projects.models import Project
+from apps.units.models import Unit
 from core.permissions import IsCustomer
 from .models import Notification
 from .serializers import (
     PortalProfileSerializer, PortalBillSerializer, PortalPaymentSerializer,
     PortalPaymentSubmitSerializer, NotificationSerializer, PortalUnitSerializer,
+    PortalManagerBillSerializer,
 )
 
 
@@ -136,6 +142,227 @@ class PortalBillDetailView(CustomerScopedMixin, generics.RetrieveAPIView):
 
     def get_queryset(self):
         return self.get_bill_queryset()
+
+
+# ── Project manager unit ──────────────────────────────────────────────────────
+# A project can have one "manager unit" (Project.manager_unit, set by an Admin
+# from the Units page). The resident of that unit gets a READ-ONLY view of the
+# whole project's bill status: who has paid, who hasn't.
+#
+# Access rule, checked on the server for EVERY request (hiding the menu item
+# in the frontend is only cosmetic):
+#   the logged-in customer's mobile number must be the mobile_number of an
+#   Active unit that is the manager_unit of an active project.
+# It is deliberately independent of which flat is currently selected in the
+# portal header — the manager overview isn't about one flat. A forged
+# ?project= id for a project they don't manage is refused.
+
+class ManagerScopedMixin(CustomerScopedMixin):
+
+    def get_managed_projects(self):
+        return list(
+            Project.objects
+            .filter(
+                is_active=True,
+                manager_unit__status=Unit.STATUS_ACTIVE,
+                manager_unit__mobile_number=self.request.user.mobile,
+            )
+            .select_related('manager_unit__building')
+            .order_by('name')
+        )
+
+    def get_managed_project(self):
+        projects = self.get_managed_projects()
+        if not projects:
+            raise PermissionDenied('You are not a project manager.')
+
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            match = next((p for p in projects if str(p.id) == str(project_id)), None)
+            if match is None:
+                raise PermissionDenied('You do not manage this project.')
+            return match
+        if len(projects) == 1:
+            return projects[0]
+        raise ValidationError('Several projects are managed from this account — specify which one.')
+
+    @staticmethod
+    def parse_month(value):
+        """'YYYY-MM' -> first day of that month, or None when not given."""
+        if not value:
+            return None
+        try:
+            return datetime.strptime(value, '%Y-%m').date().replace(day=1)
+        except ValueError:
+            raise ValidationError('month must be in YYYY-MM format.')
+
+
+class PortalManagerAccessView(ManagerScopedMixin, APIView):
+    """
+    GET /api/v1/portal/manager/access/
+
+    Always 200. Tells the portal whether to show the Project section at all,
+    and for which project(s). Not an access grant by itself — the overview
+    and bill endpoints below re-check on their own.
+    """
+    def get(self, request):
+        projects = self.get_managed_projects()
+        return Response({
+            'is_manager': bool(projects),
+            'projects': [
+                {
+                    'id': p.id,
+                    'name': p.name,
+                    'manager_unit_no': p.manager_unit.unit_no,
+                    'manager_unit_building': p.manager_unit.building.name,
+                }
+                for p in projects
+            ],
+        })
+
+
+class PortalManagerOverviewView(ManagerScopedMixin, APIView):
+    """
+    GET /api/v1/portal/manager/overview/?project=<id>&month=YYYY-MM
+
+    Bill-status summary for one month of the managed project (defaults to
+    the latest month that has bills): counts of Paid / Partial / Unpaid,
+    billed / collected / due totals, and the same per building. Also lists
+    the months that have bills so the page can offer a month picker.
+    """
+    def get(self, request):
+        project = self.get_managed_project()
+        bills = Bill.objects.filter(project=project)
+
+        month_dates = list(bills.dates('billing_month', 'month', order='DESC')[:24])
+        months = [
+            {'value': d.strftime('%Y-%m'), 'label': d.strftime('%B %Y')}
+            for d in month_dates
+        ]
+
+        requested = self.parse_month(request.query_params.get('month'))
+        month_start = requested or (month_dates[0] if month_dates else None)
+
+        active_units = Unit.objects.filter(
+            building__project=project, status=Unit.STATUS_ACTIVE
+        ).count()
+
+        summary = {
+            'bill_count': 0, 'paid_count': 0, 'partial_count': 0, 'unpaid_count': 0,
+            'total_billed': 0.0, 'total_paid': 0.0, 'total_due': 0.0,
+            'collection_rate': 0.0, 'active_units': active_units, 'billed_units': 0,
+        }
+        by_building = []
+
+        if month_start:
+            qs = bills.filter(
+                billing_month__year=month_start.year,
+                billing_month__month=month_start.month,
+            )
+            agg = qs.aggregate(
+                bill_count=Count('id'),
+                paid_count=Count('id', filter=Q(status='Paid')),
+                partial_count=Count('id', filter=Q(status='Partial')),
+                unpaid_count=Count('id', filter=Q(status='Unpaid')),
+                total_billed=Sum('total_amount'),
+                total_paid=Sum('paid_amount'),
+                total_due=Sum('due_amount'),
+            )
+            billed = float(agg['total_billed'] or 0)
+            paid = float(agg['total_paid'] or 0)
+            summary.update({
+                'bill_count': agg['bill_count'],
+                'paid_count': agg['paid_count'],
+                'partial_count': agg['partial_count'],
+                'unpaid_count': agg['unpaid_count'],
+                'total_billed': billed,
+                'total_paid': paid,
+                'total_due': float(agg['total_due'] or 0),
+                'collection_rate': round(paid / billed * 100, 1) if billed > 0 else 0.0,
+                'billed_units': qs.values('unit_id').distinct().count(),
+            })
+
+            rows = (
+                qs.values('building_id', 'building__name')
+                .annotate(
+                    bill_count=Count('id'),
+                    paid_count=Count('id', filter=Q(status='Paid')),
+                    partial_count=Count('id', filter=Q(status='Partial')),
+                    unpaid_count=Count('id', filter=Q(status='Unpaid')),
+                    total_billed=Sum('total_amount'),
+                    total_paid=Sum('paid_amount'),
+                    total_due=Sum('due_amount'),
+                )
+                .order_by('building__name')
+            )
+            by_building = [
+                {
+                    'building_id': r['building_id'],
+                    'building_name': r['building__name'],
+                    'bill_count': r['bill_count'],
+                    'paid_count': r['paid_count'],
+                    'partial_count': r['partial_count'],
+                    'unpaid_count': r['unpaid_count'],
+                    'total_billed': float(r['total_billed'] or 0),
+                    'total_paid': float(r['total_paid'] or 0),
+                    'total_due': float(r['total_due'] or 0),
+                }
+                for r in rows
+            ]
+
+        return Response({
+            'project': {
+                'id': project.id,
+                'name': project.name,
+                'manager_unit_no': project.manager_unit.unit_no,
+                'manager_unit_building': project.manager_unit.building.name,
+            },
+            'month': month_start.strftime('%Y-%m') if month_start else None,
+            'months': months,
+            'summary': summary,
+            'by_building': by_building,
+        })
+
+
+class PortalManagerBillListView(ManagerScopedMixin, generics.ListAPIView):
+    """
+    GET /api/v1/portal/manager/bills/
+        ?project=<id>&month=YYYY-MM&status=Paid|Partial|Unpaid&building=<id>&search=<text>
+
+    Paginated, read-only list of the managed project's bills — see
+    PortalManagerBillSerializer for the (deliberately limited) fields.
+    """
+    serializer_class = PortalManagerBillSerializer
+
+    def get_queryset(self):
+        project = self.get_managed_project()
+        params = self.request.query_params
+
+        qs = (
+            Bill.objects.filter(project=project)
+            .select_related('unit', 'building')
+            .order_by('-billing_month', 'building__name', 'unit__floor_no', 'unit__unit_no')
+        )
+
+        month_start = self.parse_month(params.get('month'))
+        if month_start:
+            qs = qs.filter(billing_month__year=month_start.year, billing_month__month=month_start.month)
+
+        bill_status = params.get('status')
+        if bill_status:
+            if bill_status not in ('Paid', 'Partial', 'Unpaid'):
+                raise ValidationError('status must be Paid, Partial or Unpaid.')
+            qs = qs.filter(status=bill_status)
+
+        building = params.get('building')
+        if building:
+            qs = qs.filter(building_id=building)
+
+        search = params.get('search')
+        if search:
+            qs = qs.filter(Q(unit__unit_no__icontains=search) | Q(bill_number__icontains=search))
+
+        return qs
 
 
 # ── Payments ──────────────────────────────────────────────────────────────────
