@@ -16,9 +16,17 @@ from .bulk_import import (
     create_units_from_rows,
 )
 
+# UnitSerializer reads building.project.manager_unit (+ its building) for the
+# "project manager unit" fields on every row, so load that chain up front
+# instead of one extra query per unit.
+UNIT_RELATED = (
+    'building__project__manager_unit__building',
+    'package', 'allottee', 'meter',
+)
+
 
 class UnitListCreateView(generics.ListCreateAPIView):
-    queryset           = Unit.objects.all().select_related('building__project', 'package', 'allottee', 'meter')
+    queryset           = Unit.objects.all().select_related(*UNIT_RELATED)
     serializer_class   = UnitSerializer
     permission_classes = [IsAuthenticated, UnitPermission]
     filter_backends    = [DjangoFilterBackend, filters.SearchFilter]
@@ -27,7 +35,7 @@ class UnitListCreateView(generics.ListCreateAPIView):
 
 
 class UnitDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset           = Unit.objects.all().select_related('building__project', 'package', 'allottee', 'meter')
+    queryset           = Unit.objects.all().select_related(*UNIT_RELATED)
     serializer_class   = UnitSerializer
     permission_classes = [IsAuthenticated, UnitPermission]
 
