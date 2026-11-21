@@ -1,9 +1,11 @@
 from django.urls import path
 from . import views
+from .month_correction import MoveBillingMonthView
 
 urlpatterns = [
     path('',                    views.BillListCreateView.as_view()),
     path('bulk-create/',        views.BulkCreateBillsView.as_view()),
+    path('move-month/',         MoveBillingMonthView.as_view()),
     path('<int:pk>/',           views.BillDetailView.as_view()),
     path('<int:pk>/quick-edit/', views.BillQuickEditView.as_view()),
     path('summary/',            views.BillSummaryView.as_view()),

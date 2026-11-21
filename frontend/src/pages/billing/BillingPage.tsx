@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Table2, List, Download, Layers } from "lucide-react";
+import {
+  Plus,
+  Table2,
+  List,
+  Download,
+  Layers,
+  CalendarClock,
+} from "lucide-react";
 import { billingAPI, reportsAPI } from "@/api/client";
 import { PageLoader } from "@/components/ui";
 import { PaymentModal } from "@/components/payments/PaymentModal";
@@ -10,6 +17,7 @@ import toast from "react-hot-toast";
 
 import { CreateBillModal } from "./components/CreateBillModal";
 import { BulkCreateBillModal } from "./components/BulkCreateBillModal";
+import { MoveBillingMonthModal } from "./components/MoveBillingMonthModal";
 import { SpreadsheetBillingTable } from "./components/SpreadsheetBillingTable";
 import { BillsTable } from "./components/BillsTable";
 import { ExportBillsModal, type ExportFormat } from "./components/ExportBillsModal";
@@ -75,6 +83,7 @@ export default function BillingPage() {
   // Modals / transient UI stay in plain local state on purpose.
   const [createModal, setCreateModal] = useState(false);
   const [bulkModal, setBulkModal] = useState(false);
+  const [moveMonthModal, setMoveMonthModal] = useState(false);
   const [exportModal, setExportModal] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [payTarget, setPayTarget] = useState<any | null>(null);
@@ -133,21 +142,19 @@ export default function BillingPage() {
             <div className="flex gap-1 bg-surface-100 rounded-xl p-1 self-start">
               <button
                 onClick={() => setView("table")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  view === "table"
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${view === "table"
                     ? "bg-white shadow-sm text-surface-900"
                     : "text-surface-500"
-                }`}
+                  }`}
               >
                 <List className="w-3.5 h-3.5" /> Table
               </button>
               <button
                 onClick={() => setView("spreadsheet")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                  view === "spreadsheet"
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${view === "spreadsheet"
                     ? "bg-white shadow-sm text-surface-900"
                     : "text-surface-500"
-                }`}
+                  }`}
               >
                 <Table2 className="w-3.5 h-3.5" /> Spreadsheet
               </button>
@@ -161,6 +168,17 @@ export default function BillingPage() {
             <Download className="w-4 h-4" />
             Export
           </button>
+          {/* The backend only allows Super Admin; Admin sees the button
+              (same flag as the spreadsheet view) but gets a clear 403. */}
+          {can.editBillSpreadsheet && (
+            <button
+              className="btn-secondary w-full sm:w-auto justify-center"
+              onClick={() => setMoveMonthModal(true)}
+              title="Fix bills created under the wrong billing month (Super Admin)"
+            >
+              <CalendarClock className="w-4 h-4" /> Move Month
+            </button>
+          )}
           {can.createBill && (
             <button
               className="btn-secondary w-full sm:w-auto justify-center"
@@ -205,6 +223,10 @@ export default function BillingPage() {
       <BulkCreateBillModal
         open={bulkModal}
         onClose={() => setBulkModal(false)}
+      />
+      <MoveBillingMonthModal
+        open={moveMonthModal}
+        onClose={() => setMoveMonthModal(false)}
       />
       <ExportBillsModal
         open={exportModal}
