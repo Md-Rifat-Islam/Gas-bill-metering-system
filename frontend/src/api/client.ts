@@ -185,6 +185,8 @@ export const billingAPI = {
   // meter reading for the month, auto-filling rate from the package.
   bulkCreate: (data: { building_id: string | number; billing_month: string; percentage_rate?: number }) =>
     api.post('/billing/bulk-create/', data),
+  // Changing billing month after creating bills for that month.
+  moveMonth: (data: any) => api.post("/billing/move-month/", data),
   // Fetches the latest reading for a unit, if any, to pre-fill the "Previous Reading" field when creating a new bill.
   latestReading: (unitId: string | number) =>
     api.get(`/billing/latest-reading/${unitId}/`),
