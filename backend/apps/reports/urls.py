@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .insights import DashboardInsightsView, ReportInsightsView
 
 urlpatterns = [
     path('dashboard/',       views.DashboardSummaryView.as_view()),
@@ -12,4 +13,6 @@ urlpatterns = [
     path('export/building/<int:building_id>/', views.ExportBuildingExcelView.as_view(), name='export-building-excel'),
     path('export/bills/',    views.ExportBillsExcelView.as_view(), name='export-bills-excel'),
     path('export/payments/', views.ExportPaymentsExcelView.as_view(), name='export-payments-excel'),
+    path('insights/dashboard/', DashboardInsightsView.as_view()),
+    path('insights/reports/', ReportInsightsView.as_view()),
 ]
