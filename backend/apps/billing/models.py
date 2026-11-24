@@ -4,7 +4,7 @@ from decimal import Decimal
 from apps.units.models import Unit
 from apps.buildings.models import Building
 from apps.projects.models import Project
-
+from .cylinder_models import CylinderType, CylinderSupply  # noqa: E402,F401
 
 class Bill(models.Model):
     STATUS_UNPAID = 'Unpaid'

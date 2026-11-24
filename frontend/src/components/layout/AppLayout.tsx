@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
@@ -22,6 +22,7 @@ import {
   History,
   Database,
   MessageSquare,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/utils/helpers";
 import { useAuthStore } from "@/store/authStore";
@@ -48,6 +49,7 @@ export default function AppLayout() {
   const { user, clearAuth, refresh_token } = useAuthStore();
   const { can, isLoading } = usePermissions();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   // Single source of truth — matches backend PaymentWritePermission exactly,
   // instead of duplicating the role-string comparison here separately.
@@ -92,6 +94,10 @@ export default function AppLayout() {
   // of "/staff/dashboard". They still "worked" only because of the legacy
   // redirect routes added for old bookmarks, but every click was silently
   // taking an extra redirect hop. Now pointing directly at the real paths.
+  //
+  // `notActiveOn`: NavLink highlights by path prefix, so "Billing" would stay
+  // lit on /staff/billing/project-status too. Billing still highlights on its
+  // other sub-pages (e.g. a bill's detail page), just not on Project Status.
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/staff/dashboard", show: can.viewDashboard },
     { icon: Layers, label: "Projects", path: "/staff/projects", show: can.viewProjects },
@@ -99,7 +105,14 @@ export default function AppLayout() {
     { icon: Home, label: "Units", path: "/staff/units", show: can.viewBuildings },
     { icon: Gauge, label: "Meters", path: "/staff/meters", show: can.viewMeters },
     { icon: Flame, label: "Quick Reading", path: "/staff/meters/quick-reading", show: can.recordReading },
-    { icon: FileText, label: "Billing", path: "/staff/billing", show: can.viewBills },
+    {
+      icon: FileText,
+      label: "Billing",
+      path: "/staff/billing",
+      show: can.viewBills,
+      notActiveOn: "/staff/billing/project-status",
+    },
+    { icon: ClipboardList, label: "Project Status", path: "/staff/billing/project-status", show: can.viewBills },
     { icon: CreditCard, label: "Payments", path: "/staff/payments", show: can.viewPayments },
     {
       icon: Clock,
@@ -190,14 +203,17 @@ export default function AppLayout() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-0.5">
-          {navItems.map(({ icon: Icon, label, path, badge }) => (
+          {navItems.map(({ icon: Icon, label, path, badge, notActiveOn }) => (
             <NavLink
               key={path}
               to={path}
               onClick={handleNavClick}
               title={!open ? label : undefined}
               className={({ isActive }) =>
-                cn("sidebar-link relative", isActive && "active")
+                cn(
+                  "sidebar-link relative",
+                  isActive && !(notActiveOn && pathname.startsWith(notActiveOn)) && "active"
+                )
               }
             >
               <Icon className="w-[18px] h-[18px] shrink-0" />

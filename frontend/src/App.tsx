@@ -24,6 +24,7 @@ const UnitsPage = lazy(() => import("@/pages/units/UnitsPage"));
 const MetersPage = lazy(() => import("@/pages/meters/MetersPage"));
 const BillingPage = lazy(() => import("@/pages/billing/BillingPage"));
 const BillDetailPage = lazy(() => import("@/pages/billing/BillDetailPage"));
+const ProjectStatusPage = lazy(() => import("@/pages/billing/ProjectStatusPage"));
 const PaymentsPage = lazy(() => import("@/pages/payments/PaymentsPage"));
 const PendingPaymentsPage = lazy(() => import("@/pages/payments/PendingPaymentsPage"));
 const ReportsPage = lazy(() => import("@/pages/reports/ReportsPage"));
@@ -114,6 +115,9 @@ export default function App() {
         <Route path="units" element={page(<UnitsPage />)} />
         <Route path="meters" element={page(<MetersPage />)} />
         <Route path="billing" element={page(<BillingPage />)} />
+        {/* Static segment, so React Router ranks it above billing/:id below —
+            "project-status" is never mistaken for a bill id. */}
+        <Route path="billing/project-status" element={page(<ProjectStatusPage />)} />
         <Route path="billing/:id" element={page(<BillDetailPage />)} />
         <Route path="payments" element={page(<PaymentsPage />)} />
         <Route path="reports" element={page(<ReportsPage />)} />
