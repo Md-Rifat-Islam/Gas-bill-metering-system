@@ -1,321 +1,325 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import {
-  Download,
-  CalendarClock,
-  Package,
-  Gauge,
-  Flame,
-  Wallet,
-  AlertCircle,
-  FileText,
-  ArrowLeft,
-} from "lucide-react";
-import toast from "react-hot-toast";
-import { reportsAPI } from "@/api/client";
-import { projectStatusAPI } from "@/api/projectStatusClient";
-import { usePermissions } from "@/hooks/usePermissions";
-import { usePersistedState } from "@/hooks";
-import { PageLoader, EmptyState } from "@/components/ui";
-import { formatMonth } from "@/utils/helpers";
-import {
-  formatTaka,
-  pct,
-  rateTone,
-  SectionCard,
-  MetricCard,
-  ProgressRow,
-} from "@/components/dashboard/widgets";
+"""
+Project Status page backend.
 
-import {
-  BillingFilters,
-  EMPTY_BILLING_FILTERS,
-  type BillingFilterState,
-} from "./components/BillingFilters";
-import { ExportBillsModal, type ExportFormat } from "./components/ExportBillsModal";
-import { MoveBillingMonthModal } from "./components/MoveBillingMonthModal";
-import { CylinderTypesModal } from "./components/CylinderTypesModal";
-import { CylinderSupplyModal } from "./components/CylinderSupplyModal";
-import { buildBillingParams, buildExportParams } from "./billingParams";
+GET  /api/v1/billing/project-status/        per-project usage / paid / unpaid / cylinders
+GET  /api/v1/billing/cylinder-types/        list cylinder types
+POST /api/v1/billing/cylinder-types/        create a cylinder type
+PATCH/DELETE /api/v1/billing/cylinder-types/<id>/
+GET  /api/v1/billing/cylinder-supply/?project=<id>&month=YYYY-MM
+PUT  /api/v1/billing/cylinder-supply/       replace one project-month's cylinder lines
 
-const num = (v: any, digits = 2) =>
-  Number(v || 0).toLocaleString("en-BD", { maximumFractionDigits: digits });
+The summary accepts exactly the filters the Billing page sends (project,
+building, billing_month, status, min_amount, max_amount, search) and runs
+them through the same BillFilter, so a number here always matches what the
+Billing list shows for the same filters.
+"""
+from decimal import Decimal
 
-function currentMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
+from django.db import transaction
+from django.db.models import Count, DecimalField, Q, Sum, Value
+from django.db.models.functions import Coalesce
+from rest_framework import generics, serializers, status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-export default function ProjectStatusPage() {
-  const { can } = usePermissions();
+from apps.audit.utils import log_action
+from apps.projects.models import Project
+from core.permissions import BillPermission
 
-  // Same filter component and state shape as the Billing page, kept under
-  // its own sessionStorage key so the two pages don't overwrite each other.
-  const [filters, setFilters] = usePersistedState<BillingFilterState>(
-    "projectstatus:filters",
-    EMPTY_BILLING_FILTERS,
-  );
+from .cylinder_models import CylinderSupply, CylinderType
+from .filters import BillFilter
+from .models import Bill
+from .month_correction import _parse_month
 
-  const [exportModal, setExportModal] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [moveMonthModal, setMoveMonthModal] = useState(false);
-  const [typesModal, setTypesModal] = useState(false);
-  const [supplyProject, setSupplyProject] = useState<{ id: number; name: string } | null>(null);
+_ZERO = Value(Decimal('0'), output_field=DecimalField(max_digits=14, decimal_places=2))
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["project-status", filters],
-    queryFn: () =>
-      projectStatusAPI.status(buildBillingParams(filters)).then((r) => r.data),
-    placeholderData: keepPreviousData,
-  });
 
-  const handleExport = async (columns: string[], format: ExportFormat) => {
-    setExporting(true);
-    try {
-      // Exactly what the filters above select, same as the Billing page.
-      await reportsAPI.exportBills(buildExportParams(filters), { columns, format });
-      setExportModal(false);
-    } catch {
-      toast.error("Could not export bills");
-    } finally {
-      setExporting(false);
-    }
-  };
+def _sum(field, **kwargs):
+    return Coalesce(
+        Sum(field, **kwargs), _ZERO,
+        output_field=DecimalField(max_digits=14, decimal_places=4),
+    )
 
-  const totals = data?.totals;
-  const projects: any[] = data?.projects || [];
-  const comparable: boolean = !!data?.comparable;
-  const totalRate = totals ? pct(Number(totals.paid), Number(totals.billed)) : 0;
-  const supplyMonthLabel = data?.supply_month ? formatMonth(data.supply_month) : "all months";
 
-  return (
-    <div>
-      <div className="page-header flex-col items-stretch gap-3 lg:flex-row lg:items-center lg:gap-4">
-        <div>
-          <Link
-            to="/staff/billing"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-surface-400 hover:text-surface-600 mb-1"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" /> Billing
-          </Link>
-          <h1 className="page-title">Project Status</h1>
-          <p className="page-subtitle">
-            Gas usage, collection and cylinder supply by project
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full lg:w-auto">
-          <button
-            className="btn-secondary w-full sm:w-auto justify-center"
-            onClick={() => setExportModal(true)}
-            title="Export the bills behind these numbers to Excel or PDF"
-          >
-            <Download className="w-4 h-4" /> Export
-          </button>
-          {/* Backend allows Super Admin only; Admin sees it (same flag as
-              before) and gets a clear 403 message. */}
-          {can.editBillSpreadsheet && (
-            <button
-              className="btn-secondary w-full sm:w-auto justify-center"
-              onClick={() => setMoveMonthModal(true)}
-              title="Fix bills created under the wrong billing month (Super Admin)"
-            >
-              <CalendarClock className="w-4 h-4" /> Move Month
-            </button>
-          )}
-          <button
-            className="btn-secondary w-full sm:w-auto justify-center"
-            onClick={() => setTypesModal(true)}
-            title="Create and manage cylinder sizes"
-          >
-            <Package className="w-4 h-4" /> Cylinder Types
-          </button>
-        </div>
-      </div>
+# ── Project status summary ───────────────────────────────────────────────────
 
-      <BillingFilters filters={filters} onChange={setFilters} />
+class ProjectStatusView(APIView):
+    permission_classes = [IsAuthenticated, BillPermission]
 
-      {isLoading || !data ? (
-        <PageLoader />
-      ) : (
-        <>
-          {/* Totals for everything the filters select */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
-            <MetricCard
-              label="Usage (m³)"
-              value={`${num(totals.usage_m3)} m³`}
-              sub={`${totals.bills} bills · ${totals.units} units`}
-              icon={Gauge}
-              color="bg-brand-50"
-            />
-            <MetricCard
-              label="Usage (kg)"
-              value={`${num(totals.usage_kg)} kg`}
-              sub={`${totals.kg_bills} bills priced per kg`}
-              icon={Flame}
-              color="bg-warning-50"
-            />
-            <MetricCard
-              label="Paid"
-              value={formatTaka(totals.paid)}
-              sub={`${totalRate.toFixed(1)}% of ${formatTaka(totals.billed)} billed`}
-              icon={Wallet}
-              color="bg-success-50"
-            />
-            <MetricCard
-              label="Unpaid"
-              value={formatTaka(totals.due)}
-              sub={`${totals.unpaid_bills} unpaid · ${totals.partial_bills} partial`}
-              icon={AlertCircle}
-              color="bg-danger-50"
-            />
-            <MetricCard
-              label="Cylinders given"
-              value={num(totals.cylinder_count, 0)}
-              sub={`${num(totals.cylinder_kg)} kg · ${supplyMonthLabel}`}
-              icon={Package}
-              color="bg-purple-50"
-            />
-          </div>
+    def get(self, request):
+        params = request.query_params
 
-          {projects.length === 0 ? (
-            <div className="card">
-              <EmptyState
-                icon={FileText}
-                title="No projects found"
-                description="Projects appear here once they are created and active."
-              />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {projects.map((p) => {
-                const rate = pct(Number(p.paid), Number(p.billed));
-                const cyl = p.cylinders;
-                const supplied = Number(cyl.weight_kg);
-                const billedKg = Number(p.usage_kg);
-                const showCompare = comparable && cyl.count > 0 && billedKg > 0;
-                const diff = supplied - billedKg;
+        qs = BillFilter(params, queryset=Bill.objects.all()).qs
+        search = (params.get('search') or '').strip()
+        if search:
+            qs = qs.filter(
+                Q(bill_number__icontains=search)
+                | Q(unit__unit_no__icontains=search)
+                | Q(unit__allottee__name__icontains=search)
+                | Q(unit__mobile_number__icontains=search)
+            )
 
-                return (
-                  <SectionCard
-                    key={p.project_id}
-                    title={p.name}
-                    subtitle={`${p.bills} bills · ${p.units} units`}
-                    action={
-                      <button
-                        className="btn-secondary btn-sm shrink-0"
-                        onClick={() => setSupplyProject({ id: p.project_id, name: p.name })}
-                      >
-                        <Package className="w-3.5 h-3.5" /> Cylinders
-                      </button>
-                    }
-                  >
-                    <div className="grid grid-cols-2 gap-3 mb-5">
-                      <div className="bg-surface-50 rounded-xl p-3">
-                        <div className="text-xs text-surface-500">Usage (m³)</div>
-                        <div className="text-lg font-bold text-surface-900 mt-0.5">
-                          {num(p.usage_m3)}
-                        </div>
-                      </div>
-                      <div className="bg-surface-50 rounded-xl p-3">
-                        <div className="text-xs text-surface-500">Usage (kg)</div>
-                        <div className="text-lg font-bold text-surface-900 mt-0.5">
-                          {num(p.usage_kg)}
-                        </div>
-                        {p.kg_bills > 0 && (
-                          <div className="text-[11px] text-surface-400">
-                            {p.kg_bills} bills priced per kg
-                          </div>
-                        )}
-                      </div>
-                    </div>
+        rows = {
+            r['project_id']: r
+            for r in qs.values('project_id')
+            .annotate(
+                bills=Count('id'),
+                units=Count('unit_id', distinct=True),
+                usage_m3=_sum('total_usage_m3'),
+                usage_kg=_sum('total_usage_kg'),
+                kg_bills=Count('id', filter=Q(conversion_factor__isnull=False)),
+                billed=_sum('total_amount'),
+                paid=_sum('paid_amount'),
+                due=_sum('due_amount'),
+                paid_bills=Count('id', filter=Q(status=Bill.STATUS_PAID)),
+                partial_bills=Count('id', filter=Q(status=Bill.STATUS_PARTIAL)),
+                unpaid_bills=Count('id', filter=Q(status=Bill.STATUS_UNPAID)),
+            )
+            .order_by()
+        }
 
-                    <ProgressRow
-                      label="Collected"
-                      percent={rate}
-                      tone={p.bills > 0 ? rateTone(rate) : "brand"}
-                      right={`${rate.toFixed(0)}% of ${formatTaka(p.billed)}`}
-                    />
-                    <div className="grid grid-cols-2 gap-3 mt-3 mb-4">
-                      <div>
-                        <div className="text-xs text-surface-500">Paid</div>
-                        <div className="text-sm font-bold text-success-600">{formatTaka(p.paid)}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-surface-500">Unpaid</div>
-                        <div className="text-sm font-bold text-danger-600">{formatTaka(p.due)}</div>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mb-5">
-                      <span className="badge-green">{p.paid_bills} paid</span>
-                      <span className="badge-yellow">{p.partial_bills} partial</span>
-                      <span className="badge-red">{p.unpaid_bills} unpaid</span>
-                    </div>
+        # Every active project is listed (even with no bills in this filter)
+        # so cylinders can still be entered for it.
+        projects = Project.objects.filter(is_active=True)
+        project_param = params.get('project')
+        if project_param and str(project_param).isdigit():
+            projects = projects.filter(id=int(project_param))
+        projects = list(projects.order_by('name'))
 
-                    <div className="border-t border-surface-100 pt-4">
-                      <div className="flex items-baseline justify-between mb-2">
-                        <div className="text-sm font-semibold text-surface-700">
-                          Cylinders given
-                          <span className="text-xs font-normal text-surface-400 ml-2">
-                            {supplyMonthLabel}
-                          </span>
-                        </div>
-                        <div className="text-sm font-bold text-surface-900">
-                          {num(cyl.count, 0)} · {num(cyl.weight_kg)} kg
-                        </div>
-                      </div>
-                      {cyl.lines.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {cyl.lines.map((l: any) => (
-                            <span key={l.cylinder_type_id} className="badge-gray">
-                              {l.quantity} × {l.name}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-xs text-surface-400">
-                          No cylinders recorded
-                          {data.supply_month ? " for this month" : ""}.
-                        </div>
-                      )}
-                      {showCompare && (
-                        <div className="mt-3 text-xs bg-surface-50 rounded-xl p-3 text-surface-600">
-                          Supplied <strong>{num(supplied)} kg</strong> · billed{" "}
-                          <strong>{num(billedKg)} kg</strong> ·{" "}
-                          {diff >= 0 ? "not billed" : "billed above supply"}{" "}
-                          <strong className={diff >= 0 ? "text-warning-600" : "text-danger-600"}>
-                            {num(Math.abs(diff))} kg
-                            {supplied > 0 && ` (${Math.abs((diff / supplied) * 100).toFixed(1)}%)`}
-                          </strong>
-                        </div>
-                      )}
-                    </div>
-                  </SectionCard>
-                );
-              })}
-            </div>
-          )}
-        </>
-      )}
+        # Cylinders follow the month filter (all months when it is empty).
+        supply_month = _parse_month(params.get('billing_month'))
+        supply_qs = CylinderSupply.objects.filter(
+            project_id__in=[p.id for p in projects], quantity__gt=0,
+        ).select_related('cylinder_type')
+        if supply_month:
+            supply_qs = supply_qs.filter(month=supply_month)
 
-      <ExportBillsModal
-        open={exportModal}
-        onClose={() => setExportModal(false)}
-        exporting={exporting}
-        onExport={handleExport}
-      />
-      <MoveBillingMonthModal
-        open={moveMonthModal}
-        onClose={() => setMoveMonthModal(false)}
-      />
-      <CylinderTypesModal open={typesModal} onClose={() => setTypesModal(false)} />
-      <CylinderSupplyModal
-        open={!!supplyProject}
-        onClose={() => setSupplyProject(null)}
-        project={supplyProject}
-        defaultMonth={filters.month || currentMonth()}
-        canEdit={!!can.createBill}
-      />
-    </div>
-  );
-}
+        cylinders = {p.id: {'count': 0, 'weight_kg': Decimal('0'), 'lines': {}} for p in projects}
+        for s in supply_qs:
+            c = cylinders[s.project_id]
+            weight = s.cylinder_type.weight_kg * s.quantity
+            c['count'] += s.quantity
+            c['weight_kg'] += weight
+            line = c['lines'].setdefault(s.cylinder_type_id, {
+                'cylinder_type_id': s.cylinder_type_id,
+                'name': s.cylinder_type.name,
+                'weight_kg': s.cylinder_type.weight_kg,
+                'quantity': 0,
+            })
+            line['quantity'] += s.quantity
+
+        zero = Decimal('0')
+        out, totals = [], {
+            'bills': 0, 'units': 0, 'usage_m3': zero, 'usage_kg': zero, 'kg_bills': 0,
+            'billed': zero, 'paid': zero, 'due': zero,
+            'paid_bills': 0, 'partial_bills': 0, 'unpaid_bills': 0,
+            'cylinder_count': 0, 'cylinder_kg': zero,
+        }
+        for p in projects:
+            r = rows.get(p.id, {})
+            item = {
+                'project_id': p.id,
+                'name': p.name,
+                'bills': r.get('bills', 0),
+                'units': r.get('units', 0),
+                'usage_m3': r.get('usage_m3', zero),
+                'usage_kg': r.get('usage_kg', zero),
+                'kg_bills': r.get('kg_bills', 0),
+                'billed': r.get('billed', zero),
+                'paid': r.get('paid', zero),
+                'due': r.get('due', zero),
+                'paid_bills': r.get('paid_bills', 0),
+                'partial_bills': r.get('partial_bills', 0),
+                'unpaid_bills': r.get('unpaid_bills', 0),
+                'cylinders': {
+                    'count': cylinders[p.id]['count'],
+                    'weight_kg': cylinders[p.id]['weight_kg'],
+                    'lines': list(cylinders[p.id]['lines'].values()),
+                },
+            }
+            out.append(item)
+            for k in ('bills', 'units', 'usage_m3', 'usage_kg', 'kg_bills', 'billed', 'paid', 'due',
+                      'paid_bills', 'partial_bills', 'unpaid_bills'):
+                totals[k] += item[k]
+            totals['cylinder_count'] += item['cylinders']['count']
+            totals['cylinder_kg'] += item['cylinders']['weight_kg']
+
+        # Supplied-vs-billed kg only means something when nothing narrows the
+        # bills below "whole project, chosen month".
+        comparable = not any(
+            params.get(k) for k in ('building', 'status', 'min_amount', 'max_amount', 'search')
+        )
+
+        return Response({
+            'supply_month': supply_month.isoformat() if supply_month else None,
+            'comparable': comparable,
+            'totals': totals,
+            'projects': out,
+        })
+
+
+# ── Cylinder types ───────────────────────────────────────────────────────────
+
+class CylinderTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CylinderType
+        fields = ['id', 'name', 'weight_kg', 'is_active', 'created_at']
+        read_only_fields = ['id', 'created_at']
+        extra_kwargs = {'name': {'required': False, 'allow_blank': True}}
+
+    def validate_weight_kg(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('Weight must be greater than 0.')
+        return value
+
+    def validate(self, attrs):
+        if not self.instance and not attrs.get('name'):
+            attrs['name'] = f"{attrs['weight_kg'].normalize():f} kg cylinder"
+        return attrs
+
+
+class CylinderTypeListCreateView(generics.ListCreateAPIView):
+    queryset = CylinderType.objects.all().order_by('weight_kg', 'name')
+    serializer_class = CylinderTypeSerializer
+    permission_classes = [IsAuthenticated, BillPermission]
+    pagination_class = None
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        obj = serializer.save(created_by=self.request.user)
+        log_action(self.request.user, 'cylinder_types', obj.id, 'CREATE', None, serializer.data)
+
+
+class CylinderTypeDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = CylinderType.objects.all()
+    serializer_class = CylinderTypeSerializer
+    permission_classes = [IsAuthenticated, BillPermission]
+    http_method_names = ['get', 'patch', 'delete']
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        old = CylinderTypeSerializer(self.get_object()).data
+        obj = serializer.save()
+        log_action(self.request.user, 'cylinder_types', obj.id, 'UPDATE', old, serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        obj = self.get_object()
+        if obj.supplies.exists():
+            return Response(
+                {'detail': 'This cylinder type has supply records. Deactivate it instead of deleting.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        old = CylinderTypeSerializer(obj).data
+        log_action(request.user, 'cylinder_types', obj.id, 'DELETE', old, None)
+        return super().destroy(request, *args, **kwargs)
+
+
+# ── Cylinder supply (per project, per month) ─────────────────────────────────
+
+class CylinderSupplyView(APIView):
+    permission_classes = [IsAuthenticated, BillPermission]
+
+    @staticmethod
+    def _lines(project_id, month):
+        return [
+            {'cylinder_type_id': s.cylinder_type_id, 'quantity': s.quantity}
+            for s in CylinderSupply.objects.filter(project_id=project_id, month=month)
+            .select_related('cylinder_type')
+            .order_by('cylinder_type__weight_kg')
+        ]
+
+    def get(self, request):
+        project_id = request.query_params.get('project')
+        month = _parse_month(request.query_params.get('month'))
+        if not project_id or not str(project_id).isdigit() or not month:
+            return Response(
+                {'detail': 'project and month (YYYY-MM) are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({
+            'project_id': int(project_id),
+            'month': month.strftime('%Y-%m'),
+            'lines': self._lines(int(project_id), month),
+        })
+
+    @transaction.atomic
+    def put(self, request):
+        project_id = request.data.get('project_id')
+        month = _parse_month(request.data.get('month'))
+        raw_lines = request.data.get('lines')
+
+        if not project_id or not month or not isinstance(raw_lines, list):
+            return Response(
+                {'detail': 'project_id, month (YYYY-MM) and lines are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            project = Project.objects.get(id=project_id)
+        except (Project.DoesNotExist, ValueError, TypeError):
+            return Response({'detail': 'Project not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Pass 1: validate everything before touching the database.
+        wanted = {}
+        for item in raw_lines:
+            try:
+                type_id = int(item.get('cylinder_type_id'))
+                qty = int(item.get('quantity') or 0)
+            except (AttributeError, TypeError, ValueError):
+                return Response({'detail': 'Each line needs a cylinder type and a whole-number quantity.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            if qty < 0:
+                return Response({'detail': 'Quantity cannot be negative.'}, status=status.HTTP_400_BAD_REQUEST)
+            if type_id in wanted:
+                return Response({'detail': 'The same cylinder type appears twice — combine the quantities.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            wanted[type_id] = qty
+
+        types = {t.id: t for t in CylinderType.objects.filter(id__in=wanted)}
+        if len(types) != len(wanted):
+            return Response({'detail': 'Unknown cylinder type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        existing = {
+            s.cylinder_type_id: s
+            for s in CylinderSupply.objects.select_for_update().filter(project=project, month=month)
+        }
+        for type_id, qty in wanted.items():
+            if qty > 0 and type_id not in existing and not types[type_id].is_active:
+                return Response(
+                    {'detail': f'"{types[type_id].name}" is inactive and cannot be added to new supply.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        old_lines = {str(t): s.quantity for t, s in existing.items()}
+
+        # Pass 2: apply.
+        for type_id, qty in wanted.items():
+            row = existing.get(type_id)
+            if qty == 0:
+                if row:
+                    row.delete()
+            elif row:
+                if row.quantity != qty:
+                    row.quantity = qty
+                    row.save(update_fields=['quantity', 'updated_at'])
+            else:
+                CylinderSupply.objects.create(
+                    project=project, month=month, cylinder_type=types[type_id],
+                    quantity=qty, created_by=request.user,
+                )
+        for type_id, row in existing.items():
+            if type_id not in wanted:
+                row.delete()
+
+        new_lines = self._lines(project.id, month)
+        log_action(
+            request.user, 'cylinder_supply', project.id, 'UPDATE',
+            {'month': month.strftime('%Y-%m'), 'lines': old_lines},
+            {'month': month.strftime('%Y-%m'),
+             'lines': {str(l['cylinder_type_id']): l['quantity'] for l in new_lines}},
+        )
+        return Response({
+            'project_id': project.id,
+            'month': month.strftime('%Y-%m'),
+            'lines': new_lines,
+        })
